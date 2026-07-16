@@ -1,0 +1,19 @@
+---
+import EscortLayout from "../../layouts/EscortLayout.astro";
+import EscortSidebar from "../../components/escort/EscortSidebar";
+import EscortAuthGuard from "../../components/escort/EscortAuthGuard";
+import GaleriaManager from "../../components/escort/GaleriaManager";
+import AprobacionRequerida from "../../components/escort/AprobacionRequerida";
+---
+
+<EscortLayout title="Gestionar Fotos - CS Panel" activePage="fotos">
+  <EscortSidebar slot="sidebar" activePage="fotos" client:load />
+
+  <EscortAuthGuard client:load>
+    <div class="w-full max-w-full">
+      <AprobacionRequerida client:load>
+        <GaleriaManager client:load />
+      </AprobacionRequerida>
+    </div>
+  </EscortAuthGuard>
+</EscortLayout>

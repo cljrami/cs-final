@@ -1,0 +1,19 @@
+---
+import EscortLayout from "../../layouts/EscortLayout.astro";
+import EscortSidebar from "../../components/escort/EscortSidebar";
+import EscortAuthGuard from "../../components/escort/EscortAuthGuard";
+import HistorialPagos from "../../components/escort/HistorialPagos";
+import AprobacionRequerida from "../../components/escort/AprobacionRequerida";
+---
+
+<EscortLayout title="Historial de Pagos - CS Panel" activePage="pagos">
+  <EscortSidebar slot="sidebar" activePage="pagos" client:load />
+
+  <EscortAuthGuard client:load>
+    <div class="w-full max-w-full">
+      <AprobacionRequerida client:load>
+        <HistorialPagos client:load />
+      </AprobacionRequerida>
+    </div>
+  </EscortAuthGuard>
+</EscortLayout>

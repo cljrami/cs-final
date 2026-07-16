@@ -1,0 +1,12 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import Sidebar from "../../components/admin/Sidebar";
+import AuthGuard from "../../components/admin/AuthGuard";
+import ComentariosData from "../../components/admin/ComentariosData";
+---
+<AdminLayout title="Comentarios" activePage="comentarios">
+  <Sidebar slot="sidebar" activePage="comentarios" client:load />
+  <AuthGuard client:load>
+    <ComentariosData client:load />
+  </AuthGuard>
+</AdminLayout>

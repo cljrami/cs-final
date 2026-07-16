@@ -1,0 +1,15 @@
+---
+// src/pages/admin/idiomas.astro
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import Sidebar from "../../components/admin/Sidebar";
+import AuthGuard from "../../components/admin/AuthGuard";
+import IdiomasData from "../../components/admin/IdiomasData";
+---
+
+<AdminLayout title="Idiomas" activePage="idiomas">
+  <Sidebar slot="sidebar" activePage="idiomas" client:load />
+
+  <AuthGuard client:load>
+    <IdiomasData client:load />
+  </AuthGuard>
+</AdminLayout>

@@ -1,0 +1,14 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import Sidebar from "../../components/admin/Sidebar";
+import AuthGuard from "../../components/admin/AuthGuard";
+import VipActivos from "../../components/admin/VipActivos";
+---
+
+<AdminLayout title="VIP Activos" activePage="vip-activos">
+  <Sidebar slot="sidebar" activePage="vip-activos" client:load />
+
+  <AuthGuard client:load>
+    <VipActivos client:load />
+  </AuthGuard>
+</AdminLayout>

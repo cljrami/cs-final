@@ -1,0 +1,13 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import Sidebar from "../../components/admin/Sidebar";
+import AuthGuard from "../../components/admin/AuthGuard";
+import ColoresData from "../../components/admin/ColoresData";
+---
+
+<AdminLayout title="Colores" activePage="colores">
+  <Sidebar slot="sidebar" activePage="colores" client:load />
+  <AuthGuard client:load>
+    <ColoresData client:load />
+  </AuthGuard>
+</AdminLayout>

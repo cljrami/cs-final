@@ -1,0 +1,15 @@
+---
+// src/paggs/admin/Orientaciones.astro
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import Sidebar from "../../components/admin/Sidebar";
+import AuthGuard from "../../components/admin/AuthGuard";
+import OrientacionesData from "../../components/admin/OrientacionesData";
+---
+
+<AdminLayout title="Orientaciones Sexuales" activePage="orientaciones">
+  <Sidebar slot="sidebar" activePage="orientaciones" client:load />
+
+  <AuthGuard client:load>
+    <OrientacionesData client:load />
+  </AuthGuard>
+</AdminLayout>

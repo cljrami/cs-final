@@ -1,0 +1,116 @@
+---
+import "@fortawesome/fontawesome-free/css/all.min.css";
+import Sidebar from "../components/admin/Sidebar";
+import NotificationBell from "../components/admin/NotificationBell";
+
+interface Props {
+  title: string;
+  activePage?: string;
+}
+
+const { title, activePage = "dashboard" } = Astro.props;
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title} | Kimi Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="bg-admin-bg text-admin-text antialiased overflow-x-hidden">
+    <!-- Sidebar: siempre visible, hidratado como React -->
+    <Sidebar client:load activePage={activePage} />
+
+    <!-- Contenido principal con margen para el sidebar fijo -->
+    <main class="md:ml-[260px] min-h-screen flex flex-col">
+      <!-- Header sticky -->
+      <header
+        class="bg-admin-card border-b border-admin-border px-6 py-4 flex justify-between items-center sticky top-0 z-40 backdrop-blur-sm bg-opacity-95"
+      >
+        <div class="text-sm text-admin-muted flex items-center">
+          <i class="fas fa-shield-alt mr-2 text-red-500"></i>
+          <span>Admin</span>
+          <span class="mx-2 text-admin-border">›</span>
+          <span class="text-admin-text font-medium">{title}</span>
+        </div>
+        <div class="flex gap-3 items-center">
+          <NotificationBell client:load />
+          <a
+            href="/"
+            target="_blank"
+            class="bg-transparent border border-admin-border text-admin-muted w-10 h-10 rounded-lg hover:text-admin-text hover:border-admin-muted transition-all duration-200 flex items-center justify-center"
+            aria-label="Ver sitio"
+          >
+            <i class="fas fa-external-link-alt"></i>
+          </a>
+        </div>
+      </header>
+
+      <!-- Contenido de la página -->
+      <div class="p-4 sm:p-6 md:p-8 flex-1 w-full max-w-full">
+        <slot />
+      </div>
+    </main>
+  </body>
+</html>
+
+<style is:global>
+  @import "tailwindcss";
+
+  @theme {
+    --color-black: #000000;
+    --color-white: #ffffff;
+    --color-admin-bg: #0f0f1a;
+    --color-admin-card: #1a1a2e;
+    --color-admin-border: #2d2d44;
+    --color-admin-text: #ffffff;
+    --color-admin-muted: #9ca3af;
+    --color-admin-accent: #ef4444;
+  }
+
+  body {
+    font-family:
+      "Inter",
+      system-ui,
+      -apple-system,
+      sans-serif;
+    background-color: #0f0f1a;
+    color: #ffffff;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0f0f1a;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2d2d44;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3d3d5c;
+  }
+
+  /* Animación pulse para skeleton CSS fallback */
+  @keyframes pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.4;
+    }
+  }
+  .animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+</style>

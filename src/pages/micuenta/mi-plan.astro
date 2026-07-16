@@ -1,0 +1,19 @@
+---
+import EscortLayout from "../../layouts/EscortLayout.astro";
+import EscortSidebar from "../../components/escort/EscortSidebar";
+import EscortAuthGuard from "../../components/escort/EscortAuthGuard";
+import MiPlanComponent from "../../components/escort/MiPlan";
+import AprobacionRequerida from "../../components/escort/AprobacionRequerida";
+---
+
+<EscortLayout title="Mi Plan - CS Panel" activePage="mi-plan">
+  <EscortSidebar slot="sidebar" activePage="mi-plan" client:load />
+
+  <EscortAuthGuard client:load>
+    <div class="w-full max-w-full">
+      <AprobacionRequerida client:load>
+        <MiPlanComponent client:load />
+      </AprobacionRequerida>
+    </div>
+  </EscortAuthGuard>
+</EscortLayout>

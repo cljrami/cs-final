@@ -1,0 +1,19 @@
+---
+import EscortLayout from "../../layouts/EscortLayout.astro";
+import EscortSidebar from "../../components/escort/EscortSidebar";
+import EscortAuthGuard from "../../components/escort/EscortAuthGuard";
+import PerfilForm from "../../components/escort/PerfilForm";
+import AprobacionRequerida from "../../components/escort/AprobacionRequerida";
+---
+
+<EscortLayout title="Editar Perfil - CS Panel" activePage="perfil">
+  <EscortSidebar slot="sidebar" activePage="perfil" client:load />
+
+  <EscortAuthGuard client:load>
+    <div class="w-full max-w-full">
+      <AprobacionRequerida client:load>
+        <PerfilForm client:load />
+      </AprobacionRequerida>
+    </div>
+  </EscortAuthGuard>
+</EscortLayout>

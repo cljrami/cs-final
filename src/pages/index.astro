@@ -1,0 +1,477 @@
+---
+// src/pages/index.astro
+import Layout from '../layouts/Layout.astro';
+import CTASection from '../components/CTASection';
+---
+
+<Layout title="Inicio">
+  <main class="min-h-screen bg-[#0f0f1a]">
+    {/* Hero */}
+    <section class="relative overflow-hidden">
+      <div class="absolute inset-0 bg-gradient-to-b from-red-950/20 via-transparent to-transparent"></div>
+      <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-red-500/5 rounded-full blur-3xl"></div>
+      <div class="relative max-w-4xl mx-auto px-4 sm:px-6 pt-16 pb-10 text-center">
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium mb-6">
+          <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+          Perfiles verificados
+        </div>
+        <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 leading-tight">
+          Encuentra tu <span class="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-pink-400">Experiencia Perfecta</span>
+        </h1>
+        <p class="text-gray-500 text-sm md:text-base mb-8 max-w-xl mx-auto">Perfiles verificados y actualizados diariamente</p>
+
+        <form action="/buscar" method="GET" class="max-w-xl mx-auto">
+          <div class="flex items-center bg-[#1a1a2e] border border-white/10 rounded-xl px-4 py-3 focus-within:border-red-500/50 transition-all duration-300 shadow-lg shadow-black/20">
+            <i class="fas fa-search text-gray-500 mr-3"></i>
+            <input type="text" name="q" placeholder="Busca por ciudad, servicio, nombre..." class="flex-1 bg-transparent text-white text-sm outline-none placeholder-gray-600" />
+            <button type="submit" class="bg-red-500 hover:bg-red-600 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-all duration-200 flex items-center gap-2 shadow-lg shadow-red-500/20">
+              <i class="fas fa-search"></i>Buscar
+            </button>
+          </div>
+        </form>
+        <div class="flex items-center justify-center gap-6 mt-6 text-xs text-gray-600">
+          <span><i class="fas fa-check-circle text-green-500/50 mr-1"></i>Verificados</span>
+          <span><i class="fas fa-shield-alt text-blue-500/50 mr-1"></i>Seguro</span>
+          <span><i class="fas fa-clock text-yellow-500/50 mr-1"></i>Actualizados hoy</span>
+        </div>
+      </div>
+    </section>
+
+    {/* Ciudades */}
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-white font-bold text-lg flex items-center gap-2">
+          <i class="fas fa-map-marker-alt text-red-400"></i>Explora por Ciudad
+        </h2>
+        <span id="ciudades-total" class="text-gray-600 text-sm"></span>
+      </div>
+      <div id="ciudades-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+        <div class="col-span-full text-center py-8">
+          <i class="fas fa-spinner fa-spin text-red-500 text-xl"></i>
+        </div>
+      </div>
+    </section>
+
+    {/* Historias */}
+    <section id="historias-section" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-2 hidden">
+      <h2 class="text-white font-bold text-lg flex items-center gap-2 mb-4">
+        <i class="fas fa-circle-play text-red-500"></i>Historias
+      </h2>
+      <div id="historias-row" class="flex gap-4 overflow-x-auto pb-2 scrollbar-thin"></div>
+    </section>
+
+    {/* Visor de historias */}
+    <div id="historias-viewer" class="fixed inset-0 z-[200] bg-black/95 hidden items-center justify-center">
+      <button id="hv-close" class="absolute top-4 right-4 z-20 w-11 h-11 bg-white/10 hover:bg-white/20 rounded-full text-white text-xl">
+        <i class="fas fa-times"></i>
+      </button>
+      <button id="hv-prev" class="absolute left-2 sm:left-6 z-20 w-11 h-11 bg-white/10 hover:bg-white/20 rounded-full text-white">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+      <button id="hv-next" class="absolute right-2 sm:right-6 z-20 w-11 h-11 bg-white/10 hover:bg-white/20 rounded-full text-white">
+        <i class="fas fa-chevron-right"></i>
+      </button>
+      <div class="relative w-full max-w-sm h-full sm:h-[85vh] flex flex-col">
+        <div id="hv-bars" class="absolute top-3 left-3 right-3 z-20 flex gap-1"></div>
+        <a id="hv-header" href="#" class="absolute top-6 left-3 right-3 z-20 flex items-center gap-2">
+          <span id="hv-avatar" class="w-9 h-9 rounded-full bg-[#2a2a3e] overflow-hidden border border-white/20 shrink-0"></span>
+          <span id="hv-name" class="text-white text-sm font-semibold drop-shadow"></span>
+        </a>
+        <div id="hv-media" class="flex-1 flex items-center justify-center"></div>
+      </div>
+    </div>
+
+    {/* Destacadas */}
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-white font-bold text-lg flex items-center gap-2">
+          <i class="fas fa-fire text-red-500"></i>Escorts Destacadas
+        </h2>
+        <span id="destacadas-total" class="text-gray-600 text-sm">0 encontradas</span>
+      </div>
+
+      <div id="destacadas-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
+    </section>
+
+    {/* Escorts Recientes */}
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <h2 class="text-white font-bold text-lg flex items-center gap-2 mb-6">
+        <i class="fas fa-id-card text-red-500"></i>Escorts Recientes
+      </h2>
+      <div id="recientes-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
+    </section>
+
+    {/* CTA */}
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <CTASection client:load />
+    </section>
+
+    {/* Últimas */}
+    <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-white font-bold text-lg flex items-center gap-2">
+          <i class="fas fa-users text-gray-500"></i>Últimas Escorts
+        </h2>
+        <a href="/buscar" class="text-red-400 text-sm hover:text-red-300 transition-colors">Ver todas <i class="fas fa-arrow-right ml-1"></i></a>
+      </div>
+      
+      <div id="ultimas-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"></div>
+      
+      <div class="mt-8 text-center">
+        <button id="cargar-mas" class="bg-[#1a1a2e] hover:bg-red-500/10 text-white px-8 py-3 rounded-xl border border-white/10 hover:border-red-500/30 transition-all duration-200 text-sm font-medium hover:shadow-lg hover:shadow-red-500/5">
+          Cargar más escorts <i class="fas fa-chevron-down ml-1.5 text-[0.65rem]"></i>
+        </button>
+      </div>
+    </section>
+
+    <div class="h-16"></div>
+  </main>
+
+  <style>
+    .sk-card {
+      background: #1a1a2e;
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 0.75rem;
+      overflow: hidden;
+    }
+    .sk-shimmer {
+      position: relative;
+      background: linear-gradient(100deg, #1a1a2e 30%, #2a2a3e 50%, #1a1a2e 70%);
+      background-size: 200% 100%;
+      animation: sk-shimmer 1.4s infinite linear;
+    }
+    @keyframes sk-shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+  </style>
+
+  <script>
+    let page = 1;
+
+    // ─── Historias ──────────────────────────────────────────────
+    let historiasData: any[] = [];
+    let hvEscortIdx = 0;
+    let hvItemIdx = 0;
+    let hvTimer: any = null;
+
+    async function cargarHistorias() {
+      try {
+        const res = await fetch('/api/escorts/historias.php');
+        const data = await res.json();
+        if (!data.success || !data.data.length) return;
+
+        historiasData = data.data;
+        const section = document.getElementById('historias-section');
+        const row = document.getElementById('historias-row');
+        if (!section || !row) return;
+
+        row.innerHTML = '';
+        historiasData.forEach((esc: any, idx: number) => {
+          const item = document.createElement('button');
+          item.className = 'flex flex-col items-center gap-1.5 shrink-0 w-20 focus:outline-none';
+          const avatar = esc.foto_principal
+            ? `<img src="${esc.foto_principal}" alt="${esc.nombre}" class="w-full h-full object-cover" loading="lazy" onerror="this.style.display='none'" />`
+            : `<div class="w-full h-full flex items-center justify-center"><i class="fas fa-user text-gray-600 text-xl"></i></div>`;
+          item.innerHTML = `
+            <span class="w-16 h-16 rounded-full p-[2.5px] bg-gradient-to-tr from-red-500 via-pink-500 to-yellow-500">
+              <span class="block w-full h-full rounded-full overflow-hidden bg-[#1a1a2e] border-2 border-[#0f0f1a]">${avatar}</span>
+            </span>
+            <span class="text-gray-300 text-xs truncate w-full text-center">${esc.nombre}</span>
+          `;
+          item.addEventListener('click', () => abrirHistorias(idx));
+          row.appendChild(item);
+        });
+
+        section.classList.remove('hidden');
+      } catch (e) {
+        // silencioso
+      }
+    }
+
+    function abrirHistorias(escortIdx: number) {
+      hvEscortIdx = escortIdx;
+      hvItemIdx = 0;
+      const viewer = document.getElementById('historias-viewer');
+      if (!viewer) return;
+      viewer.classList.remove('hidden');
+      viewer.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+      mostrarHistoria();
+    }
+
+    function cerrarHistorias() {
+      const viewer = document.getElementById('historias-viewer');
+      if (!viewer) return;
+      viewer.classList.add('hidden');
+      viewer.classList.remove('flex');
+      document.body.style.overflow = '';
+      if (hvTimer) clearTimeout(hvTimer);
+      const media = document.getElementById('hv-media');
+      if (media) media.innerHTML = '';
+    }
+
+    function mostrarHistoria() {
+      const esc = historiasData[hvEscortIdx];
+      if (!esc) { cerrarHistorias(); return; }
+      const item = esc.historias[hvItemIdx];
+      if (!item) { cerrarHistorias(); return; }
+
+      const media = document.getElementById('hv-media');
+      const name = document.getElementById('hv-name');
+      const avatar = document.getElementById('hv-avatar');
+      const header = document.getElementById('hv-header') as HTMLAnchorElement | null;
+      const bars = document.getElementById('hv-bars');
+      if (!media || !name || !avatar || !bars) return;
+
+      name.textContent = esc.nombre;
+      avatar.innerHTML = esc.foto_principal ? `<img src="${esc.foto_principal}" class="w-full h-full object-cover" />` : '';
+      if (header) header.href = `/${esc.escort_id}`;
+
+      bars.innerHTML = esc.historias.map((_: any, i: number) =>
+        `<span class="flex-1 h-0.5 rounded-full ${i < hvItemIdx ? 'bg-white' : i === hvItemIdx ? 'bg-white/90' : 'bg-white/30'}"></span>`
+      ).join('');
+
+      if (hvTimer) clearTimeout(hvTimer);
+
+      if (item.tipo === 'video') {
+        media.innerHTML = `<video src="${item.url}" class="max-h-full max-w-full rounded-lg" autoplay playsinline controls></video>`;
+        const vid = media.querySelector('video');
+        if (vid) vid.addEventListener('ended', siguienteHistoria);
+      } else {
+        media.innerHTML = `<img src="${item.url}" class="max-h-full max-w-full rounded-lg object-contain" />`;
+        hvTimer = setTimeout(siguienteHistoria, 5000);
+      }
+    }
+
+    function siguienteHistoria() {
+      const esc = historiasData[hvEscortIdx];
+      if (!esc) return;
+      if (hvItemIdx < esc.historias.length - 1) {
+        hvItemIdx++;
+      } else if (hvEscortIdx < historiasData.length - 1) {
+        hvEscortIdx++;
+        hvItemIdx = 0;
+      } else {
+        cerrarHistorias();
+        return;
+      }
+      mostrarHistoria();
+    }
+
+    function anteriorHistoria() {
+      if (hvItemIdx > 0) {
+        hvItemIdx--;
+      } else if (hvEscortIdx > 0) {
+        hvEscortIdx--;
+        hvItemIdx = historiasData[hvEscortIdx].historias.length - 1;
+      } else {
+        return;
+      }
+      mostrarHistoria();
+    }
+
+    document.getElementById('hv-close')?.addEventListener('click', cerrarHistorias);
+    document.getElementById('hv-next')?.addEventListener('click', siguienteHistoria);
+    document.getElementById('hv-prev')?.addEventListener('click', anteriorHistoria);
+
+    // ─── Cards ──────────────────────────────────────────────────
+    function crearSkeletonCard(): HTMLDivElement {
+      const el = document.createElement('div');
+      el.className = 'sk-card';
+      el.innerHTML = `
+        <div class="sk-shimmer aspect-[3/4] w-full"></div>
+        <div class="p-2.5 space-y-2">
+          <div class="sk-shimmer h-3 w-2/3 rounded"></div>
+          <div class="sk-shimmer h-2.5 w-1/2 rounded"></div>
+        </div>
+      `;
+      return el;
+    }
+
+    function mostrarSkeletons(grid: HTMLElement | null, cantidad = 12) {
+      if (!grid) return;
+      grid.innerHTML = '';
+      for (let i = 0; i < cantidad; i++) grid.appendChild(crearSkeletonCard());
+    }
+
+    function crearCard(escort: any): HTMLAnchorElement {
+      const card = document.createElement('a');
+      card.href = `/${escort.id}`;
+      card.className = 'group block bg-[#1a1a2e] rounded-xl overflow-hidden border border-white/5 hover:border-red-500/30 hover:shadow-lg hover:shadow-red-500/5 transition-all duration-300 hover:-translate-y-1';
+
+      const img = escort.foto_principal
+        ? `<img src="${escort.foto_principal}" alt="${escort.nombre}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" onerror="this.style.display='none'" />`
+        : `<div class="w-full h-full flex items-center justify-center"><div class="w-20 h-20 rounded-full bg-[#2a2a3e] flex items-center justify-center"><i class="fas fa-user text-3xl text-gray-600"></i></div></div>`;
+
+      const badgesList: string[] = [];
+      if (Number(escort.vip) === 1) {
+        badgesList.push('<div class="absolute top-2 left-2 bg-amber-400 text-black text-[0.6rem] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-lg"><i class="fas fa-crown text-[0.5rem]"></i>VIP</div>');
+      }
+      if (Number(escort.verificado) === 1) {
+        badgesList.push('<div class="absolute top-2 right-2 bg-blue-500 text-white text-[0.6rem] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-lg"><i class="fas fa-check-circle text-[0.5rem]"></i>VERIF</div>');
+      }
+      const badge = badgesList.length
+        ? badgesList.join('')
+        : '';
+
+      const servicios = escort.servicios && escort.servicios.length
+        ? `<div class="flex items-center gap-1.5 mt-1.5">${escort.servicios.slice(0, 2).map((s: any) => `<span class="text-[0.55rem] px-1.5 py-0.5 rounded-full bg-white/5 text-gray-400 truncate">${s.icono ? `<i class="${s.icono} mr-0.5"></i>` : ''}${s.nombre}</span>`).join('')}${escort.servicios.length > 2 ? '<span class="text-[0.55rem] text-gray-600">+'+ (escort.servicios.length - 2) +'</span>' : ''}</div>`
+        : '';
+
+      card.innerHTML = `
+        <div class="relative aspect-[3/4] bg-gradient-to-b from-[#2a2a3e] to-[#1a1a2e] overflow-hidden">
+          ${img}${badge}
+          <div class="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#1a1a2e] to-transparent pointer-events-none"></div>
+          <div class="absolute bottom-2 left-2 right-2 flex items-end justify-between pointer-events-none">
+            <div class="flex items-center gap-1 text-white text-xs font-semibold drop-shadow">
+              <span>${escort.nombre}</span>
+            </div>
+            ${escort.likes > 0 ? `<div class="flex items-center gap-1 text-red-400 text-[0.6rem] drop-shadow"><i class="fas fa-heart"></i>${escort.likes}</div>` : ''}
+          </div>
+        </div>
+        <div class="p-2.5">
+          <div class="flex items-center justify-between text-xs">
+            <div class="flex items-center gap-1.5 text-gray-400">
+              <i class="fas fa-map-marker-alt text-[0.55rem]"></i>
+              <span>${escort.ciudad}</span>
+              <span class="text-gray-700">•</span>
+              <span class="text-gray-500">${escort.edad}</span>
+            </div>
+          </div>
+          ${servicios}
+        </div>
+      `;
+      return card;
+    }
+
+    function vacio(mensaje: string): string {
+      return `<div class="col-span-full text-center py-8 text-gray-500"><i class="fas fa-inbox text-3xl mb-3 opacity-30"></i><p>${mensaje}</p></div>`;
+    }
+
+    async function cargarDestacadas() {
+      const grid = document.getElementById('destacadas-grid');
+      const recientes = document.getElementById('recientes-grid');
+      const total = document.getElementById('destacadas-total');
+      mostrarSkeletons(grid, 12);
+      mostrarSkeletons(recientes, 12);
+      try {
+        const res = await fetch('/api/escorts/destacadas.php');
+        const data = await res.json();
+        if (!data.success) throw new Error('respuesta inválida');
+
+        if (total) total.textContent = `${data.total} encontradas`;
+
+        if (grid) {
+          grid.innerHTML = '';
+          if (data.data.length === 0) {
+            grid.innerHTML = vacio('No hay escorts destacadas');
+          } else {
+            data.data.forEach((e: any) => grid.appendChild(crearCard(e)));
+          }
+        }
+
+        if (recientes) {
+          recientes.innerHTML = '';
+          const orden = [...data.data].sort(
+            (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+          if (orden.length === 0) {
+            recientes.innerHTML = vacio('No hay escorts recientes');
+          } else {
+            orden.forEach((e: any) => recientes.appendChild(crearCard(e)));
+          }
+        }
+      } catch (e) {
+        if (grid) grid.innerHTML = vacio('No se pudieron cargar las escorts');
+        if (recientes) recientes.innerHTML = vacio('No se pudieron cargar las escorts');
+      }
+    }
+
+    async function cargarUltimas(pageNum = 1, append = false) {
+      const grid = document.getElementById('ultimas-grid');
+      if (!grid) return;
+      if (!append) mostrarSkeletons(grid, 12);
+      try {
+        const res = await fetch(`/api/escorts/listado.php?page=${pageNum}&limit=12`);
+        const data = await res.json();
+        if (!data.success) return;
+
+        if (!append) grid.innerHTML = '';
+
+        if (data.data.length === 0 && !append) {
+          grid.innerHTML = vacio('No hay escorts disponibles');
+          return;
+        }
+
+        data.data.forEach((escort: any, i: number) => {
+          const card = crearCard(escort);
+          card.style.opacity = '0';
+          card.style.transform = 'translateY(10px)';
+          card.style.transition = 'all 0.3s ease';
+          grid.appendChild(card);
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              card.style.opacity = '1';
+              card.style.transform = 'translateY(0)';
+            }, i * 30);
+          });
+        });
+
+        const btn = document.getElementById('cargar-mas');
+        if (btn && !data.pagination.has_more) btn.style.display = 'none';
+      } catch (e) {
+        if (!append) grid.innerHTML = vacio('No se pudieron cargar las escorts');
+      }
+    }
+
+    async function cargarCiudades() {
+      const grid = document.getElementById('ciudades-grid');
+      const total = document.getElementById('ciudades-total');
+      if (!grid) return;
+      try {
+        const res = await fetch('/api/ciudades/listado.php');
+        const data = await res.json();
+        if (!data.success || !data.data.length) { grid.innerHTML = ''; return; }
+        if (total) total.textContent = `${data.data.length} ciudades`;
+        grid.innerHTML = '';
+        data.data.forEach((c) => {
+          const card = document.createElement('a');
+          card.href = `/ciudad?nombre=${encodeURIComponent(c.nombre.toLowerCase())}`;
+          card.className = 'group relative bg-gradient-to-br from-[#1a1a2e] to-[#16162a] border border-white/5 hover:border-red-500/30 rounded-xl p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/5 overflow-hidden';
+          card.innerHTML = `
+            <div class="absolute top-0 right-0 w-24 h-24 bg-red-500/5 rounded-bl-full -mr-8 -mt-8 group-hover:bg-red-500/10 transition-all duration-300"></div>
+            <div class="relative">
+              <div class="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center mb-3 group-hover:bg-red-500/20 transition-all">
+                <i class="fas fa-city text-red-400 text-sm"></i>
+              </div>
+              <h3 class="text-white font-semibold text-sm capitalize group-hover:text-red-400 transition-colors">${c.nombre}</h3>
+              <p class="text-gray-500 text-xs mt-1">${c.region || ''}</p>
+              <div class="mt-2 flex items-center gap-1.5 text-xs text-gray-500">
+                <i class="fas fa-user"></i>
+                <span><strong class="text-gray-300">${c.escorts_activas}</strong> escort${c.escorts_activas !== 1 ? 's' : ''}</span>
+              </div>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+      } catch (e) { grid.innerHTML = ''; }
+    }
+
+    cargarHistorias();
+    cargarCiudades();
+    cargarDestacadas();
+    cargarUltimas(1, false);
+
+    document.getElementById('cargar-mas')?.addEventListener('click', (e) => {
+      const btn = e.currentTarget as HTMLButtonElement;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
+      page++;
+      cargarUltimas(page, true).finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = 'Cargar más escorts <i class="fas fa-chevron-down ml-1.5 text-[0.65rem]"></i>';
+      });
+    });
+  </script>
+</Layout>

@@ -1,0 +1,7 @@
+---
+import UserLayout from "../layouts/UserLayout.astro";
+import MisFavoritos from "../components/MisFavoritos";
+---
+<UserLayout title="Mis Favoritos" activePage="favoritos">
+  <MisFavoritos client:load />
+</UserLayout>

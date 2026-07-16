@@ -1,0 +1,16 @@
+---
+import EscortLayout from "../../layouts/EscortLayout.astro";
+import EscortSidebar from "../../components/escort/EscortSidebar";
+import EscortAuthGuard from "../../components/escort/EscortAuthGuard";
+import ResumenData from "../../components/escort/ResumenData";
+---
+
+<EscortLayout title="Resumen - CS Panel" activePage="resumen">
+  <EscortSidebar slot="sidebar" activePage="resumen" client:load />
+
+  <EscortAuthGuard client:load>
+    <div class="w-full max-w-full">
+      <ResumenData client:load />
+    </div>
+  </EscortAuthGuard>
+</EscortLayout>

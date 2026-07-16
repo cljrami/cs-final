@@ -1,0 +1,98 @@
+# ============================================
+# CORS — explicado como si tuvieras 5 años
+# ============================================
+#
+# ═══════════════════════════════════════════
+# REGLA 1: PREFLIGHT (el "¿puedo pasar?" del navegador)
+#
+# Cuando React le dice al navegador "oye, mandale
+# un fetch a esta API con un token secreto",
+# el navegador NO manda el pedido directo.
+# Primero manda un PREFLIGHT — un aviso:
+# "¿Señor servidor, aceptás pedidos con token?"
+#
+# Si el server no responde bien este aviso,
+# el navegador NUNCA manda el pedido real.
+# Es como pedir permiso a tus papás antes
+# de invitar un amigo — si no responden, no viene.
+#
+# ═══════════════════════════════════════════
+# REGLA 2: ACCESS-CONTROL-ALLOW-ORIGIN (el "quién puede entrar")
+#
+# El navegador NO deja que cualquier página web
+# le pegue a esta API. Solo deja pasar a las
+# páginas que el servidor autoriza.
+#
+# "Ah, venís de kimi.zona8.cl? Pasá nomás."
+# "Venís de localhost:4321? También, es dev."
+# "Venís de malware.ru? A la calle."
+#
+# ═══════════════════════════════════════════
+# REGLA 3: ALLOW-CREDENTIALS (el "podés mostrar tu DNI")
+#
+# Como usamos tokens (el "Bearer xyz..."), el
+# navegador necesita permiso extra del server
+# para mandar esa info. Sin esta regla, el token
+# se queda en casa.
+#
+# ═══════════════════════════════════════════
+# REGLA 4: ALLOW-HEADERS (el "qué cosas podés traer")
+#
+# "Podés traer Content-Type? Sí."
+# "Podés traer Authorization? También."
+# Cualquier otro header que no esté en esta
+# lista el navegador lo bloquea.
+#
+# ═══════════════════════════════════════════
+# REGLA 5: EXPOSE-HEADERS (el "mirá lo que te traje")
+#
+# La API a veces manda headers raros además
+# del JSON (como X-RateLimit). Sin esto, React
+# no los puede ver.
+#
+# ============================================
+# ╔══════════════════════════════════════════╗
+# ║          IMPLEMENTACIÓN                  ║
+# ╚══════════════════════════════════════════╝
+
+# --- Paso 1: ¿De qué origen viene el request? ---
+# Agarro el origen que el navegador mandó.
+# Si viene de nuestros dominios, lo guardo.
+SetEnvIf Origin "^(https?://(kimi\.zona8\.cl|localhost(:[0-9]+)?))$" ALLOWED_ORIGIN=$1
+
+# --- Paso 2: Si el origen es válido, decile que sí ---
+# Esto le dice al navegador: "el que preguntó puede pasar"
+Header always set Access-Control-Allow-Origin "%{ALLOWED_ORIGIN}e" env=ALLOWED_ORIGIN
+
+# --- Paso 3: Permití que el browser mande tokens ---
+# Sin esto, el Authorization header nunca llega a PHP
+Header always set Access-Control-Allow-Credentials "true"
+
+# --- Paso 4: Métodos permitidos ---
+Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+
+# --- Paso 5: Headers que React necesita mandar ---
+Header always set Access-Control-Allow-Headers "Content-Type, Authorization"
+
+# --- Paso 6: Headers que React necesita LEER ---
+Header always set Access-Control-Expose-Headers "X-RateLimit-Limit, X-RateLimit-Remaining"
+
+# --- Paso 7: Avísale a los cache que el origen importa ---
+Header always set Vary "Origin"
+
+# --- Paso 8: PREFLIGHT — responder altiro, sin molestar a PHP ---
+# Cuando el navegador manda OPTIONS (el "¿puedo?"),
+# le respondemos 204 ("sí, dale") y cortamos.
+# Así PHP ni se entera, el request ni entra a los .php
+RewriteEngine On
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteRule ^(.*)$ $1 [R=204,L]
+
+# ============================================
+# SEGURIDAD (lo que ya había)
+# ============================================
+<FilesMatch "^\.env$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+Options -Indexes

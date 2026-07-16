@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colores base que faltan en v4 */
+  --color-black: #000000;
+  --color-white: #ffffff;
+  
+  /* Tus colores admin personalizados */
+  --color-admin-bg: #0f0f1a;
+  --color-admin-card: #1e1e2d;
+  --color-admin-border: #2d2d44;
+  --color-admin-text: #ffffff;
+  --color-admin-muted: #9ca3af;
+  --color-admin-accent: #ef4444;
+}

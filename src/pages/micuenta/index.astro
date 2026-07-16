@@ -1,0 +1,13 @@
+---
+// src/pages/micuenta/index.astro
+// Redirige según estado de autenticación
+---
+
+<script>
+  const token = localStorage.getItem("escort_token");
+  if (!token) {
+    window.location.href = "/micuenta/login";
+  } else {
+    window.location.href = "/micuenta/resumen";
+  }
+</script>

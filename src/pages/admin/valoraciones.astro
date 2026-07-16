@@ -1,0 +1,12 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import Sidebar from '../../components/admin/Sidebar';
+import AuthGuard from '../../components/admin/AuthGuard';
+import ValoracionesData from '../../components/admin/ValoracionesData';
+---
+<AdminLayout title="Valoraciones" activePage="valoraciones">
+  <Sidebar slot="sidebar" activePage="valoraciones" client:load />
+  <AuthGuard client:load>
+    <ValoracionesData client:load />
+  </AuthGuard>
+</AdminLayout>

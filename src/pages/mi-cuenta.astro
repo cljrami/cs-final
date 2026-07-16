@@ -1,0 +1,113 @@
+---
+import UserLayout from "../layouts/UserLayout.astro";
+---
+<UserLayout title="Panel" activePage="dashboard">
+  <div id="loading" class="text-center py-16">
+    <i class="fas fa-spinner fa-spin text-red-500 text-2xl"></i>
+    <p class="text-gray-500 text-sm mt-3">Cargando...</p>
+  </div>
+
+  <div id="dashboard" class="hidden">
+    <div class="flex items-center gap-4 mb-8">
+      <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center text-2xl shadow-lg shadow-red-500/20">
+        <i class="fas fa-user text-white"></i>
+      </div>
+      <div>
+        <h1 class="text-2xl font-bold text-white" id="userName"></h1>
+        <p class="text-gray-500 text-sm" id="userEmail"></p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+      <a href="/mis-favoritos" class="group bg-[#1a1a2e] border border-white/5 hover:border-red-500/30 rounded-xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-red-500/5">
+        <div class="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center mb-4 group-hover:bg-red-500/20 transition-all">
+          <i class="fas fa-heart text-red-400 text-lg"></i>
+        </div>
+        <h3 class="text-white font-semibold mb-1">Mis Favoritos</h3>
+        <p class="text-gray-500 text-sm">Escorts que has guardado</p>
+        <div class="mt-3 flex items-center gap-2 text-sm">
+          <span class="text-gray-400"><span id="favCount" class="text-red-400 font-semibold">0</span> escorts</span>
+          <i class="fas fa-arrow-right text-red-400/50 group-hover:text-red-400 transition-all ml-auto"></i>
+        </div>
+      </a>
+
+      <a href="/mi-perfil" class="group bg-[#1a1a2e] border border-white/5 hover:border-blue-500/30 rounded-xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-blue-500/5">
+        <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-4 group-hover:bg-blue-500/20 transition-all">
+          <i class="fas fa-user-edit text-blue-400 text-lg"></i>
+        </div>
+        <h3 class="text-white font-semibold mb-1">Mi Perfil</h3>
+        <p class="text-gray-500 text-sm">Edita tus datos personales</p>
+        <i class="fas fa-arrow-right text-blue-400/50 group-hover:text-blue-400 transition-all mt-3 block"></i>
+      </a>
+
+      <a href="/mis-valoraciones" class="group bg-[#1a1a2e] border border-white/5 hover:border-amber-500/30 rounded-xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-amber-500/5">
+        <div class="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center mb-4 group-hover:bg-amber-500/20 transition-all">
+          <i class="fas fa-star text-amber-400 text-lg"></i>
+        </div>
+        <h3 class="text-white font-semibold mb-1">Mis Valoraciones</h3>
+        <p class="text-gray-500 text-sm">Opiniones que has dejado</p>
+        <div class="mt-3 flex items-center gap-2 text-sm">
+          <span class="text-gray-400"><span id="valCount" class="text-amber-400 font-semibold">0</span> valoraciones</span>
+          <i class="fas fa-arrow-right text-amber-400/50 group-hover:text-amber-400 transition-all ml-auto"></i>
+        </div>
+      </a>
+    </div>
+
+    <div class="bg-[#1a1a2e] border border-white/5 rounded-xl p-6">
+      <h3 class="text-white font-semibold mb-4">Actividad reciente</h3>
+      <div id="recentActivity" class="text-gray-500 text-sm">
+        <p class="py-4 text-center"><i class="fas fa-inbox opacity-30 mr-2"></i>No hay actividad reciente</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="notLoggedIn" class="hidden text-center py-16">
+    <i class="fas fa-user-lock text-4xl text-gray-600 mb-4"></i>
+    <p class="text-gray-500 mb-4">Debes iniciar sesión para ver esta página</p>
+    <a href="/ingresar" class="inline-flex items-center gap-2 px-6 py-3 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition-all">Iniciar Sesión</a>
+  </div>
+</UserLayout>
+
+<script is:inline>
+(function() {
+  const token = localStorage.getItem('usuario_token');
+  const userDataRaw = localStorage.getItem('usuario_data');
+  const loading = document.getElementById('loading');
+  const dashboard = document.getElementById('dashboard');
+  const notLoggedIn = document.getElementById('notLoggedIn');
+
+  if (!token || !userDataRaw) {
+    loading.classList.add('hidden');
+    notLoggedIn.classList.remove('hidden');
+    return;
+  }
+
+  const user = JSON.parse(userDataRaw);
+  document.getElementById('userName').textContent = user.nombre || 'Usuario';
+  document.getElementById('userEmail').textContent = user.email || '';
+
+  fetch('/api/usuarios/favoritos.php', {
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      document.getElementById('favCount').textContent = data.favoritos ? data.favoritos.length : 0;
+    }
+  })
+  .catch(() => {});
+
+  const userId = user.id;
+  fetch('/api/escorts/valorar.php?usuario_id=' + userId)
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      document.getElementById('valCount').textContent = data.valoraciones ? data.valoraciones.length : 0;
+    }
+  })
+  .catch(() => {});
+
+  loading.classList.add('hidden');
+  dashboard.classList.remove('hidden');
+})();
+</script>

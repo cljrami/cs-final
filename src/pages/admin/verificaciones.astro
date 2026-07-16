@@ -1,0 +1,14 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import Sidebar from "../../components/admin/Sidebar";
+import AuthGuard from "../../components/admin/AuthGuard";
+import VerificacionesData from "../../components/admin/VerificacionesData";
+---
+
+<AdminLayout title="Verificaciones" activePage="verificaciones">
+  <Sidebar slot="sidebar" activePage="verificaciones" client:load />
+
+  <AuthGuard client:only="react">
+    <VerificacionesData client:only="react" />
+  </AuthGuard>
+</AdminLayout>

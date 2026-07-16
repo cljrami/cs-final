@@ -1,0 +1,12 @@
+---
+import EscortLayout from "../../layouts/EscortLayout.astro";
+import SolicitarVip from "../../components/escort/SolicitarVip";
+import AprobacionRequerida from "../../components/escort/AprobacionRequerida";
+
+---
+
+<EscortLayout title="Solicitar VIP" activePage="vip">
+  <AprobacionRequerida client:load>
+    <SolicitarVip client:only="react" />
+  </AprobacionRequerida>
+</EscortLayout>

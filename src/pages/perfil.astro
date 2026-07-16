@@ -1,0 +1,10 @@
+---
+// src/pages/perfil.astro
+// URL accesible: /perfil?id=30 y /30 (gracias al rewrite de Apache)
+import Layout from "../layouts/Layout.astro";
+import PerfilPublico from "../components/escort/PerfilPublico";
+---
+
+<Layout title="Cargando perfil...">
+  <PerfilPublico client:load />
+</Layout>

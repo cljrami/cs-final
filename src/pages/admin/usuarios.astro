@@ -1,0 +1,12 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import Sidebar from "../../components/admin/Sidebar";
+import AuthGuard from "../../components/admin/AuthGuard";
+import UsuariosData from "../../components/admin/UsuariosData";
+---
+<AdminLayout title="Usuarios" activePage="usuarios">
+  <Sidebar slot="sidebar" activePage="usuarios" client:load />
+  <AuthGuard client:load>
+    <UsuariosData client:load />
+  </AuthGuard>
+</AdminLayout>

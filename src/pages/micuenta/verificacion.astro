@@ -1,0 +1,14 @@
+---
+// src/pages/micuenta/verificacion.astro
+import EscortLayout from '../../layouts/EscortLayout.astro';
+import VerificacionPanel from '../../components/escort/VerificacionPanel';
+import AprobacionRequerida from '../../components/escort/AprobacionRequerida';
+
+const activePage = 'verificacion';
+---
+
+<EscortLayout title="Verificaci��n" activePage={activePage}>
+  <AprobacionRequerida client:load>
+    <VerificacionPanel client:load />
+  </AprobacionRequerida>
+</EscortLayout>

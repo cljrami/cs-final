@@ -1,0 +1,14 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import Sidebar from "../../components/admin/Sidebar";
+import AuthGuard from "../../components/admin/AuthGuard";
+import PagosData from "../../components/admin/PagosData";
+---
+
+<AdminLayout title="Pagos" activePage="pagos">
+  <Sidebar slot="sidebar" activePage="pagos" client:load />
+
+  <AuthGuard client:load>
+    <PagosData client:load />
+  </AuthGuard>
+</AdminLayout>

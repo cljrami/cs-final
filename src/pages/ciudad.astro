@@ -1,0 +1,127 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="Escorts por Ciudad">
+  <main class="min-h-screen bg-[#0f0f1a]">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <nav class="flex items-center gap-3 mb-8">
+        <a href="/" class="text-gray-500 hover:text-white text-sm transition-colors"><i class="fas fa-arrow-left mr-1"></i>Inicio</a>
+        <span class="text-gray-700 text-sm">/</span>
+        <span class="text-gray-400 text-sm capitalize" id="ciudad-nombre"></span>
+      </nav>
+      <div class="mb-8">
+        <h1 class="text-2xl md:text-3xl font-bold text-white flex items-center gap-3">
+          <i class="fas fa-map-marker-alt text-red-400"></i>
+          Escorts en <span class="text-red-400 capitalize" id="ciudad-titulo"></span>
+        </h1>
+        <p id="ciudad-total" class="text-gray-500 text-sm mt-2">Cargando...</p>
+      </div>
+      <div id="escorts-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        <div class="col-span-full text-center py-16">
+          <i class="fas fa-spinner fa-spin text-red-500 text-2xl"></i>
+          <p class="text-gray-500 text-sm mt-3">Buscando escorts en esta ciudad...</p>
+        </div>
+      </div>
+      <div class="mt-8 text-center">
+        <button id="cargar-mas" class="bg-[#1a1a2e] hover:bg-red-500/10 text-white px-8 py-3 rounded-xl border border-white/10 hover:border-red-500/30 transition-all duration-200 text-sm font-medium hidden">
+          Cargar m&aacute;s <i class="fas fa-chevron-down ml-1.5 text-[0.65rem]"></i>
+        </button>
+      </div>
+    </div>
+    <div class="h-16"></div>
+  </main>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const ciudad = params.get('nombre') || '';
+    if (!ciudad) {
+      document.getElementById('escorts-grid').innerHTML = '<div class="col-span-full text-center py-16 text-gray-500"><i class="fas fa-exclamation-triangle text-4xl mb-3 opacity-30"></i><p>Ciudad no especificada</p></div>';
+    } else {
+      document.getElementById('ciudad-nombre').textContent = ciudad;
+      document.getElementById('ciudad-titulo').textContent = ciudad;
+    }
+    let page = 1;
+    function crearCard(escort) {
+      const card = document.createElement('a');
+      card.href = `/${escort.id}`;
+      card.className = 'group block bg-[#1a1a2e] rounded-xl overflow-hidden border border-white/5 hover:border-red-500/30 hover:shadow-lg hover:shadow-red-500/5 transition-all duration-300 hover:-translate-y-1';
+      const img = escort.foto_principal
+        ? `<img src="${escort.foto_principal}" alt="${escort.nombre}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" onerror="this.style.display='none'" />`
+        : `<div class="w-full h-full flex items-center justify-center"><div class="w-20 h-20 rounded-full bg-[#2a2a3e] flex items-center justify-center"><i class="fas fa-user text-3xl text-gray-600"></i></div></div>`;
+      const badge = escort.vip === 1
+        ? '<div class="absolute top-2 left-2 bg-gradient-to-r from-yellow-400 to-yellow-500 text-black text-[0.6rem] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-lg"><i class="fas fa-crown text-[0.5rem]"></i>VIP</div>'
+        : escort.verificado === 1
+          ? '<div class="absolute top-2 left-2 bg-blue-500 text-white text-[0.6rem] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-lg"><i class="fas fa-check-circle text-[0.5rem]"></i>VERIF</div>'
+          : '';
+      card.innerHTML = `
+        <div class="relative aspect-[3/4] bg-gradient-to-b from-[#2a2a3e] to-[#1a1a2e] overflow-hidden">
+          ${img}${badge}
+          <div class="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#1a1a2e] to-transparent pointer-events-none"></div>
+          <div class="absolute bottom-2 left-2 right-2 flex items-end justify-between pointer-events-none">
+            <div class="flex items-center gap-1 text-white text-xs font-semibold drop-shadow">
+              <span>${escort.nombre}</span>
+            </div>
+            ${escort.likes > 0 ? `<div class="flex items-center gap-1 text-red-400 text-[0.6rem] drop-shadow"><i class="fas fa-heart"></i>${escort.likes}</div>` : ''}
+          </div>
+        </div>
+        <div class="p-2.5">
+          <div class="flex items-center justify-between text-xs">
+            <div class="flex items-center gap-1.5 text-gray-400">
+              <i class="fas fa-map-marker-alt text-[0.55rem]"></i>
+              <span>${escort.ciudad}</span>
+              <span class="text-gray-700">&bull;</span>
+              <span class="text-gray-500">${escort.edad}</span>
+            </div>
+          </div>
+        </div>
+      `;
+      return card;
+    }
+    async function cargarEscorts(pageNum, append) {
+      if (!ciudad) return;
+      const grid = document.getElementById('escorts-grid');
+      const total = document.getElementById('ciudad-total');
+      const btn = document.getElementById('cargar-mas');
+      if (!grid) return;
+      try {
+        const res = await fetch(`/api/escorts/por-ciudad.php?ciudad=${encodeURIComponent(ciudad)}&page=${pageNum}`);
+        const data = await res.json();
+        if (!data.success) throw new Error('Error');
+        if (total) total.textContent = `${data.total} escort${data.total !== 1 ? 's' : ''} encontrada${data.total !== 1 ? 's' : ''}`;
+        if (!append) grid.innerHTML = '';
+        if (data.data.length === 0 && !append) {
+          grid.innerHTML = '<div class="col-span-full text-center py-16 text-gray-500"><i class="fas fa-inbox text-4xl mb-3 opacity-30"></i><p>No hay escorts en esta ciudad</p></div>';
+          if (btn) btn.style.display = 'none';
+          return;
+        }
+        data.data.forEach((escort, i) => {
+          const card = crearCard(escort);
+          card.style.opacity = '0';
+          card.style.transform = 'translateY(10px)';
+          card.style.transition = 'all 0.3s ease';
+          grid.appendChild(card);
+          requestAnimationFrame(() => {
+            setTimeout(() => {
+              card.style.opacity = '1';
+              card.style.transform = 'translateY(0)';
+            }, i * 30);
+          });
+        });
+        if (btn) btn.style.display = data.has_more ? 'inline-flex' : 'none';
+      } catch (e) {
+        if (!append) grid.innerHTML = '<div class="col-span-full text-center py-16 text-gray-500"><i class="fas fa-exclamation-triangle text-4xl mb-3 opacity-30"></i><p>Error al cargar escorts</p></div>';
+        if (total) total.textContent = 'Error al cargar';
+      }
+    }
+    cargarEscorts(1, false);
+    document.getElementById('cargar-mas')?.addEventListener('click', (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando...';
+      page++;
+      cargarEscorts(page, true).finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = 'Cargar m&aacute;s <i class="fas fa-chevron-down ml-1.5 text-[0.65rem]"></i>';
+      });
+    });
+  </script>
+</Layout>

@@ -1,0 +1,14 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import Sidebar from "../../components/admin/Sidebar";
+import AuthGuard from "../../components/admin/AuthGuard";
+import SuscripcionesEscort from "../../components/admin/SuscripcionesData";
+---
+
+<AdminLayout title="Suscripciones" activePage="suscripciones">
+  <Sidebar slot="sidebar" activePage="suscripciones" client:load />
+
+  <AuthGuard client:load>
+    <SuscripcionesEscort client:load />
+  </AuthGuard>
+</AdminLayout>

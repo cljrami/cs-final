@@ -1,0 +1,14 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import Sidebar from "../../components/admin/Sidebar";
+import AuthGuard from "../../components/admin/AuthGuard";
+import NacionalidadesData from "../../components/admin/NacionalidadesData";
+---
+
+<AdminLayout title="Nacionalidades" activePage="nacionalidades">
+  <Sidebar slot="sidebar" activePage="nacionalidades" client:load />
+
+  <AuthGuard client:load>
+    <NacionalidadesData client:load />
+  </AuthGuard>
+</AdminLayout>

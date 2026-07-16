@@ -1,0 +1,153 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+<Layout title="Crear cuenta" showNavFooter={false}>
+  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f0f1a] to-[#1a1a2e]">
+    <div class="w-full max-w-md mx-4 bg-admin-card rounded-2xl p-8 md:p-10">
+      <div class="text-center mb-8">
+        <div class="w-16 h-16 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4">
+          <i class="fas fa-user-plus text-white"></i>
+        </div>
+        <h1 class="text-2xl font-bold mb-2 text-white">Crear cuenta</h1>
+        <p class="text-admin-muted text-sm">Regístrate para guardar favoritos y valorar</p>
+      </div>
+
+      <form id="registerForm" class="space-y-5">
+        <div>
+          <label class="block text-sm text-admin-muted mb-2"><i class="fas fa-user mr-2"></i>Nombre</label>
+          <div class="flex items-center bg-[#0f0f1a] rounded-xl px-4 focus-within:bg-[#2a2a3e] transition-colors">
+            <i class="fas fa-user text-gray-500"></i>
+            <input type="text" id="nombre" class="flex-1 bg-transparent border-none text-white px-4 py-3 outline-none" placeholder="Tu nombre" required />
+          </div>
+          <p id="nombreError" class="text-red-500 text-xs mt-1 hidden"></p>
+        </div>
+
+        <div>
+          <label class="block text-sm text-admin-muted mb-2"><i class="fas fa-envelope mr-2"></i>Email</label>
+          <div class="flex items-center bg-[#0f0f1a] rounded-xl px-4 focus-within:bg-[#2a2a3e] transition-colors">
+            <i class="fas fa-envelope text-gray-500"></i>
+            <input type="email" id="email" class="flex-1 bg-transparent border-none text-white px-4 py-3 outline-none" placeholder="tu@email.com" required />
+          </div>
+          <p id="emailError" class="text-red-500 text-xs mt-1 hidden"></p>
+        </div>
+
+        <div>
+          <label class="block text-sm text-admin-muted mb-2"><i class="fas fa-lock mr-2"></i>Contraseña</label>
+          <div class="flex items-center bg-[#0f0f1a] rounded-xl px-4 focus-within:bg-[#2a2a3e] transition-colors">
+            <i class="fas fa-lock text-gray-500"></i>
+            <input type="password" id="password" class="flex-1 bg-transparent border-none text-white px-4 py-3 outline-none" placeholder="Mínimo 8 caracteres" required />
+          </div>
+          <p id="passwordError" class="text-red-500 text-xs mt-1 hidden"></p>
+        </div>
+
+        <div>
+          <label class="block text-sm text-admin-muted mb-2"><i class="fas fa-check-circle mr-2"></i>Confirmar contraseña</label>
+          <div class="flex items-center bg-[#0f0f1a] rounded-xl px-4 focus-within:bg-[#2a2a3e] transition-colors">
+            <i class="fas fa-check-circle text-gray-500"></i>
+            <input type="password" id="password_confirm" class="flex-1 bg-transparent border-none text-white px-4 py-3 outline-none" placeholder="Repite la contraseña" required />
+          </div>
+          <p id="passwordConfirmError" class="text-red-500 text-xs mt-1 hidden"></p>
+        </div>
+
+        <div id="generalError" class="hidden text-red-500 text-sm bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+          <i class="fas fa-exclamation-circle mr-2"></i><span id="generalErrorText"></span>
+        </div>
+
+        <button type="submit" id="submitBtn"
+          class="w-full bg-gradient-to-r from-red-500 to-red-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity cursor-pointer">
+          <i class="fas fa-user-plus"></i>
+          <span>Crear Cuenta</span>
+        </button>
+      </form>
+
+      <p class="text-center mt-4 text-gray-500 text-sm">
+        ¿Ya tienes cuenta? <a href="/ingresar" class="text-red-400 hover:text-red-300 transition-colors">Inicia sesión</a>
+      </p>
+
+      <p class="text-center mt-2 text-gray-500 text-sm">
+        <a href="/" class="text-admin-muted hover:text-white transition-colors"><i class="fas fa-arrow-left mr-1"></i>Volver al sitio</a>
+      </p>
+    </div>
+  </div>
+</Layout>
+
+<script is:inline>
+(function() {
+  const form = document.getElementById('registerForm');
+  const nombre = document.getElementById('nombre');
+  const email = document.getElementById('email');
+  const password = document.getElementById('password');
+  const passwordConfirm = document.getElementById('password_confirm');
+  const submitBtn = document.getElementById('submitBtn');
+  const generalError = document.getElementById('generalError');
+  const generalErrorText = document.getElementById('generalErrorText');
+
+  function hideErrors() {
+    ['nombreError','emailError','passwordError','passwordConfirmError'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('hidden');
+    });
+    generalError.classList.add('hidden');
+  }
+
+  function showFieldError(id, msg) {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = msg; el.classList.remove('hidden'); }
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideErrors();
+
+    const data = {
+      nombre: nombre.value.trim(),
+      email: email.value.trim(),
+      password: password.value,
+      password_confirm: passwordConfirm.value,
+    };
+
+    if (!data.nombre || !data.email || !data.password || !data.password_confirm) {
+      showFieldError('nombreError', 'Completa todos los campos');
+      return;
+    }
+
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando cuenta...';
+    submitBtn.disabled = true;
+
+    try {
+      const res = await fetch('/api/usuarios/registro.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const result = await res.json();
+      if (result.success) {
+        localStorage.setItem('usuario_token', result.token);
+        localStorage.setItem('usuario_data', JSON.stringify(result.usuario));
+        window.location.replace('/mi-cuenta');
+      } else {
+        if (result.fieldErrors) {
+          if (result.fieldErrors.nombre) showFieldError('nombreError', result.fieldErrors.nombre);
+          if (result.fieldErrors.email) showFieldError('emailError', result.fieldErrors.email);
+          if (result.fieldErrors.password) showFieldError('passwordError', result.fieldErrors.password);
+          if (result.fieldErrors.password_confirm) showFieldError('passwordConfirmError', result.fieldErrors.password_confirm);
+          if (result.fieldErrors.general) {
+            generalErrorText.textContent = result.fieldErrors.general;
+            generalError.classList.remove('hidden');
+          }
+        } else {
+          generalErrorText.textContent = result.error || 'Error al registrar';
+          generalError.classList.remove('hidden');
+        }
+      }
+    } catch (err) {
+      generalErrorText.textContent = 'Error de conexión';
+      generalError.classList.remove('hidden');
+    } finally {
+      submitBtn.innerHTML = originalText;
+      submitBtn.disabled = false;
+    }
+  });
+})();
+</script>

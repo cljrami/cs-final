@@ -1,0 +1,44 @@
+RewriteEngine On
+
+# ============================================
+# CRÍTICO: Pasar Authorization header a PHP
+# ============================================
+RewriteCond %{HTTP:Authorization} ^(.*)
+RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
+
+# ============================================
+# PREFLIGHT - Solo para API (204 = No Content)
+# ============================================
+RewriteCond %{REQUEST_METHOD} OPTIONS
+RewriteCond %{REQUEST_URI} ^/api/
+RewriteRule ^ - [R=204,L]
+
+# ============================================
+# ARCHIVOS/CARPETAS EXISTENTES - No redirigir
+# ============================================
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# ============================================
+# API - No redirigir
+# ============================================
+RewriteRule ^api/ - [L]
+
+# ============================================
+# ADMIN - No redirigir
+# ============================================
+RewriteRule ^admin/ - [L]
+
+# ============================================
+# RUTAS NUMÉRICAS (/8, /123) → escort.php?id=8
+# ============================================
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} ^/(\d+)/?$
+RewriteRule ^(\d+)/?$ escort.php?id=$1 [L,QSA]
+
+# ============================================
+# ASTRO - SPA fallback
+# ============================================
+RewriteRule ^(.*)$ /index.html [L]

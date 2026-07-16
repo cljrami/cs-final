@@ -1,0 +1,21 @@
+---
+import EscortLayout from "../../layouts/EscortLayout.astro";
+import EscortSidebar from "../../components/escort/EscortSidebar";
+import EscortAuthGuard from "../../components/escort/EscortAuthGuard";
+import PlanesDisponibles from "../../components/escort/PlanesDisponibles";
+import AprobacionRequerida from "../../components/escort/AprobacionRequerida";
+---
+
+<EscortLayout title="Planes Disponibles - CS Panel" activePage="planes">
+  <EscortSidebar slot="sidebar" activePage="planes" client:load />
+
+  <EscortAuthGuard client:load>
+    <div class="w-full max-w-full">
+      <h1 class="text-2xl font-bold text-white mb-2">Planes Disponibles</h1>
+      <p class="text-gray-400 text-sm mb-6">Selecciona el plan que mejor se adapte a tus necesidades</p>
+      <AprobacionRequerida client:load>
+        <PlanesDisponibles client:load />
+      </AprobacionRequerida>
+    </div>
+  </EscortAuthGuard>
+</EscortLayout>
