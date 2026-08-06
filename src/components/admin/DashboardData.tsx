@@ -142,6 +142,40 @@ export default function DashboardData() {
           Resumen de actividad y estadísticas
         </p>
 
+        {/* Atención requerida */}
+        {(() => {
+          const acciones = [
+            { label: 'Escorts por aprobar', href: '/admin/escorts', color: 'text-red-400', icon: 'fa-user-clock', count: stats?.pendientes ?? 0 },
+            { label: 'Solicitudes VIP por activar', href: '/admin/solicitudes-vip', color: 'text-yellow-400', icon: 'fa-crown', count: stats?.planes_por_activar ?? 0 },
+            { label: 'Verificaciones pendientes', href: '/admin/verificaciones', color: 'text-purple-400', icon: 'fa-id-card', count: stats?.verificaciones_pendientes ?? 0 },
+            { label: 'Suscripciones por vencer (7 días)', href: '/admin/suscripciones', color: 'text-orange-400', icon: 'fa-clock', count: stats?.por_vencer ?? 0 },
+          ].filter(a => !loading && a.count > 0);
+
+          if (acciones.length === 0) return null;
+
+          return (
+            <div className="bg-admin-card border border-admin-border rounded-2xl p-5">
+              <h3 className="text-base font-bold mb-4 flex items-center gap-2">
+                <i className="fas fa-exclamation-triangle text-yellow-400"></i>
+                Atención requerida
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {acciones.map(a => (
+                  <a
+                    key={a.label}
+                    href={a.href}
+                    className={`flex items-center gap-3 bg-[#252538] hover:bg-[#2d2d44] rounded-xl px-4 py-3 transition-colors`}
+                  >
+                    <i className={`fas ${a.icon} ${a.color} text-lg flex-shrink-0`}></i>
+                    <span className="flex-1 min-w-0 text-sm text-gray-300 truncate">{a.label}</span>
+                    <span className={`text-lg font-bold ${a.color}`}>{a.count}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Stats grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
           <StatCard icon="fa-users" value={stats?.total ?? 0} label="Total Escorts" color="#3b82f6" loading={loading} />
@@ -149,6 +183,15 @@ export default function DashboardData() {
           <StatCard icon="fa-pause-circle" value={stats?.pausadas ?? 0} label="Pausadas" color="#f59e0b" loading={loading} />
           <StatCard icon="fa-city" value={stats?.total_ciudades ?? 0} label="Ciudades" color="#a855f7" loading={loading} />
           <StatCard icon="fa-star" value={stats?.nuevas_hoy ?? 0} label="Nuevas Hoy" color="#ef4444" loading={loading} />
+        </div>
+
+        {/* Stats acción */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+          <StatCard icon="fa-user-clock" value={stats?.pendientes ?? 0} label="Por aprobar" color="#f97316" loading={loading} href="/admin/escorts" />
+          <StatCard icon="fa-star" value={stats?.vip ?? 0} label="VIP Activos" color="#eab308" loading={loading} href="/admin/vip-activos" />
+          <StatCard icon="fa-shield-alt" value={stats?.verificadas ?? 0} label="Verificadas" color="#06b6d4" loading={loading} href="/admin/verificaciones" />
+          <StatCard icon="fa-flag" value={stats?.destacadas ?? 0} label="Destacadas" color="#ec4899" loading={loading} />
+          <StatCard icon="fa-clock" value={stats?.por_vencer ?? 0} label="Por vencer (7d)" color="#8b5cf6" loading={loading} href="/admin/suscripciones" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
