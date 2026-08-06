@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+    echo json_encode(['success' => false, 'error' => 'MíƒÂ©todo no permitido']);
     exit;
 }
 
@@ -19,11 +19,13 @@ require_once __DIR__ . '/../bootstrap.php';
 
 try {
     $tokenData = requireAuth();
+
+    requireAdminRole($tokenData);
     $pdo = getDBConnection();
 
     $stats = [
         'total' => (int)$pdo->query("SELECT COUNT(*) FROM escorts WHERE eliminada = 0")->fetchColumn(),
-        'pendientes' => (int)$pdo->query("SELECT COUNT(*) FROM escorts WHERE activa = 0 AND eliminada = 0")->fetchColumn(),
+        'pendientes' => (int)$pdo->query("SELECT COUNT(*) FROM escorts WHERE activa = 0 AND (aprobada = 0 OR aprobada IS NULL) AND eliminada = 0")->fetchColumn(),
         'aprobadas' => (int)$pdo->query("SELECT COUNT(*) FROM escorts WHERE activa = 1 AND eliminada = 0")->fetchColumn(),
         'rechazadas' => (int)$pdo->query("SELECT COUNT(*) FROM escorts WHERE activa = -1 AND eliminada = 0")->fetchColumn(),
         'verificadas' => (int)$pdo->query("SELECT COUNT(*) FROM escorts WHERE verificado = 1 AND eliminada = 0")->fetchColumn(),
@@ -32,8 +34,23 @@ try {
         'planes_por_activar' => (int)$pdo->query("SELECT COUNT(*) FROM escort_vip_solicitudes WHERE estado = 'enviado'")->fetchColumn(),
         'verificaciones_pendientes' => (int)$pdo->query("SELECT COUNT(*) FROM escorts WHERE verificado = 0 AND activa = 1 AND eliminada = 0")->fetchColumn(),
         'nuevas_hoy' => (int)$pdo->query("SELECT COUNT(*) FROM escorts WHERE DATE(created_at) = CURDATE() AND eliminada = 0")->fetchColumn(),
+        'pausadas' => (int)$pdo->query("
+            SELECT COUNT(*) FROM escorts e WHERE (
+                SELECT COALESCE(s.estado, '') FROM suscripciones s
+                JOIN planes p ON p.id = s.plan_id AND p.extra_tipo IS NULL
+                WHERE s.escort_id = e.id
+                ORDER BY s.id DESC LIMIT 1
+            ) = 'pausada' AND e.eliminada = 0
+        ")->fetchColumn(),
+        'por_vencer' => (int)$pdo->query("
+            SELECT COUNT(*) FROM suscripciones s
+            JOIN escorts e ON e.id = s.escort_id
+            JOIN planes p ON p.id = s.plan_id AND p.extra_tipo IS NULL
+            WHERE s.estado = 'activa' AND e.eliminada = 0
+                AND s.fecha_fin BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)
+        ")->fetchColumn(),
         'total_usuarios' => (int)$pdo->query("SELECT COUNT(*) FROM usuarios")->fetchColumn(),
-        'total_ciudades' => (int)$pdo->query("SELECT COUNT(*) FROM ciudades WHERE activa = 1")->fetchColumn(),
+        'total_ciudades' => (int)$pdo->query("SELECT COUNT(DISTINCT ciudad) FROM escorts WHERE eliminada = 0 AND ciudad IS NOT NULL AND ciudad != ''")->fetchColumn(),
         'total_categorias' => (int)$pdo->query("SELECT COUNT(*) FROM categorias WHERE activa = 1")->fetchColumn(),
     ];
 
@@ -107,7 +124,7 @@ try {
     ");
     $escorts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Ingresos diarios (últimos 12 días) desde suscripciones aprobadas
+    // Ingresos diarios (íƒÂºltimos 12 díƒÂ­as) desde suscripciones aprobadas
     $ingresos = $pdo->query("
         SELECT
             DATE(s.fecha_aprobacion) as fecha,
@@ -119,7 +136,7 @@ try {
         ORDER BY fecha ASC
     ")->fetchAll(PDO::FETCH_ASSOC);
 
-    // Rellenar días sin ingresos con 0
+    // Rellenar díƒÂ­as sin ingresos con 0
     $ingresosCompletos = [];
     for ($i = 11; $i >= 0; $i--) {
         $ts = strtotime("-$i days");
@@ -150,7 +167,7 @@ try {
         LIMIT 5
     ")->fetchAll(PDO::FETCH_ASSOC);
 
-    // Top 5 escorts más visitadas
+    // Top 5 escorts míƒÂ¡s visitadas
     $topEscorts = $pdo->query("
         SELECT id, nombre, slug, ciudad, visitas_perfil, foto_principal
         FROM escorts
@@ -159,7 +176,7 @@ try {
         LIMIT 5
     ")->fetchAll(PDO::FETCH_ASSOC);
 
-    // Suscripciones por vencer (próximos 7 días, solo planes base)
+    // Suscripciones por vencer (príƒÂ³ximos 7 díƒÂ­as, solo planes base)
     $porVencer = $pdo->query("
         SELECT s.id, s.fecha_fin, e.nombre as escort_nombre, e.id as escort_id,
                p.nombre as plan_nombre, DATEDIFF(s.fecha_fin, CURDATE()) as dias_restantes
@@ -187,12 +204,13 @@ try {
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'error' => 'Error de base de datos: ' . $e->getMessage()
+        'error' => 'Error de base de datos'
     ]);
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode([
         'success' => false,
-        'error' => 'Error interno: ' . $e->getMessage()
+        'error' => 'Error del servidor'
     ]);
 }
+

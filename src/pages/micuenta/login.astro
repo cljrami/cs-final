@@ -4,7 +4,7 @@ import Layout from "../../layouts/Layout.astro";
 
 <Layout title="Iniciar Sesión - CS Panel">
   <div
-    class="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f0f1a] to-[#1a1a2e]"
+    class="min-h-screen flex items-center justify-center bg-gradient-to-br from-page to-surface"
   >
     <div
       class="w-full max-w-md mx-4 bg-admin-card rounded-2xl p-8 md:p-10"
@@ -13,9 +13,9 @@ import Layout from "../../layouts/Layout.astro";
         <div
           class="w-16 h-16 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4"
         >
-          <i class="fas fa-user text-white"></i>
+          <i class="fas fa-user text-ink"></i>
         </div>
-        <h1 class="text-2xl font-bold mb-2 text-white">CS Panel</h1>
+        <h1 class="text-2xl font-bold mb-2 text-ink">CS Panel</h1>
         <p class="text-admin-muted text-sm">
           Acceso para escorts
         </p>
@@ -24,17 +24,17 @@ import Layout from "../../layouts/Layout.astro";
       <form id="loginForm" class="space-y-5">
         <div>
           <label class="block text-sm text-admin-muted mb-2">
-            <i class="fas fa-user mr-2"></i>Usuario
+            <i class="fas fa-envelope mr-2"></i>Email
           </label>
           <div
-            class="flex items-center bg-[#0f0f1a] rounded-xl px-4 focus-within:bg-[#2a2a3e] transition-colors"
+            class="flex items-center bg-page rounded-xl px-4 focus-within:bg-raised transition-colors"
           >
-            <i class="fas fa-user text-gray-500"></i>
+            <i class="fas fa-envelope text-muted"></i>
             <input
-              type="text"
-              id="usuario"
-              class="flex-1 bg-transparent border-none text-white px-4 py-3 outline-none"
-              placeholder="Tu usuario"
+              type="email"
+              id="email"
+              class="flex-1 bg-transparent border-none text-ink px-4 py-3 outline-none"
+              placeholder="tu@email.com"
               required
             />
           </div>
@@ -45,13 +45,13 @@ import Layout from "../../layouts/Layout.astro";
             <i class="fas fa-lock mr-2"></i>Contraseña
           </label>
           <div
-            class="flex items-center bg-[#0f0f1a] rounded-xl px-4 focus-within:bg-[#2a2a3e] transition-colors"
+            class="flex items-center bg-page rounded-xl px-4 focus-within:bg-raised transition-colors"
           >
-            <i class="fas fa-lock text-gray-500"></i>
+            <i class="fas fa-lock text-muted"></i>
             <input
               type="password"
               id="password"
-              class="flex-1 bg-transparent border-none text-white px-4 py-3 outline-none"
+              class="flex-1 bg-transparent border-none text-ink px-4 py-3 outline-none"
               placeholder="••••••••"
               required
             />
@@ -76,19 +76,19 @@ import Layout from "../../layouts/Layout.astro";
         <span id="errorText"></span>
       </div>
 
-      <p class="text-center mt-4 text-gray-500 text-sm">
+      <p class="text-center mt-4 text-muted text-sm">
         ¿No tienes cuenta?
         <a href="/micuenta/registro" class="text-red-400 hover:text-red-300 transition-colors">Regístrate aquí</a>
       </p>
 
-      <p class="text-center mt-2 text-gray-500 text-sm">
-        <a href="/micuenta/recuperar" class="text-admin-muted hover:text-white transition-colors">
+      <p class="text-center mt-2 text-muted text-sm">
+        <a href="/micuenta/recuperar" class="text-admin-muted hover:text-ink transition-colors">
           <i class="fas fa-key mr-2"></i>¿Olvidaste tu contraseña?
         </a>
       </p>
 
-      <p class="text-center mt-2 text-gray-500 text-sm">
-        <a href="/" class="text-admin-muted hover:text-white transition-colors">
+      <p class="text-center mt-2 text-muted text-sm">
+        <a href="/" class="text-admin-muted hover:text-ink transition-colors">
           <i class="fas fa-arrow-left mr-2"></i>Volver al sitio
         </a>
       </p>
@@ -99,13 +99,13 @@ import Layout from "../../layouts/Layout.astro";
 <script is:inline>
   (function () {
     const form = document.getElementById("loginForm");
-    const usuarioInput = document.getElementById("usuario");
+    const emailInput = document.getElementById("email");
     const passwordInput = document.getElementById("password");
     const errorDiv = document.getElementById("error");
     const errorText = document.getElementById("errorText");
     const submitBtn = document.getElementById("submitBtn");
 
-    if (!form || !usuarioInput || !passwordInput || !errorDiv || !errorText) {
+    if (!form || !emailInput || !passwordInput || !errorDiv || !errorText) {
       console.error("Form elements not found");
       return;
     }
@@ -114,10 +114,10 @@ import Layout from "../../layouts/Layout.astro";
       e.preventDefault();
       errorDiv.classList.add("hidden");
 
-      const usuario = usuarioInput.value.trim();
+      const email = emailInput.value.trim();
       const password = passwordInput.value;
 
-      if (!usuario || !password) {
+      if (!email || !password) {
         errorText.textContent = "Completa todos los campos";
         errorDiv.classList.remove("hidden");
         return;
@@ -132,7 +132,7 @@ import Layout from "../../layouts/Layout.astro";
         const response = await fetch("/api/escort/login.php", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ usuario, password }),
+          body: JSON.stringify({ usuario: email, password }),
         });
 
         const text = await response.text();

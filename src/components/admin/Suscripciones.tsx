@@ -34,7 +34,6 @@ interface Suscripcion {
     estado: string;
     estado_raw: string;
     dias_restantes: number;
-    auto_renovar: boolean;
     comprobante_pago: string | null;
     creado_en: string;
     contador_pausas: number;
@@ -200,16 +199,6 @@ export default function Suscripciones() {
     cancelada: 'Cancelada'
   };
 
-  if (loading && suscripciones.length === 0) {
-    return (
-      <div className="space-y-4">
-        <div className="animate-pulse bg-[#13131a] border border-gray-800 rounded-2xl p-6 h-32" />
-        <div className="animate-pulse bg-[#13131a] border border-gray-800 rounded-2xl p-6 h-32" />
-        <div className="animate-pulse bg-[#13131a] border border-gray-800 rounded-2xl p-6 h-32" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -244,7 +233,37 @@ export default function Suscripciones() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {suscripciones.length === 0 ? (
+              {loading && suscripciones.length === 0 ? (
+                [1, 2, 3, 4, 5].map((i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gray-800" />
+                        <div className="space-y-2">
+                          <div className="w-28 h-4 bg-gray-800 rounded" />
+                          <div className="w-20 h-3 bg-gray-800 rounded" />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="w-16 h-5 bg-gray-800 rounded" />
+                      <div className="w-12 h-3 bg-gray-800 rounded mt-1" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="w-20 h-5 bg-gray-800 rounded" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="w-24 h-4 bg-gray-800 rounded" />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="w-16 h-4 bg-gray-800 rounded" />
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="w-16 h-4 bg-gray-800 rounded ml-auto" />
+                    </td>
+                  </tr>
+                ))
+              ) : suscripciones.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                     <i className="fas fa-inbox text-3xl mb-3 block" />

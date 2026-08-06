@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
@@ -16,27 +16,6 @@ try {
     $pdo = getDBConnection();
     $method = $_SERVER['REQUEST_METHOD'];
 
-    function obtenerTabla($tipo): string {
-        return $tipo === 'ojos' ? 'colores_ojos' : 'colores_pelo';
-    }
-
-    function obtenerTipo($tabla): string {
-        return $tabla === 'colores_ojos' ? 'ojos' : 'pelo';
-    }
-
-    function buscarRegistro($pdo, $id, &$tabla): ?array {
-        foreach (['colores_pelo', 'colores_ojos'] as $t) {
-            $stmt = $pdo->prepare("SELECT id, nombre, orden, activo, created_at FROM $t WHERE id = ?");
-            $stmt->execute([$id]);
-            $r = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($r) {
-                $tabla = $t;
-                return $r;
-            }
-        }
-        return null;
-    }
-
     if ($method === 'GET') {
         $search = isset($_GET['search']) ? trim($_GET['search']) : '';
         $filtro = isset($_GET['filtro']) ? $_GET['filtro'] : 'todos';
@@ -45,12 +24,13 @@ try {
         $limit = isset($_GET['limit']) ? max(1, min(100, intval($_GET['limit']))) : 50;
         $offset = ($page - 1) * $limit;
 
-        $tables = ($tipoFiltro === 'todos')
-            ? ['colores_pelo', 'colores_ojos']
-            : [obtenerTabla($tipoFiltro)];
-
         $where = [];
         $params = [];
+
+        if ($tipoFiltro !== 'todos') {
+            $where[] = 'tipo = :tipo';
+            $params[':tipo'] = $tipoFiltro;
+        }
 
         if ($filtro === 'activos') {
             $where[] = 'activo = 1';
@@ -66,43 +46,29 @@ try {
         $whereClause = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
         $stats = ['total' => 0, 'activos' => 0, 'inactivos' => 0];
-        foreach (['colores_pelo', 'colores_ojos'] as $t) {
-            $stats['total'] += (int)$pdo->query("SELECT COUNT(*) FROM $t")->fetchColumn();
-            $stats['activos'] += (int)$pdo->query("SELECT COUNT(*) FROM $t WHERE activo = 1")->fetchColumn();
-            $stats['inactivos'] += (int)$pdo->query("SELECT COUNT(*) FROM $t WHERE activo = 0")->fetchColumn();
+        $stats['total'] = (int)$pdo->query("SELECT COUNT(*) FROM colores")->fetchColumn();
+        $stats['activos'] = (int)$pdo->query("SELECT COUNT(*) FROM colores WHERE activo = 1")->fetchColumn();
+        $stats['inactivos'] = (int)$pdo->query("SELECT COUNT(*) FROM colores WHERE activo = 0")->fetchColumn();
+
+        $countSql = "SELECT COUNT(*) FROM colores $whereClause";
+        $countStmt = $pdo->prepare($countSql);
+        $countStmt->execute($params);
+        $totalFiltered = (int)$countStmt->fetchColumn();
+
+        $sql = "SELECT id, nombre, tipo, orden, activo, created_at,
+                    CASE WHEN tipo = 'ojos' THEN (SELECT COUNT(*) FROM escorts WHERE color_ojos = c.nombre AND eliminada = 0)
+                         ELSE (SELECT COUNT(*) FROM escorts WHERE color_pelo = c.nombre AND eliminada = 0)
+                    END AS total_escorts
+                FROM colores c $whereClause ORDER BY orden ASC, nombre ASC
+                LIMIT :limit OFFSET :offset";
+        $stmt = $pdo->prepare($sql);
+        foreach ($params as $key => $val) {
+            $stmt->bindValue($key, $val);
         }
-
-        $rows = [];
-        $totalFiltered = 0;
-
-        foreach ($tables as $t) {
-            $countSql = "SELECT COUNT(*) FROM $t $whereClause";
-            $countStmt = $pdo->prepare($countSql);
-            $countStmt->execute($params);
-            $totalFiltered += (int)$countStmt->fetchColumn();
-
-            $sql = "SELECT id, nombre, orden, activo, created_at,
-                        (SELECT COUNT(*) FROM escorts WHERE " . ($t === 'colores_pelo' ? 'color_pelo' : 'color_ojos') . " = c.nombre AND eliminada = 0) AS total_escorts
-                    FROM $t c $whereClause ORDER BY orden ASC, nombre ASC";
-            $stmt = $pdo->prepare($sql);
-            foreach ($params as $key => $val) {
-                $stmt->bindValue($key, $val);
-            }
-            $stmt->execute();
-            $partial = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            foreach ($partial as &$r) {
-                $r['tipo'] = obtenerTipo($t);
-            }
-            unset($r);
-            $rows = array_merge($rows, $partial);
-        }
-
-        usort($rows, function($a, $b) {
-            $cmp = ($a['orden'] ?? 0) <=> ($b['orden'] ?? 0);
-            return $cmp !== 0 ? $cmp : strcasecmp($a['nombre'] ?? '', $b['nombre'] ?? '');
-        });
-
-        $rows = array_slice($rows, $offset, $limit);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         echo json_encode([
             'success' => true,
@@ -125,7 +91,6 @@ try {
         $orden = isset($input['orden']) ? intval($input['orden']) : 0;
         $activo = isset($input['activo']) ? (int)$input['activo'] : 1;
         $tipo = isset($input['tipo']) && $input['tipo'] === 'ojos' ? 'ojos' : 'pelo';
-        $tabla = obtenerTabla($tipo);
 
         $fieldErrors = [];
 
@@ -138,8 +103,8 @@ try {
         }
 
         if (empty($fieldErrors['nombre'])) {
-            $checkStmt = $pdo->prepare("SELECT id, nombre FROM $tabla WHERE LOWER(nombre) = LOWER(?)");
-            $checkStmt->execute([$nombre]);
+            $checkStmt = $pdo->prepare("SELECT id, nombre FROM colores WHERE LOWER(nombre) = LOWER(?) AND tipo = ?");
+            $checkStmt->execute([$nombre, $tipo]);
             $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
             if ($existing) {
                 $fieldErrors['nombre'] = 'Ya existe un color llamado "' . $existing['nombre'] . '"';
@@ -152,8 +117,8 @@ try {
             exit;
         }
 
-        $stmt = $pdo->prepare("INSERT INTO $tabla (nombre, orden, activo) VALUES (?, ?, ?)");
-        $stmt->execute([$nombre, $orden, $activo]);
+        $stmt = $pdo->prepare("INSERT INTO colores (nombre, tipo, orden, activo) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$nombre, $tipo, $orden, $activo]);
         $newId = $pdo->lastInsertId();
 
         echo json_encode([
@@ -174,16 +139,14 @@ try {
             exit;
         }
 
-        $oldTabla = '';
-        $oldRecord = buscarRegistro($pdo, $id, $oldTabla);
-        if (!$oldRecord) {
+        $checkStmt = $pdo->prepare("SELECT id, nombre, tipo, orden, activo FROM colores WHERE id = ?");
+        $checkStmt->execute([$id]);
+        $old = $checkStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$old) {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Color no encontrado']);
             exit;
         }
-
-        $nuevoTipo = isset($input['tipo']) && $input['tipo'] === 'ojos' ? 'ojos' : 'pelo';
-        $nuevaTabla = obtenerTabla($nuevoTipo);
 
         $updates = [];
         $values = [];
@@ -192,14 +155,15 @@ try {
         if (isset($input['nombre'])) {
             $nombre = trim($input['nombre']);
             if (empty($nombre)) {
-                $fieldErrors['nombre'] = 'El nombre no puede estar vacío';
+                $fieldErrors['nombre'] = 'El nombre no puede estar vací­o';
             } elseif (strlen($nombre) < 2) {
                 $fieldErrors['nombre'] = 'El nombre debe tener al menos 2 caracteres';
             } elseif (strlen($nombre) > 30) {
                 $fieldErrors['nombre'] = 'El nombre no puede exceder 30 caracteres';
             } else {
-                $dupStmt = $pdo->prepare("SELECT id, nombre FROM $nuevaTabla WHERE LOWER(nombre) = LOWER(?) AND id != ?");
-                $dupStmt->execute([$nombre, $id]);
+                $nuevoTipo = isset($input['tipo']) && $input['tipo'] === 'ojos' ? 'ojos' : 'pelo';
+                $dupStmt = $pdo->prepare("SELECT id, nombre FROM colores WHERE LOWER(nombre) = LOWER(?) AND tipo = ? AND id != ?");
+                $dupStmt->execute([$nombre, $nuevoTipo, $id]);
                 $existing = $dupStmt->fetch(PDO::FETCH_ASSOC);
                 if ($existing) {
                     $fieldErrors['nombre'] = 'Ya existe otro color llamado "' . $existing['nombre'] . '"';
@@ -208,6 +172,11 @@ try {
                     $values[] = $nombre;
                 }
             }
+        }
+
+        if (isset($input['tipo'])) {
+            $updates[] = 'tipo = ?';
+            $values[] = $input['tipo'] === 'ojos' ? 'ojos' : 'pelo';
         }
 
         if (isset($input['orden'])) {
@@ -226,43 +195,20 @@ try {
             exit;
         }
 
-        if (empty($updates) && $oldTabla === $nuevaTabla) {
+        if (empty($updates)) {
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'No hay datos para actualizar']);
             exit;
         }
 
-        if ($oldTabla !== $nuevaTabla) {
-            $deleteStmt = $pdo->prepare("DELETE FROM $oldTabla WHERE id = ?");
-            $deleteStmt->execute([$id]);
-
-            $insertNombre = isset($input['nombre']) ? trim($input['nombre']) : $oldRecord['nombre'];
-            $insertOrden = isset($input['orden']) ? intval($input['orden']) : $oldRecord['orden'];
-            $insertActivo = isset($input['activo']) ? (int)$input['activo'] : $oldRecord['activo'];
-
-            $stmt = $pdo->prepare("INSERT INTO $nuevaTabla (nombre, orden, activo) VALUES (?, ?, ?)");
-            $stmt->execute([$insertNombre, $insertOrden, $insertActivo]);
-            $newId = (int)$pdo->lastInsertId();
-
-            echo json_encode([
-                'success' => true,
-                'message' => 'Color actualizado correctamente',
-                'color' => ['id' => $newId, 'nombre' => $insertNombre, 'tipo' => $nuevoTipo, 'orden' => $insertOrden, 'activo' => $insertActivo]
-            ]);
-            exit;
-        }
-
         $values[] = $id;
-        $sql = "UPDATE $nuevaTabla SET " . implode(', ', $updates) . " WHERE id = ?";
+        $sql = "UPDATE colores SET " . implode(', ', $updates) . " WHERE id = ?";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($values);
 
-        $getStmt = $pdo->prepare("SELECT id, nombre, orden, activo, created_at FROM $nuevaTabla WHERE id = ?");
+        $getStmt = $pdo->prepare("SELECT id, nombre, tipo, orden, activo, created_at FROM colores WHERE id = ?");
         $getStmt->execute([$id]);
         $color = $getStmt->fetch(PDO::FETCH_ASSOC);
-        if ($color) {
-            $color['tipo'] = obtenerTipo($nuevaTabla);
-        }
 
         echo json_encode(['success' => true, 'message' => 'Color actualizado correctamente', 'color' => $color]);
         exit;
@@ -270,8 +216,6 @@ try {
 
     if ($method === 'DELETE') {
         $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-        $tipo = isset($_GET['tipo']) && $_GET['tipo'] === 'ojos' ? 'ojos' : 'pelo';
-        $tabla = obtenerTabla($tipo);
 
         if ($id <= 0) {
             http_response_code(400);
@@ -279,7 +223,7 @@ try {
             exit;
         }
 
-        $checkStmt = $pdo->prepare("SELECT nombre FROM $tabla WHERE id = ?");
+        $checkStmt = $pdo->prepare("SELECT id, nombre, tipo FROM colores WHERE id = ?");
         $checkStmt->execute([$id]);
         $color = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -289,7 +233,7 @@ try {
             exit;
         }
 
-        $escortField = $tipo === 'ojos' ? 'color_ojos' : 'color_pelo';
+        $escortField = $color['tipo'] === 'ojos' ? 'color_ojos' : 'color_pelo';
         $escortStmt = $pdo->prepare("SELECT COUNT(*) FROM escorts WHERE $escortField = ? AND eliminada = 0");
         $escortStmt->execute([$color['nombre']]);
         $escortCount = (int)$escortStmt->fetchColumn();
@@ -300,7 +244,7 @@ try {
             exit;
         }
 
-        $stmt = $pdo->prepare("DELETE FROM $tabla WHERE id = ?");
+        $stmt = $pdo->prepare("DELETE FROM colores WHERE id = ?");
         $stmt->execute([$id]);
 
         echo json_encode(['success' => true, 'message' => 'Color eliminado correctamente']);
@@ -316,5 +260,6 @@ try {
 } catch (Throwable $e) {
     error_log("Error colores.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error interno: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }
+

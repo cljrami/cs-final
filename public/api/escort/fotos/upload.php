@@ -45,7 +45,7 @@ try {
         exit;
     }
 
-    $uploadDir = __DIR__ . '/../../../uploads/escorts/fotos/';
+    $uploadDir = __DIR__ . '/../../../uploads/escorts/fotos/' . $escortId . '/';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
 
     // Obtener límite del plan activo
@@ -125,8 +125,12 @@ try {
             continue;
         }
 
-        // Validar imagen con getimagesize (solo imágenes)
+        // Validar imagen con getimagesize y MIME real
         if ($tipo === 'imagen') {
+            if (!validarMIME($tmpName, array_merge(...array_values($formatosImg)))) {
+                $errores[] = "$name no es una imagen válida o está corrupta";
+                continue;
+            }
             $imgInfo = @getimagesize($tmpName);
             if ($imgInfo === false) {
                 $errores[] = "$name no es una imagen válida o está corrupta";
@@ -139,6 +143,14 @@ try {
             // Normalizar extensión jpeg → jpg
             if ($ext === 'jpeg') {
                 $ext = 'jpg';
+            }
+        }
+
+        // Validar video con MIME real
+        if ($tipo === 'video') {
+            if (!validarMIME($tmpName, array_merge(...array_values($formatosVid)))) {
+                $errores[] = "$name no es un video válido o está corrupto";
+                continue;
             }
         }
 
@@ -160,7 +172,7 @@ try {
                 }
             }
 
-            $url = '/uploads/escorts/fotos/' . $newName;
+            $url = '/uploads/escorts/fotos/' . $escortId . '/' . $newName;
 
             $nuevoOrden = $totalActual + count($fotos);
             $esPortada = $nuevoOrden == 0 ? 1 : 0;
@@ -187,6 +199,19 @@ try {
             INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url, created_at)
             VALUES (?, 'fotos_actualizadas', 'Galería actualizada', 'Has actualizado tu galería de fotos.', '/micuenta/fotos', NOW())
         ")->execute([$escortId]);
+
+        $escortNombre = $pdo->prepare("SELECT nombre FROM escorts WHERE id = ?");
+        $escortNombre->execute([$escortId]);
+        $nombreEscort = $escortNombre->fetchColumn();
+        $pdo->prepare("
+            INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, url, escort_id, created_at)
+            VALUES (NULL, 'sistema', 'Galería actualizada', ?, '/admin/escorts', ?, NOW())
+        ")->execute(["{$nombreEscort} actualizó su galería de fotos.", $escortId]);
+
+        require_once __DIR__ . '/../../mail.php';
+        notificarAccionEscort('fotos', $escortId, $nombreEscort . ' actualizó su galería', [
+            'Archivos subidos' => count($fotos),
+        ]);
     }
 
     $respuesta = ['success' => true, 'fotos' => $fotos, 'duplicados' => $duplicados];
@@ -197,5 +222,8 @@ try {
 } catch (Throwable $e) {
     error_log("Error fotos/upload.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Error del servidor al procesar el archivo. Verifica el tamaño y formato.'
+    ]);
 }

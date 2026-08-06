@@ -1,0 +1,14 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import Sidebar from "../../components/admin/Sidebar";
+import AuthGuard from "../../components/admin/AuthGuard";
+import MiPerfilData from "../../components/admin/MiPerfilData";
+---
+
+<AdminLayout title="Mi Perfil" activePage="mi-perfil">
+  <Sidebar slot="sidebar" activePage="mi-perfil" client:load />
+
+  <AuthGuard client:load>
+    <MiPerfilData client:load />
+  </AuthGuard>
+</AdminLayout>

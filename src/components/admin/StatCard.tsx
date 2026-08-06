@@ -1,4 +1,4 @@
-import Skeleton from 'react-loading-skeleton';
+import { Skeleton } from '../ui/Skeleton';
 
 interface StatCardProps {
   icon: string;
@@ -26,17 +26,10 @@ export default function StatCard({ icon, value, label, color, loading }: StatCar
         <i className={`fas ${icon}`} style={{ color: color, fontSize: '1.1rem' }}></i>
       </div>
       <div className="min-w-0 flex-1">
-        {loading ? (
-          <>
-            <Skeleton width={50} height={28} className="mb-1" />
-            <Skeleton width={90} height={14} />
-          </>
-        ) : (
-          <>
-            <div className="text-xl md:text-2xl font-bold leading-none">{value}</div>
-            <div className="text-xs md:text-sm text-admin-muted mt-1 truncate">{label}</div>
-          </>
-        )}
+        <div className="text-xl md:text-2xl font-bold leading-none">
+          {loading ? <Skeleton width={50} height={28} /> : value}
+        </div>
+        <div className="text-xs md:text-sm text-admin-muted mt-1 truncate">{label}</div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 ---
 // src/layouts/EscortLayout.astro
-import "@fortawesome/fontawesome-free/css/all.min.css";
+import "@fortawesome/fontawesome-free/css/fontawesome.min.css";
+import "../styles/fa-fontfaces.css";
 import EscortSidebar from "../components/escort/EscortSidebar";
 import NotificationBell from "../components/escort/NotificationBell";
 
@@ -21,11 +22,12 @@ const { title, activePage = "dashboard" } = Astro.props;
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <title>{title} | Panel Escort</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
-      rel="stylesheet"
+      rel="preload"
+      href="/fonts/inter-latin-variable.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
   </head>
   <body class="bg-escort-bg text-escort-text antialiased overflow-x-hidden">
@@ -76,7 +78,83 @@ const { title, activePage = "dashboard" } = Astro.props;
         <slot />
       </div>
     </main>
-  </body>
+  <!-- Admin acting-as banner -->
+  <div id="admin-acting-banner" class="hidden fixed top-0 left-0 right-0 z-50 bg-red-600 text-white text-center py-2 px-4 text-sm font-medium">
+    Editando como administrador — <span id="acting-escort-name">...</span>
+    <button id="acting-exit" class="ml-4 bg-white text-red-600 px-3 py-0.5 rounded text-xs font-bold hover:bg-red-50 transition-colors">Salir</button>
+  </div>
+
+  <script>
+    (function() {
+      var params = new URLSearchParams(window.location.search);
+      var adminToken = params.get('admin_token');
+      var escortId = params.get('escort_id');
+
+      if (adminToken && escortId) {
+        // Guardar token anterior para restaurar
+        var prev = localStorage.getItem('token');
+        if (prev) sessionStorage.setItem('prev_escort_token', prev);
+
+        // Sobrescribir con token de admin
+        localStorage.setItem('token', adminToken);
+        sessionStorage.setItem('acting_as', escortId);
+
+        // Mostrar banner
+        var banner = document.getElementById('admin-acting-banner');
+        if (banner) {
+          (async function() {
+            try {
+              var r = await fetch('/api/admin/escorts.php?id=' + escortId, {
+                headers: { Authorization: 'Bearer ' + adminToken }
+              });
+              var d = await r.json();
+              var name = d.data && d.data.nombre ? d.data.nombre : ('#' + escortId);
+              document.getElementById('acting-escort-name').textContent = name;
+            } catch(e) {
+              document.getElementById('acting-escort-name').textContent = '#' + escortId;
+            }
+          })();
+          banner.classList.remove('hidden');
+          // Ajustar padding al body
+          document.body.style.paddingTop = '40px';
+        }
+
+        // Salir: restaurar token y recargar
+        document.getElementById('acting-exit').addEventListener('click', function() {
+          var prev = sessionStorage.getItem('prev_escort_token');
+          if (prev) {
+            localStorage.setItem('token', prev);
+          } else {
+            localStorage.removeItem('token');
+          }
+          sessionStorage.removeItem('acting_as');
+          window.location.href = '/admin/escorts';
+        });
+
+        // Override global fetch para añadir acting_as a todas las requests
+        var origFetch = window.fetch;
+        window.fetch = function(url, opts) {
+          var a = sessionStorage.getItem('acting_as');
+          if (a) {
+            var sep = url.indexOf('?') !== -1 ? '&' : '?';
+            url = url + sep + 'acting_as=' + a;
+          }
+          return origFetch.call(this, url, opts);
+        };
+
+        // Restaurar al cerrar/recargar
+        window.addEventListener('beforeunload', function() {
+          var prev = sessionStorage.getItem('prev_escort_token');
+          if (prev) {
+            localStorage.setItem('token', prev);
+          } else {
+            localStorage.removeItem('token');
+          }
+        });
+      }
+    })();
+  </script>
+</body>
 </html>
 
 <style is:global>
@@ -101,6 +179,13 @@ const { title, activePage = "dashboard" } = Astro.props;
       sans-serif;
     background-color: #0a0a0f;
     color: #ffffff;
+  }
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 300 800;
+    font-display: swap;
+    src: url('/fonts/inter-latin-variable.woff2') format('woff2');
   }
 
   @keyframes fadeIn {

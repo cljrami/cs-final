@@ -32,6 +32,8 @@ function safeCount(PDO $pdo, string $sql): int {
 
 try {
     $tokenData = requireAuth();
+
+    requireAdminRole($tokenData);
     $pdo = getDBConnection();
 
     $sinceEscorts = getSince('escorts');
@@ -60,7 +62,7 @@ try {
 
     $solicitudesVip = safeCount($pdo, "
         SELECT COUNT(*) FROM escort_vip_solicitudes 
-        WHERE estado IN ('enviado', 'en_revision')"
+        WHERE estado = 'enviado'"
     );
 
     $pagosPendientes = safeCount($pdo, "
@@ -77,8 +79,9 @@ try {
     $nacionalidades = safeCount($pdo, "SELECT COUNT(*) FROM nacionalidades WHERE activo = 1");
     $orientaciones = safeCount($pdo, "SELECT COUNT(*) FROM orientaciones_sexuales WHERE activa = 1");
     $etnias = safeCount($pdo, "SELECT COUNT(*) FROM etnias WHERE activo = 1");
-    $colores = safeCount($pdo, "SELECT COUNT(*) FROM colores_pelo WHERE activo = 1");
+    $colores = safeCount($pdo, "SELECT COUNT(*) FROM colores WHERE activo = 1");
     $estilos = safeCount($pdo, "SELECT COUNT(*) FROM estilos WHERE activo = 1");
+    $idiomas = safeCount($pdo, "SELECT COUNT(*) FROM idiomas WHERE activo = 1");
 
     $suscripcionesPendientes = safeCount($pdo, "
         SELECT COUNT(*) FROM suscripciones s
@@ -89,6 +92,10 @@ try {
 
     $comentariosPendientes = safeCount($pdo, "
         SELECT COUNT(*) FROM comentarios WHERE aprobado = 0"
+    );
+
+    $reportesPendientes = safeCount($pdo, "
+        SELECT COUNT(*) FROM reportes WHERE estado = 'pending'"
     );
 
     echo json_encode([
@@ -109,17 +116,19 @@ try {
             'etnias' => $etnias,
             'colores' => $colores,
             'estilos' => $estilos,
+            'idiomas' => $idiomas,
             'extras' => $extras,
             'suscripcionesPendientes' => $suscripcionesPendientes,
             'comentariosPendientes' => $comentariosPendientes,
+            'reportesPendientes' => $reportesPendientes,
         ]
     ]);
 } catch (PDOException $e) {
     error_log("Error counts.php PDO: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'DB: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error de base de datos']);
 } catch (Throwable $e) {
     error_log("Error counts.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }

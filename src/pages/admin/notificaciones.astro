@@ -1,0 +1,10 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import AuthGuard from "../../components/admin/AuthGuard";
+import NotificacionesData from "../../components/admin/NotificacionesData";
+---
+<AdminLayout title="Notificaciones" activePage="notificaciones">
+  <AuthGuard client:load>
+    <NotificacionesData client:load />
+  </AuthGuard>
+</AdminLayout>

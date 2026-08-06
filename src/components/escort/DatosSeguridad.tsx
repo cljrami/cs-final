@@ -1,7 +1,6 @@
 // src/components/escort/DatosSeguridad.tsx
 import { useState, useEffect } from 'react';
-import Skeleton from 'react-loading-skeleton';
-import 'react-loading-skeleton/dist/skeleton.css';
+
 
 const API_BASE = '/api/escort';
 
@@ -43,21 +42,19 @@ export default function DatosSeguridad() {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDeletePassModal, setShowDeletePassModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
 
   const handleEliminarCuenta = async () => {
     if (deleting) return;
-    if (!confirm('¿Estas segura de eliminar tu cuenta? Esta accion es irreversible.')) return;
-
-    const password = prompt('Confirma tu contrasena para eliminar la cuenta:') || '';
-    if (!password) return;
-
     setDeleting(true);
     setError('');
     try {
       const res = await fetch(`${API_BASE}/datos/eliminar-cuenta.php`, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ password })
+        body: JSON.stringify({ password: deletePassword })
       });
       const data = await res.json();
       if (data.success) {
@@ -71,6 +68,8 @@ export default function DatosSeguridad() {
       setError('Error de conexion al eliminar la cuenta');
     } finally {
       setDeleting(false);
+      setShowDeletePassModal(false);
+      setDeletePassword('');
     }
   };
 
@@ -204,46 +203,6 @@ export default function DatosSeguridad() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton width={180} height={32} className="mb-6" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <Skeleton width={40} height={40} circle />
-              <div>
-                <Skeleton width={160} height={20} className="mb-1" />
-                <Skeleton width={200} height={14} />
-              </div>
-            </div>
-            <div className="space-y-5">
-              <Skeleton width="100%" height={48} />
-              <Skeleton width="100%" height={48} />
-              <Skeleton width="100%" height={48} />
-              <Skeleton width="100%" height={44} />
-            </div>
-          </div>
-          <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <Skeleton width={40} height={40} circle />
-              <div>
-                <Skeleton width={120} height={20} className="mb-1" />
-                <Skeleton width={160} height={14} />
-              </div>
-            </div>
-            <div className="space-y-5">
-              <Skeleton width="100%" height={48} />
-              <Skeleton width="100%" height={48} />
-              <Skeleton width="100%" height={48} />
-              <Skeleton width="100%" height={44} />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const InputField = ({
     label,
     value,
@@ -260,7 +219,12 @@ export default function DatosSeguridad() {
     placeholder?: string;
     icon: string;
     error?: string;
-  }) => (
+  }) => loading ? (
+    <div>
+      <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">{label}</label>
+      <div className="animate-pulse bg-gray-800 rounded-xl h-12" />
+    </div>
+  ) : (
     <div>
       <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">{label}</label>
       <div className="relative">
@@ -293,7 +257,12 @@ export default function DatosSeguridad() {
     onToggle: () => void;
     placeholder: string;
     error?: string;
-  }) => (
+  }) => loading ? (
+    <div>
+      <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">{label}</label>
+      <div className="animate-pulse bg-gray-800 rounded-xl h-12" />
+    </div>
+  ) : (
     <div>
       <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">{label}</label>
       <div className="relative">
@@ -532,7 +501,7 @@ export default function DatosSeguridad() {
             <p className="text-gray-500 text-xs mt-0.5">Esta accion no se puede deshacer. Se eliminaran todos tus datos.</p>
           </div>
           <button
-            onClick={handleEliminarCuenta}
+            onClick={() => setShowDeleteModal(true)}
             disabled={deleting}
             className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg transition-colors text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
           >
@@ -540,6 +509,60 @@ export default function DatosSeguridad() {
           </button>
         </div>
       </div>
+
+      {/* Confirm delete modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={() => setShowDeleteModal(false)}>
+          <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                  <i className="fas fa-exclamation-triangle text-red-400 text-lg"></i>
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold text-sm">Eliminar Cuenta</h3>
+                  <p className="text-gray-400 text-sm leading-relaxed mt-0.5">¿Estas segura de eliminar tu cuenta? Esta accion es irreversible.</p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setShowDeleteModal(false)} className="px-4 py-2 bg-[#2a2a3e] hover:bg-[#353550] text-gray-300 rounded-lg text-sm font-medium transition-colors">Cancelar</button>
+                <button onClick={() => { setShowDeleteModal(false); setShowDeletePassModal(true); }} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">Continuar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Password confirmation modal */}
+      {showDeletePassModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={() => { setShowDeletePassModal(false); setDeletePassword(''); }}>
+          <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                  <i className="fas fa-lock text-red-400 text-lg"></i>
+                </div>
+                <div>
+                  <h3 className="text-white font-semibold text-sm">Confirma tu contraseña</h3>
+                  <p className="text-gray-400 text-sm leading-relaxed mt-0.5">Ingresa tu contraseña para eliminar la cuenta.</p>
+                </div>
+              </div>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="Tu contraseña"
+                className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm outline-none focus:border-red-500/50 transition-colors placeholder-gray-600 mb-4"
+                autoFocus
+              />
+              <div className="flex justify-end gap-3">
+                <button onClick={() => { setShowDeletePassModal(false); setDeletePassword(''); }} className="px-4 py-2 bg-[#2a2a3e] hover:bg-[#353550] text-gray-300 rounded-lg text-sm font-medium transition-colors">Cancelar</button>
+                <button onClick={handleEliminarCuenta} disabled={!deletePassword || deleting} className="px-4 py-2 disabled:opacity-50 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">{deleting ? 'Eliminando...' : 'Eliminar Cuenta'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

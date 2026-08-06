@@ -1,0 +1,13 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import SolicitudesExtrasData from "../../components/admin/SolicitudesExtrasData";
+import Sidebar from "../../components/admin/Sidebar";
+import AuthGuard from "../../components/admin/AuthGuard";
+---
+
+<AdminLayout title="Solicitudes Extras | Admin" activePage="solicitudes-extras">
+  <Sidebar slot="sidebar" activePage="solicitudes-extras" client:load />
+  <AuthGuard client:load>
+    <SolicitudesExtrasData client:load />
+  </AuthGuard>
+</AdminLayout>

@@ -322,7 +322,6 @@ export default function ServiciosData() {
         <StatCard label="Activos" value={stats.activos} icon="fa-toggle-on" color="#22c55e" loading={isLoading} />
         <StatCard label="Inactivos" value={stats.inactivos} icon="fa-toggle-off" color="#6b7280" loading={isLoading} />
         <StatCard label="Adicionales" value={stats.adicionales} icon="fa-plus-circle" color="#f97316" loading={isLoading} />
-        <StatCard label="Incluidos" value={stats.incluidos} icon="fa-check-circle" color="#8b5cf6" loading={isLoading} />
       </div>
 
       {successMsg && <div className="bg-green-500/10 border border-green-500/30 text-green-400 px-4 py-3 rounded-lg flex items-center gap-2"><i className="fas fa-check-circle"></i>{successMsg}</div>}

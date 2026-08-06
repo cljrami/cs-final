@@ -30,18 +30,25 @@ try {
     $perPage = isset($_GET['per_page']) ? max(10, min(100, intval($_GET['per_page']))) : 20;
     $offset = ($page - 1) * $perPage;
 
-    $estadosValidos = ['enviado', 'en_revision', 'aprobado', 'rechazado'];
+    $estadosValidos = ['enviado', 'aprobado', 'rechazado', 'pendientes'];
     $params = [];
     $where = "WHERE 1=1";
 
-    if ($estado !== 'todos' && in_array($estado, $estadosValidos)) {
+    if ($estado === 'pendientes') {
+        $where .= " AND vs.estado = 'enviado'";
+    } elseif ($estado !== 'todos' && in_array($estado, $estadosValidos)) {
         $where .= " AND vs.estado = ?";
         $params[] = $estado;
     }
 
     if ($search !== '') {
-        $where .= " AND (e.nombre LIKE ? OR e.email LIKE ?)";
-        $s = "%{$search}%";
+        $escapedSearch = str_replace(['%', '_'], ['\\%', '\\_'], $search);
+        $s = "%{$escapedSearch}%";
+        $where .= " AND (vs.id LIKE ? OR e.id LIKE ? OR e.nombre LIKE ? OR e.email LIKE ? OR e.telefono LIKE ? OR e.ciudad LIKE ?)";
+        $params[] = $s;
+        $params[] = $s;
+        $params[] = $s;
+        $params[] = $s;
         $params[] = $s;
         $params[] = $s;
     }
@@ -90,9 +97,8 @@ try {
         ORDER BY 
             CASE vs.estado 
                 WHEN 'enviado' THEN 1 
-                WHEN 'en_revision' THEN 2 
-                WHEN 'aprobado' THEN 3 
-                WHEN 'rechazado' THEN 4 
+                WHEN 'aprobado' THEN 2 
+                WHEN 'rechazado' THEN 3 
             END,
             vs.created_at DESC
         LIMIT $perPage OFFSET $offset
@@ -139,7 +145,7 @@ try {
     $stmtCounts = $pdo->query("
         SELECT 
             SUM(CASE WHEN estado = 'enviado' THEN 1 ELSE 0 END) as enviados,
-            SUM(CASE WHEN estado = 'en_revision' THEN 1 ELSE 0 END) as en_revision,
+
             SUM(CASE WHEN estado = 'aprobado' THEN 1 ELSE 0 END) as aprobados,
             SUM(CASE WHEN estado = 'rechazado' THEN 1 ELSE 0 END) as rechazados
         FROM escort_vip_solicitudes
@@ -157,8 +163,7 @@ try {
         ],
         'counts' => [
             'todos' => $total,
-            'enviados' => (int)$counts['enviados'],
-            'en_revision' => (int)$counts['en_revision'],
+            'pendientes' => (int)$counts['enviados'],
             'aprobados' => (int)$counts['aprobados'],
             'rechazados' => (int)$counts['rechazados']
         ]
@@ -166,7 +171,7 @@ try {
 } catch (PDOException $e) {
     error_log("Error vip-solicitudes.php PDO: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error de base de datos: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error de base de datos']);
 } catch (Throwable $e) {
     error_log("Error vip-solicitudes.php: " . $e->getMessage());
     http_response_code(500);

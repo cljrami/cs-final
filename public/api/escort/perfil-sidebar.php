@@ -52,6 +52,7 @@ try {
             e.id,
             e.nombre,
             $aprobadaCol
+            e.activa as escort_activa,
             e.estado as estado_cuenta,
             CAST(e.verificado AS UNSIGNED) as verificado,
             CAST(e.vip AS UNSIGNED) as vip,
@@ -83,7 +84,9 @@ try {
 
     $escort['foto_portada'] = $fotoPortada;
     $escort['nombre_artistico'] = $escort['nombre'];
-    $escort['aprobada'] = (bool)($escort['aprobada'] ?? 0) || ($escort['estado_cuenta'] ?? '') === 'aprobada';
+    $escort['aprobada'] = (bool)($escort['aprobada'] ?? 0) 
+        || ($escort['estado_cuenta'] ?? '') === 'aprobada'
+        || $escort['escort_activa'] == 1;
 
     // Fallback: si tiene suscripción aprobada, considerar aprobada
     if (!$escort['aprobada']) {
@@ -97,6 +100,10 @@ try {
             $escort['aprobada'] = true;
         }
     }
+    $stmtComent = $pdo->prepare("SELECT COUNT(*) FROM comentarios WHERE escort_id = ? AND aprobado = 1");
+    $stmtComent->execute([$escortId]);
+    $escort['comentarios_count'] = (int)$stmtComent->fetchColumn();
+
     $escort['pausas_usadas'] = isset($escort['pausas_usadas']) ? (int)$escort['pausas_usadas'] : 0;
     $escort['pausas_maximas'] = isset($escort['pausas_maximas']) ? (int)$escort['pausas_maximas'] : 0;
     $escort['pausas_restantes'] = max(0, $escort['pausas_maximas'] - $escort['pausas_usadas']);
@@ -105,7 +112,7 @@ try {
         SELECT estado 
         FROM escort_vip_solicitudes 
         WHERE escort_id = ? 
-          AND estado IN ('enviado', 'en_revision', 'rechazado')
+          AND estado IN ('enviado', 'rechazado')
         ORDER BY created_at DESC 
         LIMIT 1
     ");

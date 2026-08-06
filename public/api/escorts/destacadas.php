@@ -27,6 +27,7 @@ try {
         WHERE e.activa = 1 
           AND e.eliminada = 0
           AND (e.destacado = 1 OR e.vip = 1 OR e.sticky = 1)
+          AND EXISTS (SELECT 1 FROM suscripciones s WHERE s.escort_id = e.id AND s.fecha_aprobacion IS NOT NULL AND s.estado = 'activa' AND s.fecha_fin >= CURDATE())
         ORDER BY 
             e.sticky DESC,
             e.destacado DESC,

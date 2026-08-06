@@ -45,11 +45,12 @@ try {
     }
 
     require_once __DIR__ . '/../bootstrap.php';
+    require_once __DIR__ . '/../lib/plan_pausas.php';
 
     $pdo = getDBConnection();
     // Obtener suscripción pausada
     $stmt = $pdo->prepare("
-        SELECT s.id, s.fecha_fin, s.fecha_aprobacion, s.fecha_primer_pausa, p.duracion_dias
+        SELECT s.id, s.fecha_fin, s.fecha_aprobacion, s.fecha_pausa, s.dias_pausados, p.duracion_dias
         FROM suscripciones s
         JOIN planes p ON p.id = s.plan_id
         WHERE s.escort_id = ? AND p.tipo = 'base' AND s.estado = 'pausada'
@@ -64,51 +65,55 @@ try {
         exit;
     }
 
-    // Verificar ventana desde primera pausa
-    $fechaPrimerPausa = $suscripcion['fecha_primer_pausa'];
-    $ventanaDias = max(1, (int)$suscripcion['duracion_dias']);
-    if ($fechaPrimerPausa) {
-        $inicio = new DateTime($fechaPrimerPausa);
-        $diff = (int)$inicio->diff(new DateTime())->days;
-        if ($diff > $ventanaDias) {
-            $pdo->prepare("UPDATE suscripciones SET estado = 'expirada' WHERE id = ?")->execute([$suscripcion['id']]);
-            echo json_encode(['success' => false, 'error' => "Pasaron más de {$ventanaDias} días desde la primera pausa. El plan ha expirado."]);
-            exit;
-        }
-    }
-
-    // Obtener días acumulados de pausa
-    $stmtPausas = $pdo->prepare("
-        SELECT COALESCE(SUM(dias_acumulados_pausa), 0) as total_pausado
-        FROM historial_pausas 
-        WHERE suscripcion_id = ? AND accion = 'pausa'
-    ");
-    $stmtPausas->execute([$suscripcion['id']]);
-    $diasPausados = (int)$stmtPausas->fetchColumn();
-
-    // Calcular nueva fecha fin (extender por los días pausados)
-    $fechaFinActual = new DateTime($suscripcion['fecha_fin']);
-    $fechaFinActual->modify("+{$diasPausados} days");
+    // Modelo unificado: sumar la duración real de la pausa y recalcular fecha_fin desde la base
+    $diasEstaPausa = plan_dias_esta_pausa($suscripcion['fecha_pausa']);
+    $diasPausadosTotal = (int)($suscripcion['dias_pausados'] ?? 0) + $diasEstaPausa;
 
     // Reactivar
     $update = $pdo->prepare("
         UPDATE suscripciones 
-        SET estado = 'activa', fecha_fin = ? 
+        SET estado = 'activa', fecha_pausa = NULL, fecha_reactivacion = CURDATE(), dias_pausados = ?
         WHERE id = ?
     ");
-    $update->execute([$fechaFinActual->format('Y-m-d'), $suscripcion['id']]);
+    $update->execute([$diasPausadosTotal, $suscripcion['id']]);
+    $nuevaFechaFin = plan_recalcular_fecha_fin($pdo, $suscripcion['id']);
+
+    // Mostrar escort en el directorio
+    $pdo->prepare("UPDATE escorts SET activa = 1 WHERE id = ?")->execute([$escortId]);
+
+    // Restaurar sticky si tiene un extra sticky activo
+    $stickyExtra = $pdo->prepare("
+        SELECT s.fecha_fin FROM suscripciones s
+        JOIN planes p ON p.id = s.plan_id
+        WHERE s.escort_id = ? AND p.extra_tipo = 'sticky' AND s.estado = 'activa' AND s.fecha_aprobacion IS NOT NULL AND s.fecha_fin >= CURDATE()
+        LIMIT 1
+    ");
+    $stickyExtra->execute([$escortId]);
+    if ($stickyExtra->fetch()) {
+        $pdo->prepare("UPDATE escorts SET sticky = 1 WHERE id = ? AND sticky = 0")->execute([$escortId]);
+    }
 
     // Registrar reactivación
     $insert = $pdo->prepare("
         INSERT INTO historial_pausas (suscripcion_id, escort_id, accion, dias_acumulados_pausa, notas)
-        VALUES (?, ?, 'reactivacion', 0, 'Reactivado desde panel escort')
+        VALUES (?, ?, 'reactivacion', ?, 'Reactivado desde panel escort')
     ");
-    $insert->execute([$suscripcion['id'], $escortId]);
+    $insert->execute([$suscripcion['id'], $escortId, $diasEstaPausa]);
+
+    $af = $pdo->prepare("SELECT foto_principal, nombre FROM escorts WHERE id = ?");
+    $af->execute([$escortId]);
+    $actor = $af->fetch(PDO::FETCH_ASSOC);
+
+    $notif = $pdo->prepare("INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url) VALUES (?, 'sistema', 'Plan reactivado', ?, '/mi-cuenta/mi-plan')");
+    $notif->execute([$escortId, "Tu plan ha sido reactivado desde el panel de control. Vence el " . ($nuevaFechaFin ? date('d/m/Y', strtotime($nuevaFechaFin)) : '—') . "."]);
+
+    $pdo->prepare("INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, url, escort_id) VALUES (NULL, 'sistema', 'Reactivó su plan', ?, '/admin/escorts', ?)")
+        ->execute(["La escort {$actor['nombre']} ha reactivado su plan.", $escortId]);
 
     echo json_encode([
         'success' => true,
         'message' => 'Plan reactivado correctamente',
-        'nueva_fecha_fin' => $fechaFinActual->format('Y-m-d')
+        'nueva_fecha_fin' => $nuevaFechaFin
     ]);
 } catch (PDOException $e) {
     error_log("Error reactivar-plan.php: " . $e->getMessage());

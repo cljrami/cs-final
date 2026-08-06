@@ -2,8 +2,7 @@
 // UI basada en ExtrasPlan pero mostrando SOLO planes base
 
 import React, { useState, useEffect, useRef } from 'react';
-import Skeleton from 'react-loading-skeleton';
-import 'react-loading-skeleton/dist/skeleton.css';
+import { Skeleton } from '../ui/Skeleton';
 
 interface Plan {
   id: number;
@@ -54,12 +53,15 @@ interface MiPlanData {
   fechas?: {
     inicio: string | null;
     fin: string | null;
-    pausa: string | null;
+    pausa?: string | null;
+    fin_proyectada?: string | null;
   };
   pausas?: {
     usadas: number;
     maximas: number;
     restantes: number;
+    limite?: string | null;
+    plazo_dias_restantes?: number | null;
   };
   acciones?: {
     puede_pausar: boolean;
@@ -97,21 +99,18 @@ export default function MiPlan() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [solicitudConfirmada, setSolicitudConfirmada] = useState<SolicitudConfirmada | null>(null);
 
-  const [pausando, setPausando] = useState(false);
-  const [pausaError, setPausaError] = useState('');
-  const [pausaSuccess, setPausaSuccess] = useState('');
-
   const [comprobanteFile, setComprobanteFile] = useState<File | null>(null);
   const [comprobantePreview, setComprobantePreview] = useState('');
   const [subiendoComprobante, setSubiendoComprobante] = useState(false);
   const fileInputComprobante = useRef<HTMLInputElement>(null);
-  const [showPausaConfirm, setShowPausaConfirm] = useState<'pausar' | 'reactivar' | null>(null);
 
   const [showReuploadModal, setShowReuploadModal] = useState(false);
   const [reuploadFile, setReuploadFile] = useState<File | null>(null);
   const [reuploadPreview, setReuploadPreview] = useState('');
   const [reuploadLoading, setReuploadLoading] = useState(false);
   const reuploadInputRef = useRef<HTMLInputElement>(null);
+
+  const [renovando, setRenovando] = useState(false);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('escort_token') : '';
 
@@ -156,36 +155,6 @@ export default function MiPlan() {
     }
   };
 
-  const handlePausaToggle = async (accion: 'pausada' | 'activa') => {
-    setPausando(true);
-    setPausaError('');
-    setPausaSuccess('');
-    setShowPausaConfirm(null);
-
-    try {
-      const res = await fetch('/api/escort/estado.php', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ estado: accion })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setPausaSuccess(accion === 'pausada' ? 'Plan pausado correctamente' : 'Plan reactivado correctamente');
-        fetchMiPlan();
-        setTimeout(() => setPausaSuccess(''), 3000);
-      } else {
-        setPausaError(data.error || 'Error al cambiar estado del plan');
-      }
-    } catch (e) {
-      setPausaError('Error de conexión con el servidor');
-    } finally {
-      setPausando(false);
-    }
-  };
-
   const togglePlanSelection = (planId: number) => {
     const plan = planesBase.find(p => p.id === planId);
     if (!plan || plan.no_disponible) return;
@@ -224,7 +193,7 @@ export default function MiPlan() {
         const uploadData = await uploadRes.json();
         setSubiendoComprobante(false);
         if (uploadData.success) {
-          comprobanteUrl = uploadData.path;
+          comprobanteUrl = uploadData.comprobante_url;
         } else {
           setError(uploadData.error || 'Error al subir comprobante');
           setSolicitando(false);
@@ -301,7 +270,7 @@ export default function MiPlan() {
   // ============================================================
   // RENDER: SIN PLAN ACTIVO - Mostrar cards de planes base
   // ============================================================
-  if (!loading && planData && !planData.tiene_plan) {
+  if (!loading && planData && (!planData.tiene_plan || renovando)) {
     return (
       <>
         <div className="space-y-8">
@@ -312,12 +281,23 @@ export default function MiPlan() {
               Mi Plan
             </h1>
             <p className="text-gray-500 mt-1">
-              {planData.ya_uso_gratis 
+              {renovando
+                ? 'Tu plan anterior venció. Elige un nuevo plan para reactivar tu anuncio. Tu historial de planes, pagos y extras se conserva.'
+                : planData.ya_uso_gratis 
                 ? 'Elige un plan para seguir publicando tu perfil'
                 : '¡Publica tu perfil! Selecciona un plan para empezar'
               }
             </p>
           </div>
+
+          {renovando && (
+            <button
+              onClick={() => setRenovando(false)}
+              className="inline-flex items-center gap-2 text-gray-500 hover:text-white transition-colors text-sm"
+            >
+              <i className="fas fa-arrow-left" /> Volver a mi plan actual
+            </button>
+          )}
 
           {/* Alerts */}
           {error && (
@@ -724,11 +704,7 @@ export default function MiPlan() {
 
               {puedeRenovar && (
                 <button
-                  onClick={() => {
-                    setPlanData(null);
-                    fetchMiPlan();
-                    fetchPlanesBase();
-                  }}
+                  onClick={() => setRenovando(true)}
                   className="px-4 py-2 bg-red-500 hover:bg-red-400 text-white rounded-lg font-medium transition-colors text-sm"
                 >
                   <i className="fas fa-sync-alt mr-1.5" />
@@ -766,6 +742,7 @@ export default function MiPlan() {
                 <p className="text-sm text-gray-400 mt-1">
                   Tu plan está pausado desde el {fechas.pausa || '-'}. 
                   Tienes {estado.dias_restantes} días guardados.
+                  {fechas.fin_proyectada && <> Al reactivar, tu plan vencerá el <span className="text-white font-medium">{fechas.fin_proyectada}</span>.</>}
                 </p>
               </div>
             )}
@@ -808,10 +785,17 @@ export default function MiPlan() {
                       <span className="text-gray-500 text-sm">Inicio</span>
                       <span className="text-white font-medium">{fechas.inicio || '-'}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500 text-sm">Vencimiento</span>
-                      <span className="text-white font-medium">{fechas.fin || '-'}</span>
-                    </div>
+                    {estado.codigo === 'pausada' && fechas.fin_proyectada ? (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 text-sm">Vencimiento estimado</span>
+                        <span className="text-white font-medium">{fechas.fin_proyectada}</span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500 text-sm">Vencimiento</span>
+                        <span className="text-white font-medium">{fechas.fin || '-'}</span>
+                      </div>
+                    )}
                     {fechas.pausa && (
                       <div className="flex justify-between">
                         <span className="text-gray-500 text-sm">Pausado desde</span>
@@ -870,58 +854,47 @@ export default function MiPlan() {
                     {pausas.restantes}
                   </span>
                 </div>
+                {pausas.limite && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500 text-sm">Plazo para pausar</span>
+                    <span className="text-white font-medium">hasta {pausas.limite}</span>
+                  </div>
+                )}
+                {pausas.plazo_dias_restantes !== null && pausas.plazo_dias_restantes !== undefined && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500 text-sm">Días de plazo</span>
+                    <span className={`font-medium ${pausas.plazo_dias_restantes > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {pausas.plazo_dias_restantes}
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {pausaSuccess && (
-                <div className="mb-3 p-2.5 bg-green-500/10 border border-green-500/20 rounded-lg text-green-400 text-xs flex items-center gap-2">
-                  <i className="fas fa-check-circle"></i>
-                  {pausaSuccess}
-                </div>
-              )}
-              {pausaError && (
-                <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-xs flex items-center gap-2">
-                  <i className="fas fa-exclamation-circle"></i>
-                  {pausaError}
-                </div>
-              )}
-
               {estado.codigo === 'activa' && (
-                <button
-                  onClick={() => {
-                    if (!acciones.puede_pausar) return;
-                    setShowPausaConfirm('pausar');
-                  }}
-                  disabled={pausando || !acciones.puede_pausar}
-                  title={!acciones.puede_pausar ? acciones.motivo_no_pausar : ''}
+                <a
+                  href="/micuenta/pausar-aviso"
                   className={`
                     w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all
                     ${acciones.puede_pausar
                       ? 'bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20 hover:border-yellow-500/50'
-                      : 'bg-gray-800/50 border border-gray-700 text-gray-600 cursor-not-allowed'
+                      : 'bg-gray-800/50 border border-gray-700 text-gray-600 cursor-not-allowed pointer-events-none'
                     }
-                    ${pausando ? 'opacity-70' : ''}
                   `}
                 >
-                  {pausando ? (
-                    <><i className="fas fa-spinner fa-spin"></i> Procesando...</>
-                  ) : (
-                    <><i className="fas fa-pause"></i> Pausar Plan</>
-                  )}
-                </button>
+                  <i className="fas fa-pause"></i> Pausar Plan
+                </a>
+              )}
+              {estado.codigo === 'activa' && !acciones.puede_pausar && acciones.motivo_no_pausar && (
+                <p className="text-xs text-red-400 mt-2 text-center">{acciones.motivo_no_pausar}</p>
               )}
 
               {estado.codigo === 'pausada' && (
-                <button
-                  onClick={() => setShowPausaConfirm('reactivar')}
-                  disabled={pausando}
+                <a
+                  href="/micuenta/pausar-aviso"
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/50"
                 >
-                  {pausando ? (
-                    <><i className="fas fa-spinner fa-spin"></i> Procesando...</>
-                  ) : (
-                    <><i className="fas fa-play"></i> Reactivar Plan</>
-                  )}
-                </button>
+                  <i className="fas fa-play"></i> Reactivar Plan
+                </a>
               )}
             </div>
           </div>
@@ -1034,48 +1007,7 @@ export default function MiPlan() {
             </div>
           )}
         </div>
-      {/* Modal de confirmación para pausar/reactivar */}
-      {showPausaConfirm && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 lg:p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-[#1a1a2e] border border-[#2d2d44] rounded-2xl w-full max-w-[360px] shadow-2xl p-5 lg:p-6 max-h-[85vh] overflow-y-auto">
-            <div className="flex flex-col items-center text-center">
-              <div className={`w-12 h-12 lg:w-14 lg:h-14 rounded-full flex items-center justify-center mb-3 lg:mb-4 ${
-                showPausaConfirm === 'pausar' ? 'bg-yellow-500/10' : 'bg-emerald-500/10'
-              }`}>
-                <i className={`fas ${showPausaConfirm === 'pausar' ? 'fa-pause text-yellow-400' : 'fa-play text-emerald-400'} text-lg lg:text-xl`}></i>
-              </div>
-              <h3 className="text-base lg:text-lg font-bold text-white mb-1 lg:mb-2">
-                {showPausaConfirm === 'pausar' ? 'Pausar plan?' : 'Reactivar plan?'}
-              </h3>
-              <p className="text-gray-400 text-sm mb-4 lg:mb-6">
-                {showPausaConfirm === 'pausar'
-                  ? 'Al pausar tu plan, los días restantes se conservan. Podrás reactivarlo cuando quieras.'
-                  : 'Al reactivar tu plan, tu anuncio volverá a estar visible y se descontarán los días de pausa.'
-                }
-              </p>
-              <div className="flex gap-3 w-full">
-                <button
-                  onClick={() => setShowPausaConfirm(null)}
-                  className="flex-1 px-3 py-2 lg:px-4 lg:py-2.5 bg-[#2d2d44] hover:bg-[#3d3d5c] text-white font-medium rounded-lg transition-colors text-sm"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => handlePausaToggle(showPausaConfirm === 'pausar' ? 'pausada' : 'activa')}
-                  disabled={pausando}
-                  className={`flex-1 px-3 py-2 lg:px-4 lg:py-2.5 font-semibold rounded-lg transition-all text-sm ${
-                    showPausaConfirm === 'pausar'
-                      ? 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-white shadow-lg shadow-yellow-500/20'
-                      : 'bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white shadow-lg shadow-emerald-500/20'
-                  }`}
-                >
-                  {pausando ? 'Procesando...' : showPausaConfirm === 'pausar' ? 'Pausar' : 'Reactivar'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+
       </>
     );
   }
@@ -1085,7 +1017,15 @@ export default function MiPlan() {
   // ============================================================
     return (
       <div className="space-y-8">
-        <Skeleton width={180} height={32} className="mb-6" />
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+            <i className="fas fa-credit-card text-red-500"></i>
+            Mi Plan
+          </h1>
+          <p className="text-gray-500 mt-1">Cargando planes disponibles...</p>
+        </div>
+        {/* Skeleton de planes */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (
             <div key={i} className="bg-[#13131a] border border-gray-800 rounded-2xl p-6">

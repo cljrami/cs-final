@@ -45,12 +45,12 @@ try {
     }
 
     require_once __DIR__ . '/../bootstrap.php';
+    require_once __DIR__ . '/../lib/plan_pausas.php';
 
     $pdo = getDBConnection();
     // Obtener suscripción activa
     $stmt = $pdo->prepare("
-        SELECT s.id, s.fecha_fin, s.fecha_aprobacion, s.fecha_primer_pausa, s.estado,
-               p.max_pausas_permitidas, p.duracion_dias
+        SELECT s.id, s.estado, p.max_pausas_permitidas, p.duracion_dias
         FROM suscripciones s
         JOIN planes p ON p.id = s.plan_id
         WHERE s.escort_id = ? AND p.tipo = 'base' AND s.estado = 'activa' AND s.fecha_aprobacion IS NOT NULL
@@ -65,57 +65,52 @@ try {
         exit;
     }
 
-    // Verificar ventana desde primera pausa
-    $fechaPrimerPausa = $suscripcion['fecha_primer_pausa'];
-    $ventanaDias = max(1, (int)$suscripcion['duracion_dias']);
-    if ($fechaPrimerPausa) {
-        $inicio = new DateTime($fechaPrimerPausa);
-        $diff = (int)$inicio->diff(new DateTime())->days;
-        if ($diff > $ventanaDias) {
-            $pdo->prepare("UPDATE suscripciones SET estado = 'expirada' WHERE id = ?")->execute([$suscripcion['id']]);
-            echo json_encode(['success' => false, 'error' => "Pasaron más de {$ventanaDias} días desde la primera pausa. El plan ha expirado."]);
-            exit;
-        }
-    }
-
     // Verificar pausas usadas
-    $stmtPausas = $pdo->prepare("
-        SELECT COUNT(*) FROM historial_pausas 
-        WHERE suscripcion_id = ? AND accion = 'pausa'
-    ");
-    $stmtPausas->execute([$suscripcion['id']]);
-    $pausasUsadas = (int)$stmtPausas->fetchColumn();
+    $pausasUsadas = plan_pausas_usadas($pdo, $suscripcion['id']);
 
     if ($pausasUsadas >= (int)$suscripcion['max_pausas_permitidas']) {
         echo json_encode(['success' => false, 'error' => 'Límite de pausas alcanzado']);
         exit;
     }
 
-    // Si es la primera pausa, guardar fecha de referencia
-    if ($pausasUsadas === 0) {
-        $pdo->prepare("UPDATE suscripciones SET fecha_primer_pausa = NOW() WHERE id = ?")->execute([$suscripcion['id']]);
+    // Plazo para usar pausas (desde la primera pausa, calendario real)
+    $plazo = plan_plazo_pausas($pdo, $suscripcion['id'], (int)$suscripcion['duracion_dias']);
+    if ($plazo['vencido']) {
+        echo json_encode(['success' => false, 'error' => 'Tu plazo para usar pausas venció el ' . date('d/m/Y', strtotime($plazo['limite']))]);
+        exit;
     }
 
-    // Calcular días usados hasta hoy
-    $fechaInicio = new DateTime($suscripcion['fecha_aprobacion']);
-    $hoy = new DateTime();
-    $diasUsados = (int)$fechaInicio->diff($hoy)->days;
-
-    // Pausar suscripción
-    $update = $pdo->prepare("UPDATE suscripciones SET estado = 'pausada' WHERE id = ?");
+    // Pausar suscripción (reloj congelado: fecha_fin no cambia, se fija fecha_pausa)
+    $update = $pdo->prepare("UPDATE suscripciones SET estado = 'pausada', fecha_pausa = CURDATE() WHERE id = ?");
     $update->execute([$suscripcion['id']]);
+
+    // Ocultar escort en listados públicos
+    $pdo->prepare("UPDATE escorts SET activa = 0 WHERE id = ?")->execute([$escortId]);
+
+    // Limpiar sticky al pausar
+    $pdo->prepare("UPDATE escorts SET sticky = 0, sticky_orden = 0, sticky_expira = NULL WHERE id = ?")->execute([$escortId]);
+    $pdo->prepare("DELETE FROM sticky_posiciones WHERE escort_id = ?")->execute([$escortId]);
 
     // Registrar en historial
     $insert = $pdo->prepare("
         INSERT INTO historial_pausas (suscripcion_id, escort_id, accion, dias_acumulados_pausa, notas)
-        VALUES (?, ?, 'pausa', ?, 'Pausado desde panel escort')
+        VALUES (?, ?, 'pausa', 0, 'Pausado desde panel escort')
     ");
-    $insert->execute([$suscripcion['id'], $escortId, $diasUsados]);
+    $insert->execute([$suscripcion['id'], $escortId]);
+
+    $af = $pdo->prepare("SELECT foto_principal, nombre FROM escorts WHERE id = ?");
+    $af->execute([$escortId]);
+    $actor = $af->fetch(PDO::FETCH_ASSOC);
+
+    $notif = $pdo->prepare("INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url) VALUES (?, 'sistema', 'Plan pausado', ?, '/mi-cuenta/mi-plan')");
+    $notif->execute([$escortId, "Tu plan ha sido pausado desde el panel de control."]);
+
+    $pdo->prepare("INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, url, escort_id) VALUES (NULL, 'sistema', 'Pausó su plan', ?, '/admin/escorts', ?)")
+        ->execute(["La escort {$actor['nombre']} ha pausado su plan.", $escortId]);
 
     echo json_encode([
         'success' => true,
-        'message' => 'Plan pausado correctamente',
-        'dias_usados' => $diasUsados
+        'message' => 'Plan pausado correctamente'
     ]);
 } catch (PDOException $e) {
     error_log("Error pausar-plan.php: " . $e->getMessage());

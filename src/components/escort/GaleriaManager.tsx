@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import Sortable from 'sortablejs';
 import ConfirmModal from '../ui/ConfirmModal';
 
 interface Foto {
@@ -40,6 +41,9 @@ export default function GaleriaManager() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  const esTactil = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -52,6 +56,45 @@ export default function GaleriaManager() {
   useEffect(() => {
     fetchFotos();
   }, []);
+
+  useEffect(() => {
+    if (!esTactil || !gridRef.current || fotos.length < 2) return;
+
+    const sortable = Sortable.create(gridRef.current, {
+      draggable: '.foto-card',
+      animation: 200,
+      forceFallback: true,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      dragClass: 'sortable-drag',
+      onEnd: () => {
+        if (!gridRef.current) return;
+        const cards = Array.from(gridRef.current.querySelectorAll<HTMLElement>('.foto-card'));
+        const ordered = cards
+          .map(card => Number(card.dataset.fotoId))
+          .map((id, index) => ({ id, orden: index }));
+        setFotos(prev => {
+          const orderMap = new Map(ordered.map(f => [f.id, f.orden]));
+          return prev.map(f => ({ ...f, orden: orderMap.get(f.id) ?? f.orden }));
+        });
+        guardarOrden(ordered);
+      }
+    });
+
+    return () => sortable.destroy();
+  }, [esTactil, fotos.length]);
+
+  const guardarOrden = async (fotosOrdenadas: { id: number; orden: number }[]) => {
+    try {
+      await fetch(`${API_BASE}/fotos/ordenar.php`, {
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fotos: fotosOrdenadas })
+      });
+    } catch (err) {
+      console.error('Error guardando orden:', err);
+    }
+  };
 
   const fetchFotos = async () => {
     setLoading(true);
@@ -223,15 +266,7 @@ export default function GaleriaManager() {
     setFotos(updated);
     setDraggingId(null);
     setDragOverId(null);
-    try {
-      await fetch(`${API_BASE}/fotos/ordenar.php`, {
-        method: 'POST',
-        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fotos: updated.map(f => ({ id: f.id, orden: f.orden })) })
-      });
-    } catch (err) {
-      console.error('Error guardando orden:', err);
-    }
+    guardarOrden(updated.map(f => ({ id: f.id, orden: f.orden })));
   };
 
   const openFancybox = (index: number) => {
@@ -245,6 +280,15 @@ export default function GaleriaManager() {
 
   return (
     <div className="space-y-6" onDrop={handleDrop} onDragOver={(e) => e.preventDefault()}>
+      <style>{`
+        .sortable-ghost {
+          opacity: 0.5;
+          transform: scale(0.95) rotate(2deg);
+        }
+        .sortable-chosen {
+          opacity: 0.6;
+        }
+      `}</style>
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
           <i className="fas fa-images text-red-500"></i>
@@ -290,7 +334,7 @@ export default function GaleriaManager() {
             />
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div ref={gridRef} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {uploads.map((u) => (
               <div key={u.tempId} className="relative aspect-3/4 rounded-2xl overflow-hidden bg-gray-800/80 border border-gray-700/50">
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
@@ -310,14 +354,17 @@ export default function GaleriaManager() {
             {fotos.map((foto, index) => (
               <div
                 key={foto.id}
-                draggable
-                onDragStart={(e) => handleDragStart(e, foto.id)}
-                onDragOver={(e) => handleDragOver(e, foto.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDropReorder(e, foto.id)}
-                className={`relative aspect-3/4 rounded-2xl overflow-hidden group cursor-move transition-all duration-300 ${
-                  draggingId === foto.id ? 'opacity-50 scale-95 rotate-2' : ''
-                } ${dragOverId === foto.id && dragOverId !== draggingId ? 'scale-105 ring-2 ring-red-500' : ''} ${
+                data-foto-id={foto.id}
+                {...(!esTactil ? {
+                  draggable: true,
+                  onDragStart: (e) => handleDragStart(e, foto.id),
+                  onDragOver: (e) => handleDragOver(e, foto.id),
+                  onDragLeave: handleDragLeave,
+                  onDrop: (e) => handleDropReorder(e, foto.id)
+                } : {})}
+                className={`foto-card relative aspect-3/4 rounded-2xl overflow-hidden group cursor-move transition-all duration-300 ${
+                  !esTactil && draggingId === foto.id ? 'opacity-50 scale-95 rotate-2' : ''
+                } ${!esTactil && dragOverId === foto.id && dragOverId !== draggingId ? 'scale-105 ring-2 ring-red-500' : ''} ${
                   foto.esPortada ? 'ring-2 ring-yellow-500' : ''
                 }`}
               >
@@ -336,7 +383,7 @@ export default function GaleriaManager() {
                     src={foto.url}
                     alt=""
                     className="w-full h-full object-cover"
-                    onClick={() => openFancybox(index)}
+                    {...(!esTactil ? { onClick: () => openFancybox(index) } : {})}
                   />
                 )}
 
@@ -347,7 +394,9 @@ export default function GaleriaManager() {
                   </div>
                 )}
 
-                <div className="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div className={`absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent transition-opacity duration-300 ${
+                  esTactil ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                }`}>
                   <div className="absolute bottom-0 left-0 right-0 p-3 flex items-center justify-between">
                     <button
                       onClick={(e) => { e.stopPropagation(); setPortada(foto.id); }}

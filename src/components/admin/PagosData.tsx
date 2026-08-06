@@ -15,7 +15,8 @@ interface Pago {
   escort_id: number;
   escort_nombre: string;
   escort_email: string;
-  escort_telefono: string;
+  escort_telefono: string | null;
+  escort_foto: string | null;
   escort_activa: number;
   suscripcion_id: number | null;
   plan_id: number | null;
@@ -26,12 +27,12 @@ interface Pago {
   concepto: string;
   monto: number;
   moneda: string;
-  metodo_pago: string;
+  metodo_pago: string | null;
   estado_pago: string;
   comprobante_url: string | null;
   notas: string;
   creado_en: string;
-  pagado_en: string;
+  pagado_en: string | null;
   origen: string;
 }
 
@@ -52,6 +53,8 @@ const conceptoConfig: Record<string, { icon: string; label: string; color: strin
   plan: { icon: 'fa-box', label: 'Plan', color: '#3b82f6' },
   vip: { icon: 'fa-crown', label: 'VIP', color: '#a855f7' },
   destacado: { icon: 'fa-star', label: 'Destacado', color: '#f59e0b' },
+  sticky: { icon: 'fa-thumbtack', label: 'Sticky', color: '#f97316' },
+  verificacion: { icon: 'fa-id-card', label: 'Verificación', color: '#22d3ee' },
 };
 
 export default function PagosData() {
@@ -68,7 +71,9 @@ export default function PagosData() {
   const [actionType, setActionType] = useState<'aprobar' | 'rechazar' | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [notas, setNotas] = useState('');
+
   const [deleteConfirm, setDeleteConfirm] = useState<Pago | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Fancybox
   useEffect(() => {
@@ -157,8 +162,38 @@ export default function PagosData() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!deleteConfirm) return;
+    setDeleteLoading(true); setError('');
+    try {
+      const res = await fetch(`${API_URL}?id=${deleteConfirm.pago_id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMsg('Pago eliminado correctamente');
+        setTimeout(() => setSuccessMsg(''), 3000);
+        setDeleteConfirm(null);
+        fetchItems();
+        window.dispatchEvent(new Event('counts-refresh'));
+      } else {
+        setError(data.error || 'Error del servidor');
+      }
+    } catch {
+      setError('Error de conexión');
+    } finally { setDeleteLoading(false); }
+  };
+
   const getActions = (item: Pago): ActionItem[] => {
     const acts: ActionItem[] = [];
+    if (item.origen === 'vip') {
+      acts.push({
+        label: 'Ver solicitud', icon: 'fa-external-link-alt',
+        onClick: () => window.open('/admin/solicitudes-vip', '_blank'),
+      });
+      return acts;
+    }
     if (item.origen === 'pago' && item.estado_pago === 'pendiente') {
       acts.push({
         label: 'Aprobar', icon: 'fa-check',
@@ -169,6 +204,10 @@ export default function PagosData() {
         onClick: () => { setActionItem(item); setActionType('rechazar'); setNotas(''); },
       });
     }
+    acts.push({
+      label: 'Eliminar', icon: 'fa-trash', danger: true,
+      onClick: () => { setDeleteConfirm(item); },
+    });
     return acts;
   };
 
@@ -177,6 +216,15 @@ export default function PagosData() {
       key: 'escort', header: 'Escort', width: '240',
       render: (item) => (
         <div className="flex items-center gap-3">
+          {item.escort_foto ? (
+            <img src={item.escort_foto} alt=""
+              className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0 text-white text-xs font-bold">
+              {item.escort_nombre.charAt(0).toUpperCase()}
+            </div>
+          )}
           <div className="min-w-0">
             <div className="font-medium whitespace-nowrap text-sm text-white">
               {item.escort_nombre}
@@ -202,17 +250,20 @@ export default function PagosData() {
       ),
     },
     {
-      key: 'tipo', header: 'Tipo', width: '80', align: 'center',
+      key: 'tipo', header: 'Tipo', width: '90', align: 'center',
       render: (item) => {
-        const esBase = item.plan_tipo === 'base';
+        const styles: Record<string, { bg: string; text: string; icon: string; label: string }> = {
+          base: { bg: 'bg-purple-500/20', text: 'text-purple-400', icon: 'fa-box', label: 'Base' },
+          extra: { bg: 'bg-amber-500/20', text: 'text-amber-400', icon: 'fa-puzzle-piece', label: 'Extra' },
+          vip: { bg: 'bg-fuchsia-500/20', text: 'text-fuchsia-400', icon: 'fa-crown', label: 'VIP' },
+          verificacion: { bg: 'bg-cyan-500/20', text: 'text-cyan-400', icon: 'fa-id-card', label: 'Verif.' },
+          pago: { bg: 'bg-blue-500/20', text: 'text-blue-400', icon: 'fa-receipt', label: 'Pago' },
+        };
+        const s = styles[item.plan_tipo] || styles.pago;
         return (
-          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
-            esBase
-              ? 'bg-purple-500/20 text-purple-400'
-              : 'bg-amber-500/20 text-amber-400'
-          }`}>
-            <i className={`fas ${esBase ? 'fa-box' : 'fa-puzzle-piece'} text-[0.6rem]`}></i>
-            {esBase ? 'Base' : 'Extra'}
+          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${s.bg} ${s.text}`}>
+            <i className={`fas ${s.icon} text-[0.6rem]`}></i>
+            {s.label}
           </span>
         );
       },
@@ -229,6 +280,16 @@ export default function PagosData() {
       key: 'comprobante', header: 'Comprobante', width: '80', align: 'center',
       render: (item) => {
         if (!item.comprobante_url) return <span className="text-gray-600 text-xs">—</span>;
+        const isPdf = item.comprobante_url.match(/\.pdf$/i);
+        if (isPdf) {
+          return (
+            <a href={item.comprobante_url} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center w-10 h-10 mx-auto rounded-lg bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 transition-colors"
+              title="Ver comprobante PDF">
+              <i className="fas fa-file-pdf text-red-400 text-lg"></i>
+            </a>
+          );
+        }
         return (
           <a href={item.comprobante_url} data-fancybox="pago-comprobante" className="block relative w-10 h-10 mx-auto">
             <img src={item.comprobante_url} alt="Comprobante"
@@ -264,11 +325,13 @@ export default function PagosData() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-          <i className="fas fa-receipt text-blue-400"></i> Historial de Pagos
-        </h1>
-        <p className="text-gray-400 mt-1">Gestiona los pagos realizados por las escorts</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <i className="fas fa-receipt text-blue-400"></i> Historial de Pagos
+          </h1>
+          <p className="text-gray-400 mt-1">Gestiona los pagos realizados por las escorts</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -388,13 +451,15 @@ export default function PagosData() {
       <ConfirmModal
         isOpen={deleteConfirm !== null}
         title="Eliminar pago"
-        message="¿Eliminar este pago permanentemente?"
-        confirmText="Eliminar"
+        message={deleteConfirm ? `¿Eliminar el pago de ${deleteConfirm.escort_nombre} por ${new Intl.NumberFormat('es-CL', { style: 'currency', currency: deleteConfirm.moneda, minimumFractionDigits: 0 }).format(deleteConfirm.monto)}?` : ''}
+        confirmText={deleteLoading ? 'Eliminando...' : 'Eliminar'}
         cancelText="Cancelar"
         variant="danger"
-        onConfirm={() => {}}
+        onConfirm={handleDelete}
         onCancel={() => setDeleteConfirm(null)}
       />
+
+
     </div>
   );
 }

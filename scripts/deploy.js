@@ -2,6 +2,7 @@ import { Client } from 'basic-ftp';
 import { readdirSync, statSync, readFileSync, writeFileSync, existsSync } from 'fs';
 import { join, relative, dirname } from 'path';
 import { createHash } from 'crypto';
+import './fix-css-fonts.mjs';
 
 const CONFIG = {
   host: process.env.FTP_HOST || 'kimi.zona8.cl',
@@ -13,6 +14,7 @@ const CONFIG = {
 
 const CACHE_FILE = join(process.cwd(), '.deploy-cache.json');
 const MAX_RETRIES = 4;
+const PHP_SOURCE_DIR = 'public';
 
 function md5(filePath) {
   return createHash('md5').update(readFileSync(filePath)).digest('hex');
@@ -69,6 +71,17 @@ async function deploy() {
   });
 
   const localFiles = walkDir(CONFIG.localRoot);
+
+  // Incluir archivos PHP desde public/ (no se compilan con Astro, se despliegan directamente)
+  // Incluir archivos PHP desde public/api/ (no se compilan con Astro, se despliegan directamente)
+  const apiDir = join(PHP_SOURCE_DIR, 'api');
+  if (existsSync(apiDir)) {
+    walkDir(apiDir).filter(f => /\.(php)$/i.test(f.path)).forEach(f => {
+      const relApi = relative(apiDir, f.path).replace(/\\/g, '/');
+      const webRel = join('api', relApi).replace(/\\/g, '/');
+      localFiles.push({ ...f, webRel });
+    });
+  }
   const cache = loadCache();
   const ensuredDirs = new Set();
   let uploaded = 0;
@@ -118,23 +131,36 @@ async function deploy() {
   }
 
   try {
-    for (const file of localFiles) {
-      const relPath = relative(CONFIG.localRoot, file.path).replace(/\\/g, '/');
-      const remoteFile = join(CONFIG.remoteRoot, relPath).replace(/\\/g, '/');
-      const remoteDir = dirname(remoteFile);
-      const localHash = md5(file.path);
+    // Script para solucionar el problema de migración de sticky_posiciones
+    const fixScriptDir = join(PHP_SOURCE_DIR, 'admin');
+    const fixScriptPath = join(fixScriptDir, 'fix_sticky_positions_v2.php');
+    if (existsSync(fixScriptPath)) {
+      const fixContent = readFileSync(fixScriptPath, 'utf-8');
+      const encodedFix = Buffer.from(fixContent).toString('base64');
+      localFiles.push({
+        path: fixScriptPath,
+        size: statSync(fixScriptPath).size,
+        webRel: 'api/admin/fix_sticky_positions_v2.php',
+      });
+    }
 
-      // Saltar usando cache local (evita round-trips innecesarios al servidor).
-      if (cache[relPath] === localHash) {
+
+    // Subir archivos (saltando los que no cambiaron según cache)
+    for (const file of localFiles) {
+      const relPath = file.webRel || relative(CONFIG.localRoot, file.path).replace(/\\/g, '/');
+      const remoteFile = join(CONFIG.remoteRoot, relPath).replace(/\\/g, '/');
+      const remoteDir = dirname(remoteFile).replace(/\\/g, '/');
+      const hash = md5(file.path);
+      const cacheKey = relPath;
+
+      if (cache[cacheKey] === hash) {
         skipped++;
         continue;
       }
 
       const ok = await uploadWithRetry(file, relPath, remoteFile, remoteDir);
       if (ok) {
-        cache[relPath] = localHash;
-        saveCache(cache); // guardado incremental: no se pierde el progreso
-        console.log(`✓ ${relPath}`);
+        cache[cacheKey] = hash;
         uploaded++;
       } else {
         failed++;

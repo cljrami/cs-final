@@ -42,6 +42,6 @@ try {
     http_response_code(500);
     echo json_encode([
         'valid' => false,
-        'error' => 'Error interno: ' . $e->getMessage()
+        'error' => 'Error del servidor'
     ]);
 }

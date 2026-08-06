@@ -53,12 +53,12 @@ try {
             exit;
         }
 
-        // Buscar plan activo por escort_id
+        // Buscar plan BASE activo por escort_id (los extras se rigen por los días del plan base)
         $planStmt = $pdo->prepare("
             SELECT s.id, s.plan_id, s.fecha_fin, p.nombre as plan_nombre, p.duracion_dias as plan_duracion_dias
             FROM suscripciones s
             LEFT JOIN planes p ON s.plan_id = p.id
-            WHERE s.escort_id = ? AND s.estado = 'activa' AND s.fecha_fin >= CURDATE()
+            WHERE s.escort_id = ? AND s.estado = 'activa' AND s.fecha_fin >= CURDATE() AND p.tipo = 'base'
             ORDER BY s.fecha_fin DESC
             LIMIT 1
         ");
@@ -66,16 +66,20 @@ try {
         $planActivo = $planStmt->fetch(PDO::FETCH_ASSOC);
 
         $diasPlanRestantes = 0;
+        $planVenceEnDias = null;
         if ($planActivo && $planActivo['fecha_fin']) {
             $diasPlanRestantes = max(0, ceil((strtotime($planActivo['fecha_fin']) - time()) / 86400));
+            $planVenceEnDias = date('Y-m-d', strtotime($planActivo['fecha_fin']));
         }
 
-        // Extras disponibles (catálogo desde planes tipo='extra')
+        // Opciones disponibles para solicitar (solo las que cumplan los requisitos)
         $extrasStmt = $pdo->prepare("
-            SELECT id, nombre, slug, descripcion, extra_tipo as tipo, duracion_dias, precio, moneda, color_badge, orden, activo
-            FROM planes
-            WHERE tipo = 'extra' AND activo = 1
-            ORDER BY extra_tipo ASC, orden ASC, id ASC
+            SELECT 
+                p.id, p.nombre, p.slug, p.descripcion, p.extra_tipo as tipo, p.duracion_dias, p.precio, p.moneda, 
+                p.color_badge, p.orden, p.activo, p.uso_unico
+            FROM planes p
+            WHERE p.tipo = 'extra' AND p.activo = 1
+            ORDER BY p.extra_tipo ASC, p.orden ASC, p.id ASC
         ");
         $extrasStmt->execute();
         $extras = $extrasStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -93,6 +97,7 @@ try {
                 p.precio as extra_precio,
                 p.moneda as extra_moneda,
                 p.color_badge as extra_color_badge,
+                p.uso_unico,
                 s.fecha_inicio,
                 s.fecha_fin,
                 s.estado,
@@ -105,18 +110,52 @@ try {
         $misExtrasStmt->execute([$escortId]);
         $misExtras = $misExtrasStmt->fetchAll(PDO::FETCH_ASSOC);
 
-        // Tipos que ya tiene activos/pendientes
-        $tiposOcupados = array_unique(array_map(fn($me) => $me['extra_tipo'], $misExtras));
+        // Determinar si la escort ya tiene un extra vigente que bloquea solicitar otro.
+        // Se considera bloqueante: pendiente de aprobación, pausado o activo vigente.
+        $tieneExtraVigente = false;
+        $extraVigente = null;
+        
+        if ($misExtras) {
+            foreach ($misExtras as $extra) {
+                if ($extra['estado'] === 'pendiente_aprobacion') {
+                    $tieneExtraVigente = true;
+                    $extraVigente = $extra;
+                    break;
+                } elseif ($extra['estado'] === 'pausada') {
+                    $tieneExtraVigente = true;
+                    if (!$extraVigente) $extraVigente = $extra;
+                } elseif ($extra['estado'] === 'activa' && $extra['fecha_fin'] >= CURDATE()) {
+                    $tieneExtraVigente = true;
+                    if (!$extraVigente || $extra['fecha_fin'] > $extraVigente['fecha_fin']) $extraVigente = $extra;
+                }
+            }
+        }
 
-        // Agregar flags a cada extra para el frontend
-        $extrasConFlags = array_map(function ($extra) use ($tiposOcupados, $diasPlanRestantes, $planActivo) {
-            $tipoOcupado = in_array($extra['tipo'], $tiposOcupados);
+        // Agregar flags a cada extra para el frontend.
+        // Regla: se puede solicitar cualquier extra mientras quepa en los días
+        // restantes del plan base activo, y solo si no existe ya un extra
+        // pendiente/pausado/activo. Cuando el extra vigente venza, se permite volver a solicitar.
+        $extrasConFlags = array_map(function ($extra) use ($diasPlanRestantes, $planActivo, $tieneExtraVigente, $extraVigente) {
             $duracionOk = (int)$extra['duracion_dias'] <= $diasPlanRestantes;
 
+            $puedeSolicitar = $planActivo && $duracionOk && !$tieneExtraVigente;
+
+            $motivo = null;
+            if ($tieneExtraVigente) {
+                $motivo = 'Ya tienes un extra pendiente, pausado o activo. Podrás solicitar otro una vez que este venza.';
+                if ($extraVigente && !empty($extraVigente['fecha_fin'])) {
+                    $motivo .= ' Vence el ' . date('d/m/Y', strtotime($extraVigente['fecha_fin'])) . '.';
+                }
+            } elseif (!$planActivo) {
+                $motivo = 'Necesitas un plan base activo para contratar extras.';
+            } elseif (!$duracionOk) {
+                $motivo = 'Este extra no cabe en los días restantes de tu plan.';
+            }
+
             return array_merge($extra, [
-                '_tipo_ocupado' => $tipoOcupado,
                 '_duracion_ok' => $duracionOk,
-                '_puede_solicitar' => $planActivo && !$tipoOcupado && $duracionOk
+                '_puede_solicitar' => $puedeSolicitar,
+                '_motivo_no_disponible' => $motivo
             ]);
         }, $extras);
 
@@ -126,7 +165,17 @@ try {
                 'id' => (int)$planActivo['id'],
                 'nombre' => $planActivo['plan_nombre'],
                 'fecha_fin' => $planActivo['fecha_fin'],
-                'dias_restantes' => $diasPlanRestantes
+                'dias_restantes' => $diasPlanRestantes,
+                'vence_en_dias' => $planVenceEnDias
+            ] : null,
+            'tiene_extra_vigente' => $tieneExtraVigente,
+            'extra_vigente' => $extraVigente ? [
+                'id' => (int)$extraVigente['id'],
+                'extra_id' => (int)$extraVigente['extra_id'],
+                'extra_nombre' => $extraVigente['extra_nombre'],
+                'extra_tipo' => $extraVigente['extra_tipo'],
+                'estado' => $extraVigente['estado'],
+                'fecha_fin' => $extraVigente['fecha_fin']
             ] : null,
             'extras' => $extrasConFlags,
             'mis_extras' => $misExtras
@@ -156,12 +205,12 @@ try {
             exit;
         }
 
-        // Buscar plan activo
+        // Buscar plan BASE activo
         $planStmt = $pdo->prepare("
             SELECT s.id, s.fecha_fin, p.duracion_dias as plan_duracion_dias
             FROM suscripciones s
             LEFT JOIN planes p ON s.plan_id = p.id
-            WHERE s.escort_id = ? AND s.estado = 'activa' AND s.fecha_fin >= CURDATE()
+            WHERE s.escort_id = ? AND s.estado = 'activa' AND s.fecha_fin >= CURDATE() AND p.tipo = 'base'
             ORDER BY s.fecha_fin DESC
             LIMIT 1
         ");
@@ -198,18 +247,22 @@ try {
             exit;
         }
 
-        // Validar: no puede tener otro extra del MISMO tipo activo/pendiente
-        $mismoTipoStmt = $pdo->prepare("
+        // Validar: no puede solicitar un extra si ya tiene uno pendiente, pausado o activo.
+        // Solo una vez que el extra vigente venza podrá solicitar otro.
+        $extraBloqueanteStmt = $pdo->prepare("
             SELECT COUNT(*) FROM suscripciones s
             JOIN planes p ON s.plan_id = p.id
-            WHERE s.escort_id = ? AND p.extra_tipo = ? AND p.tipo = 'extra' AND s.estado IN ('activa', 'pendiente_aprobacion')
+            WHERE s.escort_id = ? AND p.tipo = 'extra'
+              AND (s.estado = 'pendiente_aprobacion'
+                   OR s.estado = 'pausada'
+                   OR (s.estado = 'activa' AND s.fecha_fin >= CURDATE()))
         ");
-        $mismoTipoStmt->execute([$escortId, $extra['extra_tipo']]);
-        if ((int)$mismoTipoStmt->fetchColumn() > 0) {
+        $extraBloqueanteStmt->execute([$escortId]);
+        if ((int)$extraBloqueanteStmt->fetchColumn() > 0) {
             http_response_code(409);
             echo json_encode([
                 'success' => false,
-                'error' => "Ya tienes un extra de tipo '{$extra['extra_tipo']}' activo o pendiente. Solo puedes tener uno por categoría."
+                'error' => 'Ya tienes un extra pendiente, pausado o activo. Podrás solicitar otro una vez que este venza.'
             ]);
             exit;
         }

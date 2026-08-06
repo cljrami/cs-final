@@ -53,6 +53,11 @@ try {
         exit;
     }
 
+    if ($suscripcion['plan_tipo'] === 'extra') {
+        echo json_encode(['success' => false, 'error' => 'Las solicitudes de planes extra se gestionan desde el panel de Solicitudes Extras']);
+        exit;
+    }
+
     $pdo->beginTransaction();
 
     try {
@@ -64,17 +69,14 @@ try {
         $stmtUsados = $pdo->prepare("DELETE FROM planes_usados WHERE plan_id = ? AND escort_id = ?");
         $stmtUsados->execute([$suscripcion['plan_id'], $suscripcion['escort_id']]);
 
-        // Si era plan base, limpiar plan_id y suscripcion_id de escort, y quitar VIP/destacado
+        // Si era plan base, quitar VIP/destacado
         if ($suscripcion['plan_tipo'] === 'base') {
             $stmtEscort = $pdo->prepare("
                 UPDATE escorts 
-                SET plan_id = NULL, 
-                    suscripcion_id = NULL,
-                    vip = 0,
+                SET vip = 0,
                     fecha_vip_expira = NULL,
                     destacado = 0,
-                    fecha_destacado_expira = NULL,
-                    activa = 0
+                    fecha_destacado_expira = NULL
                 WHERE id = ?
             ");
             $stmtEscort->execute([$suscripcion['escort_id']]);

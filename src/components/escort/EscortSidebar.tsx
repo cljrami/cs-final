@@ -1,7 +1,6 @@
 // src/components/escort/EscortSidebar.tsx
 import { useState, useEffect, useCallback } from 'react';
-import Skeleton from 'react-loading-skeleton';
-import 'react-loading-skeleton/dist/skeleton.css';
+import { Skeleton } from '../ui/Skeleton';
 
 interface Props {
   activePage: string;
@@ -21,8 +20,9 @@ interface EscortData {
   pausas_restantes: number;
   verificado: number;
   vip: number;
+  comentarios_count: number;
   aprobada?: number;
-  vip_solicitud_estado?: 'enviado' | 'en_revision' | 'rechazado' | null;
+  vip_solicitud_estado?: 'enviado' | 'rechazado' | null;
   verificacion_estado?: 'pendiente' | 'en_revision' | 'aprobada' | 'rechazada' | null;
 }
 
@@ -30,7 +30,6 @@ export default function EscortSidebar({ activePage }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [escort, setEscort] = useState<EscortData | null>(null);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [pausing, setPausing] = useState(false);
   const [notifMsg, setNotifMsg] = useState('');
   const [notifType, setNotifType] = useState<'error' | 'success'>('error');
 
@@ -75,48 +74,13 @@ export default function EscortSidebar({ activePage }: Props) {
     window.location.href = '/micuenta/login';
   };
 
-  const handlePauseToggle = async () => {
-    if (pausing || !escort) return;
-    const isPaused = escort.plan_estado === 'pausada';
-    const endpoint = isPaused ? '/api/escort/reactivar-plan.php' : '/api/escort/pausar-plan.php';
-    const confirmMsg = isPaused
-      ? '¿Reactivar tu aviso? Volverá a ser visible para los clientes.'
-      : '¿Pausar tu aviso? Dejará de mostrarse hasta que lo reactives.';
-    if (!confirm(confirmMsg)) return;
-
-    setPausing(true);
-    try {
-      const token = localStorage.getItem('escort_token');
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.success) {
-        fetchSidebar();
-        window.dispatchEvent(new Event('sidebar-refresh'));
-        setNotifType('success');
-        setNotifMsg(data.message || 'Estado cambiado correctamente');
-        setTimeout(() => setNotifMsg(''), 4000);
-      } else {
-        setNotifType('error');
-        setNotifMsg(data.error || 'No se pudo cambiar el estado del aviso');
-        setTimeout(() => setNotifMsg(''), 4000);
-      }
-    } catch {
-      setNotifType('error');
-      setNotifMsg('Error de conexión');
-      setTimeout(() => setNotifMsg(''), 4000);
-    } finally {
-      setPausing(false);
-    }
-  };
-
   const menuItems = [
     { id: 'resumen', label: 'Resumen', icon: 'fa-chart-line', href: '/micuenta/resumen' },
     { id: 'perfil', label: 'Editar Perfil', icon: 'fa-user-edit', href: '/micuenta/perfil' },
     { id: 'fotos', label: 'Gestionar Fotos', icon: 'fa-images', href: '/micuenta/fotos' },
     { id: 'historias', label: 'Mis Historias', icon: 'fa-history', href: '/micuenta/historias' },
+    { id: 'comentarios', label: 'Mis Comentarios', icon: 'fa-comments', href: '/micuenta/comentarios' },
+    { id: 'estadisticas', label: 'Estadísticas', icon: 'fa-chart-simple', href: '/micuenta/estadisticas' },
     { id: 'datos', label: 'Mis Datos', icon: 'fa-id-card', href: '/micuenta/datos' },
   ];
 
@@ -169,7 +133,7 @@ export default function EscortSidebar({ activePage }: Props) {
         href: '/micuenta/vip',
       };
     }
-    if (escort?.vip_solicitud_estado === 'enviado' || escort?.vip_solicitud_estado === 'en_revision') {
+    if (escort?.vip_solicitud_estado === 'enviado') {
       return {
         label: 'VIP',
         statusText: 'En proceso',
@@ -281,15 +245,13 @@ export default function EscortSidebar({ activePage }: Props) {
       >
         <i className={`fas ${item.icon} w-6 text-center`}></i>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span>{item.label}</span>
-            {item.badge && (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded border ${item.badge.color}`}>
-                {item.badge.text}
-              </span>
-            )}
-          </div>
+          <span>{item.label}</span>
         </div>
+        {item.badge && (
+          <span className={`text-xs font-bold min-w-[22px] h-[22px] flex items-center justify-center rounded-full px-1.5 shadow-lg ${item.badge.color}`}>
+            {item.badge.text}
+          </span>
+        )}
       </a>
     );
   };
@@ -395,7 +357,12 @@ export default function EscortSidebar({ activePage }: Props) {
           <div className="text-[0.7rem] text-gray-500 uppercase tracking-widest px-3 mb-2">
             Principal
           </div>
-          {menuItems.map(item => renderMenuItem(item))}
+          {menuItems.map(item => renderMenuItem({
+            ...item,
+            badge: item.id === 'comentarios' && (escort?.comentarios_count ?? 0) > 0
+              ? { text: String(escort.comentarios_count), color: 'bg-red-500 text-white shadow-red-500/30' }
+              : null
+          }))}
 
           {/* ── MI PLAN ── */}
           <div className="text-[0.7rem] text-gray-500 uppercase tracking-widest px-3 mt-4 lg:mt-6 mb-2">
@@ -410,34 +377,18 @@ export default function EscortSidebar({ activePage }: Props) {
             icon: 'fa-plus-circle',
           }, !escort)}
           {renderMenuItem({ id: 'pagos', label: 'Historial de Pagos', icon: 'fa-receipt', href: '/micuenta/pagos' })}
-
-          {/* ── PAUSAR / REACTIVAR AVISO ── */}
-          {escort && (escort.plan_estado === 'activa' || escort.plan_estado === 'pausada') && (
-            <button
-              onClick={handlePauseToggle}
-              disabled={pausing}
-              className={`
-                w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mt-1 transition-all duration-200
-                disabled:opacity-60 disabled:cursor-wait
-                ${escort.plan_estado === 'pausada'
-                  ? 'bg-green-500/10 border border-green-500/30 hover:border-green-500/60 text-green-400'
-                  : 'bg-amber-500/10 border border-amber-500/30 hover:border-amber-500/60 text-amber-400'
+          {renderMenuItem({
+            id: 'pausar-aviso',
+            label: 'Pausar Aviso',
+            icon: 'fa-pause-circle',
+            href: '/micuenta/pausar-aviso',
+            badge: (escort?.pausas_restantes ?? 0) >= 0 && (escort?.pausas_maximas ?? 0) > 0
+              ? {
+                  text: String(escort?.pausas_restantes ?? 0),
+                  color: (escort?.pausas_restantes ?? 0) > 0 ? 'bg-red-500 text-white' : 'bg-gray-600 text-gray-300',
                 }
-              `}
-            >
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${escort.plan_estado === 'pausada' ? 'bg-green-500/10' : 'bg-amber-500/10'}`}>
-                <i className={`fas ${pausing ? 'fa-circle-notch fa-spin' : escort.plan_estado === 'pausada' ? 'fa-play' : 'fa-pause'} text-sm`}></i>
-              </div>
-              <div className="flex-1 min-w-0 text-left">
-                <div className="text-sm font-semibold">
-                  {escort.plan_estado === 'pausada' ? 'Reactivar aviso' : 'Pausar aviso'}
-                </div>
-                <div className="text-[10px] opacity-70">
-                  {escort.plan_estado === 'pausada' ? 'Tu aviso está pausado' : `Pausas: ${escort.pausas_usadas ?? 0}/${escort.pausas_maximas ?? 0}`}
-                </div>
-              </div>
-            </button>
-          )}
+              : null,
+          })}
 
           {/* ── ESTADO DE CUENTA (Verificación + VIP como en la foto) ── */}
           <div className="text-[0.7rem] text-gray-500 uppercase tracking-widest px-3 mt-4 lg:mt-6 mb-2">

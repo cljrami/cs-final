@@ -47,10 +47,11 @@ try {
     $pdo = getDBConnection();
     $method = $_SERVER['REQUEST_METHOD'];
 
-    // === GET - Mis pagos (incluye extras sin pago) ===
+    // === GET - Mis pagos (incluye extras, VIP, suscripciones base) ===
     if ($method === 'GET') {
         $stmt = $pdo->prepare("
             SELECT * FROM (
+                -- 1. Pagos reales
                 SELECT 
                     p.id,
                     p.monto,
@@ -61,7 +62,7 @@ try {
                     p.comprobante_url,
                     p.creado_en,
                     p.pagado_en,
-                    pl.nombre as plan_nombre,
+                    COALESCE(pl.nombre, '') as plan_nombre,
                     s.fecha_fin as vencimiento
                 FROM pagos p
                 LEFT JOIN planes pl ON pl.id = p.plan_id
@@ -70,31 +71,70 @@ try {
 
                 UNION ALL
 
+                -- 2. Suscripciones (base + extra) sin pago vinculado
                 SELECT 
                     s.id + 1000000 as id,
                     s.precio_pagado as monto,
                     s.moneda,
-                    'destacado' as concepto,
+                    CASE WHEN pl.extra_tipo IS NOT NULL THEN pl.extra_tipo ELSE 'plan' END as concepto,
                     NULL as metodo_pago,
                     CASE 
                         WHEN s.estado = 'activa' OR s.fecha_aprobacion IS NOT NULL THEN 'completado'
-                        WHEN s.estado = 'rechazada' OR s.estado_pago = 'rechazado' THEN 'rechazado'
+                        WHEN s.estado = 'rechazada' THEN 'rechazado'
                         ELSE 'pendiente'
                     END as estado_pago,
-                    NULL as comprobante_url,
+                    s.comprobante_pago as comprobante_url,
                     s.creado_en,
-                    NULL as pagado_en,
+                    s.fecha_aprobacion as pagado_en,
                     pl.nombre as plan_nombre,
                     s.fecha_fin as vencimiento
                 FROM suscripciones s
-                JOIN planes pl ON pl.id = s.plan_id AND pl.tipo = 'extra'
+                JOIN planes pl ON pl.id = s.plan_id
                 WHERE s.escort_id = ?
-                AND NOT EXISTS (SELECT 1 FROM pagos p2 WHERE p2.suscripcion_id = s.id)
+                AND s.eliminada = 0
+                AND NOT EXISTS (
+                    SELECT 1 FROM pagos p2 
+                    WHERE p2.suscripcion_id = s.id 
+                       OR (p2.escort_id = s.escort_id AND p2.plan_id = s.plan_id AND p2.estado_pago != 'rechazado')
+                )
+
+                UNION ALL
+
+                -- 3. Solicitudes VIP
+                SELECT 
+                    vs.id + 2000000 as id,
+                    vs.precio_vip as monto,
+                    'CLP' as moneda,
+                    'vip' as concepto,
+                    vs.metodo_pago,
+                    CASE 
+                        WHEN vs.estado = 'aprobado' THEN 'completado'
+                        WHEN vs.estado = 'rechazado' THEN 'rechazado'
+                        ELSE 'pendiente'
+                    END as estado_pago,
+                    vs.comprobante_pago as comprobante_url,
+                    vs.created_at as creado_en,
+                    vs.fecha_respuesta as pagado_en,
+                    CONCAT('VIP ', UCASE(vs.plan)) as plan_nombre,
+                    NULL as vencimiento
+                FROM escort_vip_solicitudes vs
+                WHERE vs.escort_id = ?
             ) combined
             ORDER BY creado_en DESC
         ");
-        $stmt->execute([$escortId, $escortId]);
+        $stmt->execute([$escortId, $escortId, $escortId]);
         $pagos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // Proxy comprobante URLs
+        foreach ($pagos as &$p) {
+            $url = $p['comprobante_url'] ?? '';
+            if (empty($url) || preg_match('/^(pendiente|sin_comprobante|none|null|sistema_reparacion)$/i', trim($url))) {
+                $p['comprobante_url'] = null;
+            } elseif (!str_starts_with($url, '/api/serve-upload.php')) {
+                $p['comprobante_url'] = '/api/serve-upload.php?path=/' . ltrim($url, '/');
+            }
+        }
+        unset($p);
 
         echo json_encode(['success' => true, 'pagos' => $pagos]);
         exit;
@@ -209,9 +249,9 @@ try {
 } catch (PDOException $e) {
     error_log("Error escort/pagos.php PDO: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'DB: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error de base de datos']);
 } catch (Throwable $e) {
     error_log("Error escort/pagos.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }

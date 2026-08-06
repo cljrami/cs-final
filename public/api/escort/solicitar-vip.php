@@ -34,7 +34,7 @@ try {
 
     // Obtener datos de la escort
     $stmtEscort = $pdo->prepare("
-        SELECT id, nombre, email, vip, plan_id, suscripcion_id, eliminada 
+        SELECT id, nombre, email, vip, eliminada 
         FROM escorts 
         WHERE id = ?
     ");
@@ -107,7 +107,7 @@ try {
     // Verificar si ya tiene solicitud VIP pendiente
     $stmtPendiente = $pdo->prepare("
         SELECT id FROM escort_vip_solicitudes 
-        WHERE escort_id = ? AND estado IN ('enviado', 'en_revision')
+        WHERE escort_id = ? AND estado = 'enviado'
         LIMIT 1
     ");
     $stmtPendiente->execute([$escortId]);
@@ -127,16 +127,22 @@ try {
 
     if (isset($_FILES['comprobante']) && $_FILES['comprobante']['error'] === UPLOAD_ERR_OK) {
         $file = $_FILES['comprobante'];
-        $tiposPermitidos = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
-        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $tiposPermitidos = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+        $extPermitidas = ['jpg' => 'jpg', 'jpeg' => 'jpg', 'png' => 'png', 'gif' => 'gif', 'webp' => 'webp', 'pdf' => 'pdf'];
+        $ext = $extPermitidas[strtolower(pathinfo($file['name'], PATHINFO_EXTENSION))] ?? '';
 
-        if (!in_array($file['type'], $tiposPermitidos) && !in_array($ext, ['jpg', 'jpeg', 'png', 'pdf'])) {
+        if (!validarMIME($file['tmp_name'], $tiposPermitidos)) {
             echo json_encode(['success' => false, 'error' => 'Solo se permiten imágenes (JPG, PNG) o PDF']);
             exit;
         }
 
         if ($file['size'] > 5 * 1024 * 1024) {
             echo json_encode(['success' => false, 'error' => 'El comprobante no puede superar los 5MB']);
+            exit;
+        }
+
+        if ($ext === '') {
+            echo json_encode(['success' => false, 'error' => 'Extensión no permitida']);
             exit;
         }
 
@@ -168,10 +174,11 @@ try {
             plan, 
             estado, 
             comprobante_pago,
+            precio_vip,
             created_at
-        ) VALUES (?, ?, 'enviado', ?, NOW())
+        ) VALUES (?, ?, 'enviado', ?, ?, NOW())
     ");
-    $stmtInsert->execute([$escortId, $planVip, $comprobante]);
+    $stmtInsert->execute([$escortId, $planVip, $comprobante, $precioVip]);
 
     $solicitudId = $pdo->lastInsertId();
 
@@ -191,6 +198,21 @@ try {
         $escort['nombre'] . ' solicitó VIP (' . $planVip . ') - $' . number_format($precioVip, 0) . ' CLP',
         '/admin/solicitudes-vip'
     ]);
+
+    require_once __DIR__ . '/../mail.php';
+    try {
+        $body = '<p>Se ha recibido una nueva <strong style="color:#ffffff">solicitud VIP</strong>:</p>';
+        $body .= '<table class="info">';
+        $body .= '<tr><td>Escort:</td><td>' . htmlspecialchars($escort['nombre'], ENT_QUOTES, 'UTF-8') . '</td></tr>';
+        $body .= '<tr><td>Plan:</td><td>' . htmlspecialchars($planVip, ENT_QUOTES, 'UTF-8') . '</td></tr>';
+        $body .= '<tr><td>Monto:</td><td>$' . number_format($precioVip, 0) . ' CLP</td></tr>';
+        $body .= '</table>';
+        $body .= '<p>Revisa el comprobante de pago y aprueba la solicitud.</p>';
+        $body .= '<p style="text-align:center;margin-top:24px"><a class="btn" href="' . SITE_URL . '/admin/solicitudes-vip">Revisar solicitud</a></p>';
+        sendAdminNotification('pagos', 'Nueva solicitud VIP - Kimi', $body);
+    } catch (\Throwable $e2) {
+        error_log("solicitar-vip notify error: " . $e2->getMessage());
+    }
 
     echo json_encode([
         'success' => true,

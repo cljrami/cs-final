@@ -1,4 +1,4 @@
-// src/components/admin/NacionalidadesData.tsx
+import { Skeleton } from '../ui/Skeleton';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import StatCard from '../ui/StatCard';
 import DataCell from '../ui/DataCell';

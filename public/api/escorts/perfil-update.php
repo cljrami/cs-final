@@ -23,11 +23,11 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = json_decode(base64_decode($token), true);
+    $tokenData = verifyToken($token);
 
-    if (!$tokenData || ($tokenData['exp'] ?? 0) < time()) {
+    if (!$tokenData) {
         http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Token expirado']);
+        echo json_encode(['success' => false, 'error' => 'Token inválido o expirado']);
         exit;
     }
 

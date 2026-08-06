@@ -12,8 +12,6 @@ try {
 
     $tables = [
         'etnias' => 'catalogo_etnias',
-        'colores_ojos' => 'catalogo_colores_ojos',
-        'colores_pelo' => 'catalogo_colores_pelo',
         'orientaciones' => 'catalogo_orientaciones',
         'estilos' => 'catalogo_estilos',
         'idiomas' => 'catalogo_idiomas',
@@ -25,8 +23,22 @@ try {
             $stmt = $pdo->query("SELECT id, nombre FROM $table WHERE activo = 1 ORDER BY orden, nombre");
             $result[$key] = $stmt->fetchAll();
         } catch (Exception $e) {
-            $result[$key] = []; // Tabla no existe aún
+            $result[$key] = [];
         }
+    }
+
+    try {
+        $stmt = $pdo->query("SELECT id, nombre FROM colores WHERE activo = 1 AND tipo = 'ojos' ORDER BY orden, nombre");
+        $result['colores_ojos'] = $stmt->fetchAll();
+    } catch (Exception $e) {
+        $result['colores_ojos'] = [];
+    }
+
+    try {
+        $stmt = $pdo->query("SELECT id, nombre FROM colores WHERE activo = 1 AND tipo = 'pelo' ORDER BY orden, nombre");
+        $result['colores_pelo'] = $stmt->fetchAll();
+    } catch (Exception $e) {
+        $result['colores_pelo'] = [];
     }
 
     jsonResponse(true, $result);

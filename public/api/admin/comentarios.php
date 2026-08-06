@@ -36,6 +36,15 @@ try {
         $input = json_decode(file_get_contents('php://input'), true);
         $id = isset($input['id']) ? intval($input['id']) : 0;
         if ($id <= 0) { http_response_code(400); echo json_encode(['success' => false, 'error' => 'ID requerido']); exit; }
+
+        $checkStmt = $pdo->prepare("SELECT id FROM comentarios WHERE id = ?");
+        $checkStmt->execute([$id]);
+        if (!$checkStmt->fetch()) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Comentario no encontrado']);
+            exit;
+        }
+
         $stmt = $pdo->prepare("DELETE FROM comentarios WHERE id = ?");
         $stmt->execute([$id]);
         echo json_encode(['success' => true]);
@@ -59,22 +68,24 @@ try {
     }
 
     if ($search !== '') {
-        $where .= " AND (c.comentario LIKE ? OR u.nombre LIKE ? OR e.nombre LIKE ?)";
+        $where .= " AND (c.id LIKE ? OR c.escort_id LIKE ? OR c.comentario LIKE ? OR u.nombre LIKE ? OR e.nombre LIKE ?)";
         $s = "%{$search}%";
-        $params[] = $s; $params[] = $s; $params[] = $s;
+        $params[] = $s; $params[] = $s; $params[] = $s; $params[] = $s; $params[] = $s;
     }
 
-    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM comentarios c JOIN usuarios u ON u.id = c.usuario_id JOIN escorts e ON e.id = c.escort_id $where");
+    $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM comentarios c LEFT JOIN usuarios u ON u.id = c.usuario_id LEFT JOIN escorts e ON e.id = c.escort_id $where");
     $stmtCount->execute($params);
     $total = (int)$stmtCount->fetchColumn();
 
     $stmt = $pdo->prepare("
         SELECT c.id, c.comentario, c.puntuacion, c.aprobado, c.created_at,
-               u.nombre as usuario_nombre, u.email as usuario_email,
-               e.nombre as escort_nombre, e.id as escort_id
+               COALESCE(u.nombre, '(usuario eliminado)') as usuario_nombre,
+               COALESCE(u.email, '') as usuario_email,
+               COALESCE(e.nombre, '(escort eliminada)') as escort_nombre,
+               e.id as escort_id
         FROM comentarios c
-        JOIN usuarios u ON u.id = c.usuario_id
-        JOIN escorts e ON e.id = c.escort_id
+        LEFT JOIN usuarios u ON u.id = c.usuario_id
+        LEFT JOIN escorts e ON e.id = c.escort_id
         $where
         ORDER BY c.created_at DESC
         LIMIT $perPage OFFSET $offset
@@ -82,9 +93,11 @@ try {
     $stmt->execute($params);
     $comentarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Stats
-    $pendientes = (int)$pdo->query("SELECT COUNT(*) FROM comentarios WHERE aprobado = 0")->fetchColumn();
-    $aprobados = (int)$pdo->query("SELECT COUNT(*) FROM comentarios WHERE aprobado = 1")->fetchColumn();
+    // Stats - usar LEFT JOIN para contar correctamente incluso si hay registros huerfanos
+    $stmtPend = $pdo->query("SELECT COUNT(*) FROM comentarios c LEFT JOIN usuarios u ON u.id = c.usuario_id LEFT JOIN escorts e ON e.id = c.escort_id WHERE c.aprobado = 0");
+    $pendientes = (int)$stmtPend->fetchColumn();
+    $stmtAprob = $pdo->query("SELECT COUNT(*) FROM comentarios c LEFT JOIN usuarios u ON u.id = c.usuario_id LEFT JOIN escorts e ON e.id = c.escort_id WHERE c.aprobado = 1");
+    $aprobados = (int)$stmtAprob->fetchColumn();
 
     echo json_encode([
         'success' => true,

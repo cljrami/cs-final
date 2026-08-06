@@ -59,17 +59,25 @@ try {
 
     if ($tieneAprobada) {
         $escortStmt = $pdo->prepare("
-            SELECT id, nombre, foto_principal, activa, aprobada, verificado, vip, destacado,
-                   plan_id, suscripcion_id, estado, visitas_perfil, contactos_recibidos
-            FROM escorts
-            WHERE id = ? AND eliminada = 0
+            SELECT e.id, e.nombre, e.foto_principal, e.activa, e.aprobada, e.verificado, e.vip, e.destacado,
+                   e.estado, e.visitas_perfil,
+                   s.id AS suscripcion_id, s.plan_id
+             FROM escorts e
+             LEFT JOIN suscripciones s ON s.escort_id = e.id
+                 AND s.estado IN ('activa', 'pausada', 'pendiente_aprobacion')
+             WHERE e.id = ? AND e.eliminada = 0
+             ORDER BY s.id DESC LIMIT 1
         ");
     } else {
         $escortStmt = $pdo->prepare("
-            SELECT id, nombre, foto_principal, activa, verificado, vip, destacado,
-                   plan_id, suscripcion_id, estado, visitas_perfil, contactos_recibidos
-            FROM escorts
-            WHERE id = ? AND eliminada = 0
+            SELECT e.id, e.nombre, e.foto_principal, e.activa, e.verificado, e.vip, e.destacado,
+                   e.estado, e.visitas_perfil,
+                   s.id AS suscripcion_id, s.plan_id
+            FROM escorts e
+            LEFT JOIN suscripciones s ON s.escort_id = e.id
+                AND s.estado IN ('activa', 'pausada', 'pendiente_aprobacion')
+            WHERE e.id = ? AND e.eliminada = 0
+            ORDER BY s.id DESC LIMIT 1
         ");
     }
     $escortStmt->execute([$escortId]);
@@ -256,7 +264,7 @@ try {
         ] : null,
         'stats' => [
             'visitas_perfil' => (int)$escort['visitas_perfil'],
-            'contactos_recibidos' => (int)$escort['contactos_recibidos'],
+            'contactos_recibidos' => 0,
             'notificaciones_pendientes' => $notificacionesPendientes
         ],
         'verificacion' => [
@@ -277,9 +285,9 @@ try {
 } catch (PDOException $e) {
     error_log("Error micuenta-status.php PDO: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'DB: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error de base de datos']);
 } catch (Throwable $e) {
     error_log("Error micuenta-status.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }

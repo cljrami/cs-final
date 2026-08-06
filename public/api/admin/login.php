@@ -27,6 +27,9 @@ require_once __DIR__ . '/../bootstrap.php';
 try {
     $pdo = getDBConnection();
 
+    // Rate limit: máx 8 intentos por IP cada 15 minutos
+    rateLimitLogin('login_admin', 8, 15, strtolower($email));
+
     $stmt = $pdo->prepare("SELECT * FROM admins WHERE email = ? AND activo = 1 LIMIT 1");
     $stmt->execute([$email]);
     $admin = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -47,6 +50,8 @@ try {
 
     $stmt = $pdo->prepare("UPDATE admins SET ultimo_login = NOW() WHERE id = ?");
     $stmt->execute([$admin['id']]);
+
+    rateLimitReset('login_admin', strtolower($email));
 
     $token = signToken([
         'id' => (int)$admin['id'],

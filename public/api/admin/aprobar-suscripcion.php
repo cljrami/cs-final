@@ -16,6 +16,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 try {
+    $tokenData = requireAuth();
+    requireAdminRole($tokenData);
     $pdo = getDBConnection();
 
     // Obtener parámetros enviados por el panel de administración
@@ -37,12 +39,27 @@ try {
 
     $pdo->beginTransaction();
 
+    // Verificar que la suscripciíƒÂ³n pertenece a un plan base (los extras se gestionan en Solicitudes Extras)
+    $stmtPlanCheck = $pdo->prepare("
+        SELECT p.tipo
+        FROM suscripciones s
+        JOIN planes p ON p.id = s.plan_id
+        WHERE s.id = ?
+    ");
+    $stmtPlanCheck->execute(array($suscripcionId));
+    $planTipo = $stmtPlanCheck->fetchColumn();
+    if ($planTipo === 'extra') {
+        $pdo->rollBack();
+        http_response_code(400);
+        echo json_encode(array('success' => false, 'error' => 'Las solicitudes de planes extra se gestionan desde el panel de Solicitudes Extras'));
+        exit;
+    }
+
     // 1. Aprobar y activar la cuenta base de la escort globalmente
     $stmtEscort = $pdo->prepare("
         UPDATE escorts 
         SET estado = 'aprobada', 
-            aprobada = 1,
-            activa = 1
+            aprobada = 1
         WHERE id = ?
     ");
     $stmtEscort->execute(array($escortId));

@@ -1,4 +1,4 @@
-import Skeleton from 'react-loading-skeleton';
+import { Skeleton } from '../ui/Skeleton';
 
 interface ActivityData {
   fecha: string;

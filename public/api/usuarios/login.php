@@ -19,6 +19,9 @@ try {
         exit;
     }
 
+    // Rate limit: máx 10 intentos por IP cada 15 minutos
+    rateLimitLogin('login_usuario', 10, 15, strtolower($email));
+
     $stmt = $pdo->prepare("SELECT id, nombre, email, password_hash, activo FROM usuarios WHERE email = ?");
     $stmt->execute([$email]);
     $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -40,6 +43,8 @@ try {
         echo json_encode(['success' => false, 'error' => 'Cuenta inactiva']);
         exit;
     }
+
+    rateLimitReset('login_usuario', strtolower($email));
 
     $tokenData = [
         'id' => $usuario['id'],

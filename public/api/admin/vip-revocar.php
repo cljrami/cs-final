@@ -60,7 +60,7 @@ try {
             admin_notas = 'VIP revocado por administrador', 
             fecha_respuesta = NOW(), 
             revisado_por = ?
-        WHERE escort_id = ? AND estado IN ('enviado', 'en_revision', 'aprobado')
+        WHERE escort_id = ? AND estado IN ('enviado', 'aprobado')
     ")->execute([$adminId, $escortId]);
 
     // Notificar a la escort
@@ -75,7 +75,7 @@ try {
 } catch (PDOException $e) {
     error_log("Error vip-revocar.php PDO: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error de base de datos: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error de base de datos']);
 } catch (Throwable $e) {
     error_log("Error vip-revocar.php: " . $e->getMessage());
     http_response_code(500);

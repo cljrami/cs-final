@@ -1,13 +1,16 @@
-<?php
+﻿<?php
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../mail.php';
 
 try {
     $tokenData = requireAuth();
+
+    requireAdminRole($tokenData);
     $pdo = getDBConnection();
 
     $method = $_SERVER['REQUEST_METHOD'];
@@ -31,8 +34,13 @@ try {
         }
 
         if ($search !== '') {
-            $where[] = "(e.nombre LIKE ? OR e.email LIKE ?)";
-            $s = "%{$search}%";
+            $escapedSearch = str_replace(['%', '_'], ['\\%', '\\_'], $search);
+            $s = "%{$escapedSearch}%";
+            $where[] = "(v.id LIKE ? OR e.id LIKE ? OR e.nombre LIKE ? OR e.email LIKE ? OR e.telefono LIKE ? OR e.ciudad LIKE ?)";
+            $params[] = $s;
+            $params[] = $s;
+            $params[] = $s;
+            $params[] = $s;
             $params[] = $s;
             $params[] = $s;
         }
@@ -44,9 +52,15 @@ try {
         // ya que el branch legacy no tiene columna v.estado.
         $searchSql = '';
         $searchParams = [];
+        $legacySearchSql = '';
+        $legacySearchParams = [];
         if ($search !== '') {
-            $searchSql = " AND (e.nombre LIKE ? OR e.email LIKE ?)";
-            $searchParams = [$s, $s];
+            $escapedSearch = str_replace(['%', '_'], ['\\%', '\\_'], $search);
+            $s = "%{$escapedSearch}%";
+            $searchSql = " AND (v.id LIKE ? OR e.id LIKE ? OR e.nombre LIKE ? OR e.email LIKE ? OR e.telefono LIKE ? OR e.ciudad LIKE ?)";
+            $searchParams = [$s, $s, $s, $s, $s, $s];
+            $legacySearchSql = " AND (e.id LIKE ? OR e.nombre LIKE ? OR e.email LIKE ? OR e.telefono LIKE ? OR e.ciudad LIKE ?)";
+            $legacySearchParams = [$s, $s, $s, $s, $s];
         }
 
         $estadoVerifSql = '';
@@ -66,11 +80,11 @@ try {
                 (SELECT COUNT(*) FROM escorts e
                  WHERE e.verificado = 1
                    AND NOT EXISTS (SELECT 1 FROM verificaciones v WHERE v.escort_id = e.id)
-                   " . ($legacyInclude ? $searchSql : " AND 1=0") . ")
+                   " . ($legacyInclude ? $legacySearchSql : " AND 1=0") . ")
             AS total
         ";
         $stmtCount = $pdo->prepare($countSql);
-        $stmtCount->execute([...$estadoVerifParams, ...$searchParams, ...$searchParams]);
+        $stmtCount->execute([...$estadoVerifParams, ...$searchParams, ...$legacySearchParams]);
         $total = $stmtCount->fetchColumn();
 
         // Stats para las tarjetas
@@ -112,7 +126,7 @@ try {
         // Datos
         // 1) Verificaciones con registro en tabla
         $sql = "
-            SELECT v.*, e.nombre as escort_nombre, e.email as escort_email, e.foto_principal, e.verificado, e.ciudad, e.edad,
+            SELECT v.*, e.id as escort_id, e.nombre as escort_nombre, e.email as escort_email, e.telefono as escort_telefono, e.foto_principal, e.verificado, e.ciudad, e.edad,
                    0 as es_legacy
             FROM verificaciones v
             JOIN escorts e ON v.escort_id = e.id
@@ -145,10 +159,10 @@ try {
             FROM escorts e
             WHERE e.verificado = 1
               AND NOT EXISTS (SELECT 1 FROM verificaciones v WHERE v.escort_id = e.id)
-              " . ($search !== '' ? " AND (e.nombre LIKE ? OR e.email LIKE ?)" : "") . "
+              " . ($search !== '' ? " AND (e.id LIKE ? OR e.nombre LIKE ? OR e.email LIKE ? OR e.telefono LIKE ? OR e.ciudad LIKE ?)" : "") . "
         ";
         $legacyStmt = $pdo->prepare($legacySql);
-        $legacyStmt->execute($search !== '' ? [$s, $s] : []);
+        $legacyStmt->execute($search !== '' ? [$s, $s, $s, $s, $s] : []);
         $legacyData = $legacyStmt->fetchAll(PDO::FETCH_ASSOC);
 
         // Mezclar ambas listas
@@ -156,11 +170,12 @@ try {
 
         // Transform file paths to proxy URLs (handles old upload location)
         foreach ($data as &$row) {
+            $cb = !empty($row['creado_en']) ? '&_=' . strtotime($row['creado_en']) : '';
             if (!empty($row['foto_perfil_real'])) {
-                $row['foto_perfil_real'] = '/api/serve-upload.php?path=' . urlencode($row['foto_perfil_real']);
+                $row['foto_perfil_real'] = '/api/serve-upload.php?path=' . urlencode($row['foto_perfil_real']) . $cb;
             }
             if (!empty($row['comprobante_pago'])) {
-                $row['comprobante_pago'] = '/api/serve-upload.php?path=' . urlencode($row['comprobante_pago']);
+                $row['comprobante_pago'] = '/api/serve-upload.php?path=' . urlencode($row['comprobante_pago']) . $cb;
             }
         }
         unset($row);
@@ -238,6 +253,7 @@ try {
                 VALUES (?, 'sistema', 'Verificación Aprobada', 'Tu cuenta ha sido verificada exitosamente.', '/micuenta/verificacion', NOW())
             ")->execute([$escortId]);
 
+            sendVerificacionAprobada($escortId);
             echo json_encode(['success' => true, 'message' => 'Verificación aprobada correctamente']);
         } else { // rechazada
             $pdo->prepare("UPDATE verificaciones SET estado = 'rechazada', revisado_en = NOW(), notas_revision = ? WHERE id = ?")
@@ -249,6 +265,7 @@ try {
                 VALUES (?, 'sistema', 'Verificación Rechazada', ?, '/micuenta/verificacion', NOW())
             ")->execute([$escortId, $notasRevision ?? 'Tu solicitud de verificación fue rechazada.']);
 
+            sendVerificacionRechazada($escortId, $notasRevision ?? 'No se especificó motivo');
             echo json_encode(['success' => true, 'message' => 'Verificación rechazada']);
         }
         exit;
@@ -337,9 +354,10 @@ try {
 } catch (PDOException $e) {
     error_log("Error verificaciones.php PDO: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error de base de datos: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error de base de datos']);
 } catch (Throwable $e) {
     error_log("Error verificaciones.php: " . $e->getMessage());
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Error interno del servidor']);
 }
+

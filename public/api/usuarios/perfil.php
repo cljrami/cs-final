@@ -60,6 +60,8 @@ try {
             $hash = password_hash($password, PASSWORD_BCRYPT);
             $stmt = $pdo->prepare("UPDATE usuarios SET nombre = ?, email = ?, telefono = ?, ciudad = ?, password_hash = ? WHERE id = ?");
             $stmt->execute([$nombre, $email, $telefono, $ciudad, $hash, $usuarioId]);
+            require_once __DIR__ . '/../mail.php';
+            sendPasswordChanged($email, $nombre);
         } else {
             $stmt = $pdo->prepare("UPDATE usuarios SET nombre = ?, email = ?, telefono = ?, ciudad = ? WHERE id = ?");
             $stmt->execute([$nombre, $email, $telefono, $ciudad, $usuarioId]);

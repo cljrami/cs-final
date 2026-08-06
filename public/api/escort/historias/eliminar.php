@@ -69,6 +69,9 @@ try {
     $stmt = $pdo->prepare("DELETE FROM escort_historias WHERE id = ? AND escort_id = ?");
     $stmt->execute([$historiaId, $escortId]);
 
+    require_once __DIR__ . '/../../mail.php';
+    notificarAccionEscort('historias', $escortId, 'Escort eliminó una historia');
+
     echo json_encode(['success' => true, 'message' => 'Historia eliminada']);
 } catch (Throwable $e) {
     error_log("Error historias/eliminar.php: " . $e->getMessage());

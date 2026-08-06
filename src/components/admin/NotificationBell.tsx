@@ -8,6 +8,8 @@ interface Notificacion {
   leida: boolean;
   url: string | null;
   created_at: string;
+  actor_foto: string;
+  actor_nombre: string;
 }
 
 const tipoIcon: Record<string, string> = {
@@ -16,6 +18,11 @@ const tipoIcon: Record<string, string> = {
   mensaje_nuevo: 'fa-envelope text-blue-400',
   promocion: 'fa-gem text-purple-400',
   sistema: 'fa-cog text-gray-400',
+  cuenta_aprobada: 'fa-user-check text-green-400',
+  plan_aprobado: 'fa-credit-card text-green-400',
+  plan_rechazado: 'fa-credit-card text-red-400',
+  plan_pausado: 'fa-pause-circle text-blue-400',
+  plan_reactivado: 'fa-play-circle text-green-400',
 };
 
 export default function NotificationBell() {
@@ -89,6 +96,26 @@ export default function NotificationBell() {
     }
   };
 
+  const deleteNotification = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const token = localStorage.getItem('admin_token') || '';
+      await fetch('/api/admin/notificaciones.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action: 'delete', id }),
+      });
+      setNotificaciones(prev => prev.filter(n => n.id !== id));
+      setUnreadCount(prev => Math.max(0, prev - (notificaciones.find(n => n.id === id)?.leida ? 0 : 1)));
+    } catch (err) {
+      console.error('Error deleting notification:', err);
+      setError('Error al eliminar notificación');
+    }
+  };
+
   useEffect(() => {
     fetchNotificaciones();
 
@@ -131,7 +158,7 @@ export default function NotificationBell() {
   return (
     <div ref={ref} className="relative">
       <button
-        onClick={() => { setOpen(!open); if (!open) fetchNotificaciones(); }}
+        onClick={() => { console.log('🔔 NotificationBell click', { open }); setOpen(!open); if (!open) fetchNotificaciones(); }}
         className="bg-transparent border border-admin-border text-admin-muted w-10 h-10 rounded-lg hover:text-admin-text hover:border-admin-muted transition-all duration-200 flex items-center justify-center relative"
         aria-label="Notificaciones"
       >
@@ -185,21 +212,45 @@ export default function NotificationBell() {
               notificaciones.map((n) => (
                 <div
                   key={n.id}
-                  className={`px-4 py-3 border-b border-admin-border last:border-0 hover:bg-[#2a2a3e] transition-colors cursor-pointer ${!n.leida ? 'bg-red-500/5' : ''}`}
+                  className={`group px-4 py-3 border-b border-admin-border last:border-0 hover:bg-[#2a2a3e] transition-colors cursor-pointer ${!n.leida ? 'bg-red-500/5' : ''}`}
                   onClick={() => { if (!n.leida) markRead(n.id); if (n.url) window.location.href = n.url; }}
                 >
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-[#2a2a3e] flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <i className={`fas ${tipoIcon[n.tipo] || 'fa-bell text-gray-400'} text-xs`}></i>
-                    </div>
+                    {n.actor_foto ? (
+                      <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border-2 border-admin-border">
+                        <img src={n.actor_foto} alt="" className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-[#2a2a3e] flex items-center justify-center flex-shrink-0 border border-admin-border">
+                        <i className={`fas ${tipoIcon[n.tipo] || 'fa-bell text-gray-400'} text-sm`}></i>
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <p className={`text-sm truncate ${!n.leida ? 'text-white font-medium' : 'text-gray-300'}`}>
-                          {n.titulo}
-                        </p>
-                        {!n.leida && (
-                          <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></span>
+                        {n.actor_nombre ? (
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-semibold truncate ${!n.leida ? 'text-white' : 'text-gray-300'}`}>
+                              {n.actor_nombre}
+                            </p>
+                            <p className="text-xs text-gray-500 truncate">{n.titulo}</p>
+                          </div>
+                        ) : (
+                          <p className={`text-sm truncate flex-1 min-w-0 ${!n.leida ? 'text-white font-medium' : 'text-gray-300'}`}>
+                            {n.titulo}
+                          </p>
                         )}
+                        <div className="flex items-center gap-1.5 flex-shrink-0 self-start mt-0.5">
+                          {!n.leida && (
+                            <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                          )}
+                          <button
+                            onClick={(e) => deleteNotification(n.id, e)}
+                            className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                            title="Eliminar"
+                          >
+                            <i className="fas fa-times text-[10px]"></i>
+                          </button>
+                        </div>
                       </div>
                       {n.mensaje && (
                         <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.mensaje}</p>

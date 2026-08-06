@@ -61,7 +61,7 @@ try {
     // Eliminar de BD
     $pdo->prepare("DELETE FROM escort_fotos WHERE id = ? AND escort_id = ?")->execute([$fotoId, $escortId]);
 
-    // Si era portada, poner la primera como portada
+    // Si era portada, poner la primera como portada y sincronizar foto_principal
     if ($foto['es_portada']) {
         $pdo->prepare("
             UPDATE escort_fotos SET es_portada = 1 
@@ -69,7 +69,34 @@ try {
             ORDER BY orden ASC, id ASC 
             LIMIT 1
         ")->execute([$escortId]);
+
+        // Sincronizar foto_principal con la nueva portada
+        $nueva = $pdo->prepare("SELECT url FROM escort_fotos WHERE escort_id = ? AND es_portada = 1 LIMIT 1");
+        $nueva->execute([$escortId]);
+        $nuevaUrl = $nueva->fetchColumn();
+        if ($nuevaUrl) {
+            $pdo->prepare("UPDATE escorts SET foto_principal = ? WHERE id = ?")->execute([$nuevaUrl, $escortId]);
+            // Notificar cambio de portada
+            $nombreStmt = $pdo->prepare("SELECT nombre FROM escorts WHERE id = ?");
+            $nombreStmt->execute([$escortId]);
+            $nombreEscort = $nombreStmt->fetchColumn();
+            $pdo->prepare("INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url, created_at) VALUES (?, 'fotos_actualizadas', 'Foto de portada cambiada', 'Tu foto de portada ha sido actualizada automáticamente.', '/micuenta/fotos', NOW())")
+                ->execute([$escortId]);
+            $pdo->prepare("INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, url, escort_id, created_at) VALUES (NULL, 'sistema', 'Foto de portada cambiada', ?, '/admin/escorts', ?, NOW())")
+                ->execute(["{$nombreEscort} cambió su foto de portada (al eliminar la anterior).", $escortId]);
+        } else {
+            // No quedan fotos
+            $pdo->prepare("UPDATE escorts SET foto_principal = NULL WHERE id = ?")->execute([$escortId]);
+        }
     }
+
+    require_once __DIR__ . '/../../mail.php';
+    $nombreEscort = $pdo->prepare("SELECT nombre FROM escorts WHERE id = ?");
+    $nombreEscort->execute([$escortId]);
+    notificarAccionEscort('fotos', $escortId, $nombreEscort->fetchColumn() . ' eliminó una foto de su galería', [
+        'Foto eliminada' => $foto['url'] ?: '—',
+        'Era portada' => $foto['es_portada'] ? 'Sí' : 'No',
+    ]);
 
     echo json_encode(['success' => true, 'message' => 'Foto eliminada']);
 } catch (Throwable $e) {

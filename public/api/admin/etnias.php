@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
@@ -151,7 +151,7 @@ try {
         if (isset($input['nombre'])) {
             $nombre = trim($input['nombre']);
             if (empty($nombre)) {
-                $fieldErrors['nombre'] = 'El nombre no puede estar vacío';
+                $fieldErrors['nombre'] = 'El nombre no puede estar vací­o';
             } elseif (strlen($nombre) < 2) {
                 $fieldErrors['nombre'] = 'El nombre debe tener al menos 2 caracteres';
             } elseif (strlen($nombre) > 50) {
@@ -249,5 +249,6 @@ try {
 } catch (Throwable $e) {
     error_log("Error etnias.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error interno: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }
+

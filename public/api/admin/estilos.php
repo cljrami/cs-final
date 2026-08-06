@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
@@ -51,7 +51,7 @@ try {
         $totalFiltered = (int)$countStmt->fetchColumn();
 
         $sql = "
-            SELECT id, nombre, orden, activo, created_at,
+            SELECT id, nombre, icono, orden, activo, created_at,
                 (SELECT COUNT(*) FROM escorts WHERE estilo = s.nombre AND eliminada = 0) AS total_escorts
             FROM estilos s
             $whereClause
@@ -86,6 +86,7 @@ try {
     if ($method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);
         $nombre = isset($input['nombre']) ? trim($input['nombre']) : '';
+        $icono = isset($input['icono']) ? trim($input['icono']) : 'fa-sparkles';
         $orden = isset($input['orden']) ? intval($input['orden']) : 0;
         $activo = isset($input['activo']) ? (int)$input['activo'] : 1;
 
@@ -114,14 +115,14 @@ try {
             exit;
         }
 
-        $stmt = $pdo->prepare("INSERT INTO estilos (nombre, orden, activo) VALUES (?, ?, ?)");
-        $stmt->execute([$nombre, $orden, $activo]);
+        $stmt = $pdo->prepare("INSERT INTO estilos (nombre, icono, orden, activo) VALUES (?, ?, ?, ?)");
+        $stmt->execute([$nombre, $icono, $orden, $activo]);
         $newId = $pdo->lastInsertId();
 
         echo json_encode([
             'success' => true,
             'message' => 'Estilo creado correctamente',
-            'estilo' => ['id' => (int)$newId, 'nombre' => $nombre, 'orden' => $orden, 'activo' => $activo]
+            'estilo' => ['id' => (int)$newId, 'nombre' => $nombre, 'icono' => $icono, 'orden' => $orden, 'activo' => $activo]
         ]);
         exit;
     }
@@ -151,7 +152,7 @@ try {
         if (isset($input['nombre'])) {
             $nombre = trim($input['nombre']);
             if (empty($nombre)) {
-                $fieldErrors['nombre'] = 'El nombre no puede estar vacío';
+                $fieldErrors['nombre'] = 'El nombre no puede estar vací­o';
             } elseif (strlen($nombre) < 2) {
                 $fieldErrors['nombre'] = 'El nombre debe tener al menos 2 caracteres';
             } elseif (strlen($nombre) > 50) {
@@ -167,6 +168,11 @@ try {
                     $values[] = $nombre;
                 }
             }
+        }
+
+        if (isset($input['icono'])) {
+            $updates[] = 'icono = ?';
+            $values[] = trim($input['icono']);
         }
 
         if (isset($input['orden'])) {
@@ -249,5 +255,6 @@ try {
 } catch (Throwable $e) {
     error_log("Error estilos.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error interno: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }
+

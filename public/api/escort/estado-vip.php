@@ -37,7 +37,7 @@ try {
 
     // ─── DATOS ESCORT ───
     $stmt = $pdo->prepare("
-        SELECT id, nombre, vip, fecha_vip_expira, plan_id, suscripcion_id, eliminada 
+        SELECT id, nombre, vip, fecha_vip_expira, eliminada 
         FROM escorts 
         WHERE id = ?
     ");
@@ -92,7 +92,7 @@ try {
 
     // ─── SOLICITUD VIP ───
     // Solo traer solicitudes que NO estén aprobadas si ya hay VIP activo
-    // o traer la última solicitud activa (enviado/en_revision)
+    // o traer la última solicitud activa (enviado)
     $stmtSol = $pdo->prepare("
         SELECT 
             id,
@@ -103,7 +103,7 @@ try {
             created_at
         FROM escort_vip_solicitudes
         WHERE escort_id = ?
-          AND estado IN ('enviado', 'en_revision', 'rechazado')
+          AND estado IN ('enviado', 'rechazado')
         ORDER BY created_at DESC
         LIMIT 1
     ");
@@ -119,9 +119,7 @@ try {
                 id,
                 estado,
                 comprobante_pago,
-                admin_notas,
-                fecha_respuesta,
-                created_at
+                fecha_respuesta
             FROM escort_vip_solicitudes
             WHERE escort_id = ?
               AND estado = 'aprobado'
@@ -154,7 +152,7 @@ try {
 
     if ($vipActivo) {
         $motivoNoSolicitar = 'Ya tienes VIP activo';
-    } elseif ($solicitud && in_array($solicitud['estado'], ['enviado', 'en_revision'])) {
+    } elseif ($solicitud && $solicitud['estado'] === 'enviado') {
         $motivoNoSolicitar = 'Tienes una solicitud en revisión';
     } elseif (!$planBase) {
         $motivoNoSolicitar = 'No tienes un plan base activo. Contrata un plan primero.';
@@ -199,6 +197,7 @@ try {
         'solicitud_aprobada' => $solicitudAprobada ? [
             'id' => (int)$solicitudAprobada['id'],
             'estado' => $solicitudAprobada['estado'],
+            'comprobante_pago' => $solicitudAprobada['comprobante_pago'],
             'fecha_respuesta' => $solicitudAprobada['fecha_respuesta']
         ] : null,
         'config' => $config,
@@ -208,9 +207,9 @@ try {
 } catch (PDOException $e) {
     error_log("Error estado-vip.php PDO: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error de base de datos: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error de base de datos']);
 } catch (Throwable $e) {
     error_log("Error estado-vip.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error interno: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }

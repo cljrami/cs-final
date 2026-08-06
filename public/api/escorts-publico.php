@@ -73,7 +73,6 @@ try {
             e.rating,
             e.total_valoraciones,
             e.visitas_perfil,
-            e.contactos_recibidos,
             e.created_at,
             p.nombre AS plan_nombre,
             p.badge AS plan_badge,
@@ -86,8 +85,13 @@ try {
             s.fecha_fin AS plan_vence,
             s.dias_restantes
         FROM escorts e
-        JOIN suscripciones s ON s.id = e.suscripcion_id AND s.escort_id = e.id
-        LEFT JOIN planes p ON p.id = e.plan_id
+        LEFT JOIN suscripciones s ON s.escort_id = e.id AND s.id = (
+          SELECT s2.id FROM suscripciones s2
+          JOIN planes p2 ON p2.id = s2.plan_id AND p2.extra_tipo IS NULL
+          WHERE s2.escort_id = e.id
+          ORDER BY s2.id DESC LIMIT 1
+        )
+        LEFT JOIN planes p ON p.id = s.plan_id
         WHERE $whereId
           AND e.activa = 1
           AND e.eliminada = 0
@@ -270,8 +274,7 @@ try {
         'stats' => [
             'rating' => (float)$escort['rating'],
             'total_valoraciones' => (int)$escort['total_valoraciones'],
-            'visitas_perfil' => (int)$escort['visitas_perfil'],
-            'contactos_recibidos' => (int)$escort['contactos_recibidos']
+            'visitas_perfil' => (int)$escort['visitas_perfil']
         ],
         'servicios' => $serviciosAgrupados,
         'horarios' => $horariosFormateados,

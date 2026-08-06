@@ -11,7 +11,7 @@ function generarSlug($str)
 {
     $str = strtolower(trim($str));
     $str = str_replace(
-        ['á', 'é', 'í', 'ó', 'ú', 'ñ', 'ü', 'Á', 'Ã‰', 'Í', 'Ó', 'Ãš', 'Ã‘', 'Ãœ'],
+        ['á', 'é', 'í', 'ó', 'ú', 'ñ', 'ü', 'Á', 'É', 'Í', 'Ó', 'Ú', 'Ñ', 'Ü'],
         ['a', 'e', 'i', 'o', 'u', 'n', 'u', 'a', 'e', 'i', 'o', 'u', 'n', 'u'],
         $str
     );
@@ -75,9 +75,33 @@ try {
     $tokenData = [
         'id' => $newId,
         'usuario' => $usuario,
+        'tipo' => 'escort',
         'exp' => time() + (7 * 24 * 60 * 60)
     ];
     $token = signToken($tokenData);
+
+    $af = $pdo->prepare("SELECT foto_principal FROM escorts WHERE id = ?");
+    $af->execute([$newId]);
+
+    $notifMsg = "Nueva escort registrada: {$usuario} (" . ($af->fetchColumn() ?: 'sin foto') . ")";
+    $notif = $pdo->prepare("INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, url, escort_id) VALUES (NULL, 'sistema', 'Nueva escort registrada', ?, '/admin/escorts', ?)");
+    $notif->execute([$notifMsg, $newId]);
+
+    require_once __DIR__ . '/../mail.php';
+    try {
+        $body = '<p>Se ha registrado una nueva escort en la plataforma:</p>';
+        $body .= '<table class="info">';
+        $body .= '<tr><td>Usuario:</td><td>' . htmlspecialchars($usuario, ENT_QUOTES, 'UTF-8') . '</td></tr>';
+        $body .= '<tr><td>Email:</td><td>' . htmlspecialchars($email, ENT_QUOTES, 'UTF-8') . '</td></tr>';
+        $body .= '</table>';
+        $body .= '<p>La cuenta está pendiente de aprobación. Revisa sus datos y activa su anuncio cuando corresponda.</p>';
+        $body .= '<p style="text-align:center;margin-top:24px"><a class="btn" href="' . SITE_URL . '/admin/escorts">Ver escorts</a></p>';
+        sendAdminNotification('inscripciones', 'Nueva escort registrada', $body);
+    } catch (\Throwable $e2) {
+        error_log("registro.php notify error: " . $e2->getMessage());
+    }
+
+    sendWelcomeEscort($email, $usuario);
 
     echo json_encode([
         'success' => true,

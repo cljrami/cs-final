@@ -46,6 +46,18 @@ try {
         exit;
     }
 
+    // Stats
+    $statsStmt = $pdo->query("
+        SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN activo = 1 THEN 1 ELSE 0 END) as activos,
+            SUM(CASE WHEN activo = 0 THEN 1 ELSE 0 END) as inactivos
+        FROM usuarios
+    ");
+    $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
+    foreach ($stats as &$v) { $v = (int)$v; }
+    unset($v);
+
     // GET: listar usuarios
     $search = trim($_GET['search'] ?? '');
     $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
@@ -75,6 +87,7 @@ try {
 
     echo json_encode([
         'success' => true,
+        'stats' => $stats,
         'usuarios' => array_map(function ($u) {
             return [
                 'id' => (int)$u['id'],

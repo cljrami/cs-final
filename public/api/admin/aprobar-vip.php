@@ -75,7 +75,7 @@ try {
     }
 
     // Verificar que no esté ya procesada
-    if ($solicitud['estado'] !== 'enviado' && $solicitud['estado'] !== 'en_revision') {
+    if ($solicitud['estado'] !== 'enviado') {
         echo json_encode([
             'success' => false,
             'error' => 'Esta solicitud ya fue ' . ($solicitud['estado'] === 'aprobado' ? 'aprobada' : 'rechazada')
@@ -136,7 +136,7 @@ try {
             ");
             $stmtNotif->execute([
                 $solicitud['escort_id'],
-                'Â¡VIP Aprobado!',
+                '¡VIP Aprobado!',
                 'Tu solicitud VIP fue aprobada. Eres VIP hasta el ' . date('d/m/Y', strtotime($fechaVipExpira)) . '.',
                 '/panel/mi-plan'
             ]);

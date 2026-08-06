@@ -2,13 +2,10 @@
 // src/pages/admin/extras.astro
 import AdminLayout from "../../layouts/AdminLayout.astro";
 import ExtrasData from "../../components/admin/ExtrasData";
-import Sidebar from "../../components/admin/Sidebar";
 import AuthGuard from "../../components/admin/AuthGuard";
 ---
 
 <AdminLayout title="Extras | Admin" activePage="extras">
-  <Sidebar slot="sidebar" activePage="extras" client:load />
-
   <AuthGuard client:load>
     <ExtrasData client:load />
   </AuthGuard>

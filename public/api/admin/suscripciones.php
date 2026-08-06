@@ -23,25 +23,48 @@ try {
 
     $pdo = getDBConnection();
 
-    // Detalle individual
+    // Detalle individual: busca la escort y devuelve su plan base + extras
     $detalleId = isset($_GET['id']) ? intval($_GET['id']) : 0;
     if ($detalleId > 0) {
-        $stmtDet = $pdo->prepare("
+        // Primero obtener el escort_id desde cualquier suscripción
+        $stmtLookup = $pdo->prepare("SELECT escort_id FROM suscripciones WHERE id = ?");
+        $stmtLookup->execute([$detalleId]);
+        $lookup = $stmtLookup->fetch(PDO::FETCH_ASSOC);
+
+        if (!$lookup) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Suscripción no encontrada']);
+            exit;
+        }
+
+        $escortId = (int)$lookup['escort_id'];
+
+        // Obtener datos de la escort
+        $stmtEscort = $pdo->prepare("SELECT id, nombre, email, telefono, foto_principal FROM escorts WHERE id = ? AND eliminada = 0");
+        $stmtEscort->execute([$escortId]);
+        $escort = $stmtEscort->fetch(PDO::FETCH_ASSOC);
+
+        if (!$escort) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => 'Escort no encontrada']);
+            exit;
+        }
+
+        // Obtener el plan base de la escort (prioriza: activo → aprobado → más reciente)
+        $stmtBase = $pdo->prepare("
             SELECT 
                 s.id as suscripcion_id, s.escort_id, s.plan_id,
                 s.fecha_inicio, s.fecha_aprobacion, s.fecha_rechazo,
                 s.fecha_fin, s.precio_pagado, s.moneda, s.estado,
-                s.auto_renovar, s.comprobante_pago, s.creado_en,
+                s.comprobante_pago, s.creado_en,
                 s.notas_pago as notas_admin,
                 s.aprobado_por, s.rechazado_por,
-                e.nombre as escort_nombre, e.email as escort_email,
-                e.telefono as escort_telefono, e.foto_principal,
                 p.nombre as plan_nombre, p.slug as plan_slug,
                 p.tipo as plan_tipo, p.duracion_dias,
                 p.precio as plan_precio, p.badge as plan_badge,
                 p.color_badge, p.max_pausas_permitidas,
                 (SELECT COUNT(*) FROM historial_pausas hp WHERE hp.suscripcion_id = s.id AND hp.accion = 'pausa') as contador_pausas,
-                (SELECT COALESCE(SUM(hp.dias_acumulados_pausa), 0) FROM historial_pausas hp WHERE hp.suscripcion_id = s.id AND hp.accion = 'pausa') as dias_pausados,
+                COALESCE(s.dias_pausados, 0) as dias_pausados,
                 a.nombre as aprobado_por_nombre,
                 ar.nombre as rechazado_por_nombre,
                 CASE 
@@ -56,51 +79,137 @@ try {
                 END as estado_calculado,
                 GREATEST(0, DATEDIFF(s.fecha_fin, CURDATE())) as dias_restantes
             FROM suscripciones s
-            JOIN escorts e ON e.id = s.escort_id
             JOIN planes p ON p.id = s.plan_id
             LEFT JOIN admins a ON a.id = s.aprobado_por
             LEFT JOIN admins ar ON ar.id = s.rechazado_por
-            WHERE s.id = ? AND e.eliminada = 0
+            WHERE s.escort_id = ? AND p.tipo = 'base'
+            ORDER BY 
+                CASE 
+                    WHEN s.estado = 'activa' AND s.fecha_fin >= CURDATE() THEN 1
+                    WHEN s.fecha_aprobacion IS NOT NULL THEN 2
+                    ELSE 3
+                END,
+                s.fecha_aprobacion DESC,
+                s.id DESC
+            LIMIT 1
         ");
-        $stmtDet->execute([$detalleId]);
-        $det = $stmtDet->fetch(PDO::FETCH_ASSOC);
+        $stmtBase->execute([$escortId]);
+        $det = $stmtBase->fetch(PDO::FETCH_ASSOC);
 
+        // Si no tiene plan base, dejamos campos vacíos
         if (!$det) {
-            http_response_code(404);
-            echo json_encode(['success' => false, 'error' => 'Suscripción no encontrada']);
-            exit;
-        }
+            $det = [
+                'suscripcion_id' => null,
+                'escort_id' => $escortId,
+                'plan_id' => null,
+                'fecha_inicio' => null,
+                'fecha_aprobacion' => null,
+                'fecha_rechazo' => null,
+                'fecha_fin' => null,
+                'precio_pagado' => 0,
+                'moneda' => 'CLP',
+                'estado' => 'sin_plan',
 
-        // Historial de pausas
-        $stmtHist = $pdo->prepare("
-            SELECT hp.id, hp.accion, hp.fecha_accion, hp.dias_acumulados_pausa, hp.notas,
-                   COALESCE(a.nombre, 'Admin') as realizado_por_nombre
-            FROM historial_pausas hp
-            LEFT JOIN admins a ON a.id = hp.realizado_por
-            WHERE hp.suscripcion_id = ?
-            ORDER BY hp.fecha_accion DESC
-        ");
-        $stmtHist->execute([$detalleId]);
-        $historial = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
+                'comprobante_pago' => null,
+                'creado_en' => null,
+                'notas_admin' => null,
+                'aprobado_por' => null,
+                'rechazado_por' => null,
+                'plan_nombre' => 'Sin plan base',
+                'plan_slug' => '',
+                'plan_tipo' => 'base',
+                'duracion_dias' => 0,
+                'plan_precio' => 0,
+                'plan_badge' => null,
+                'color_badge' => '#6b7280',
+                'max_pausas_permitidas' => 0,
+                'contador_pausas' => 0,
+                'dias_pausados' => 0,
+                'aprobado_por_nombre' => null,
+                'rechazado_por_nombre' => null,
+                'estado_calculado' => 'sin_plan',
+                'dias_restantes' => 0,
+            ];
+            $historial = [];
+            $fechaPausa = null;
+        } else {
+            // Historial de pausas del plan base
+            $stmtHist = $pdo->prepare("
+                SELECT hp.id, hp.accion, hp.fecha_accion, hp.dias_acumulados_pausa, hp.notas,
+                       COALESCE(a.nombre, 'Admin') as realizado_por_nombre
+                FROM historial_pausas hp
+                LEFT JOIN admins a ON a.id = hp.realizado_por
+                WHERE hp.suscripcion_id = ?
+                ORDER BY hp.fecha_accion DESC
+            ");
+            $stmtHist->execute([$det['suscripcion_id']]);
+            $historial = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
 
-        // Última fecha de pausa
-        $fechaPausa = null;
-        foreach ($historial as $h) {
-            if ($h['accion'] === 'pausa') {
-                $fechaPausa = $h['fecha_accion'];
-                break;
+            // Última fecha de pausa
+            $fechaPausa = null;
+            foreach ($historial as $h) {
+                if ($h['accion'] === 'pausa') {
+                    $fechaPausa = $h['fecha_accion'];
+                    break;
+                }
             }
         }
+
+        // Extras de la escort (todos, no solo activos)
+        $stmtExtras = $pdo->prepare("
+            SELECT 
+                s.id as suscripcion_id,
+                p.nombre as plan_nombre,
+                p.slug as plan_slug,
+                p.extra_tipo,
+                p.badge as plan_badge,
+                p.color_badge,
+                s.fecha_inicio,
+                s.fecha_fin,
+                s.precio_pagado,
+                s.moneda,
+                s.estado,
+                s.creado_en,
+                CASE 
+                    WHEN s.fecha_aprobacion IS NULL THEN 'pendiente_aprobacion'
+                    WHEN s.estado = 'pausada' THEN 'pausada'
+                    WHEN s.estado = 'activa' AND s.fecha_fin >= CURDATE() THEN 'activa'
+                    WHEN s.estado = 'activa' AND s.fecha_fin < CURDATE() THEN 'expirada'
+                    ELSE s.estado
+                END as estado_calculado
+            FROM suscripciones s
+            JOIN planes p ON p.id = s.plan_id
+            WHERE s.escort_id = ? AND p.tipo = 'extra'
+            ORDER BY s.creado_en DESC
+        ");
+        $stmtExtras->execute([$escortId]);
+        $extras = $stmtExtras->fetchAll(PDO::FETCH_ASSOC);
+
+        // Días activo (desde fecha_inicio hasta hoy)
+        $diasActivo = 0;
+        if ($det['fecha_inicio']) {
+            $inicio = new DateTime($det['fecha_inicio']);
+            $hoy = new DateTime();
+            $diasActivo = (int)$inicio->diff($hoy)->days;
+        }
+
+        // Determinar el tipo de suscripción que se cliqueó (base/extra)
+        $stmtTipo = $pdo->prepare("
+            SELECT p.tipo FROM suscripciones s JOIN planes p ON p.id = s.plan_id WHERE s.id = ?
+        ");
+        $stmtTipo->execute([$detalleId]);
+        $tipoClick = $stmtTipo->fetchColumn();
 
         echo json_encode([
             'success' => true,
             'suscripcion' => [
-                'suscripcion_id' => (int)$det['suscripcion_id'],
-                'escort_id' => (int)$det['escort_id'],
-                'escort_nombre' => $det['escort_nombre'],
-                'escort_email' => $det['escort_email'],
-                'escort_telefono' => $det['escort_telefono'],
-                'foto_principal' => $det['foto_principal'],
+                'suscripcion_id' => $det['suscripcion_id'],
+                'escort_id' => (int)$escortId,
+                'escort_nombre' => $escort['nombre'],
+                'escort_email' => $escort['email'],
+                'escort_telefono' => $escort['telefono'],
+                'foto_principal' => $escort['foto_principal'],
+                'plan_id' => $det['plan_id'],
                 'plan_nombre' => $det['plan_nombre'],
                 'plan_slug' => $det['plan_slug'],
                 'plan_tipo' => $det['plan_tipo'],
@@ -113,12 +222,13 @@ try {
                 'fecha_fin' => $det['fecha_fin'],
                 'fecha_pausa' => $fechaPausa,
                 'fecha_rechazo' => $det['fecha_rechazo'],
-                'precio_pagado' => $det['precio_pagado'],
+                'precio_pagado' => (float)$det['precio_pagado'],
                 'moneda' => $det['moneda'],
                 'estado' => $det['estado'],
                 'estado_calculado' => $det['estado_calculado'],
                 'dias_restantes' => (int)$det['dias_restantes'],
-                'auto_renovar' => (bool)$det['auto_renovar'],
+                'dias_activo' => $diasActivo,
+
                 'comprobante_pago' => !empty($det['comprobante_pago'])
                     ? '/api/serve-upload.php?path=/uploads/comprobantes/' . ltrim($det['comprobante_pago'], '/')
                     : null,
@@ -129,7 +239,8 @@ try {
                 'notas_admin' => $det['notas_admin'],
                 'aprobado_por_nombre' => $det['aprobado_por_nombre'],
                 'rechazado_por_nombre' => $det['rechazado_por_nombre'],
-                'historial_pausas' => $historial
+                'historial_pausas' => $historial,
+                'extras' => $extras
             ]
         ]);
         exit;
@@ -160,16 +271,19 @@ try {
         }
     }
 
-    // Filtro por tipo de plan
-    if ($tipo !== 'todos') {
-        $where .= " AND p.tipo = ?";
-        $params[] = $tipo;
-    }
+    // Solo planes base (los extras se gestionan en el panel de Solicitudes Extras)
+    $where .= " AND p.tipo = 'base'";
 
-    // Búsqueda por nombre o email de escort
+    // Búsqueda en múltiples campos
     if ($search !== '') {
-        $where .= " AND (e.nombre LIKE ? OR e.email LIKE ?)";
-        $s = "%{$search}%";
+        $escapedSearch = str_replace(['%', '_'], ['\\%', '\\_'], $search);
+        $s = "%{$escapedSearch}%";
+        $where .= " AND (s.id LIKE ? OR e.id LIKE ? OR e.nombre LIKE ? OR e.email LIKE ? OR e.telefono LIKE ? OR e.ciudad LIKE ? OR p.nombre LIKE ?)";
+        $params[] = $s;
+        $params[] = $s;
+        $params[] = $s;
+        $params[] = $s;
+        $params[] = $s;
         $params[] = $s;
         $params[] = $s;
     }
@@ -203,7 +317,7 @@ try {
             s.precio_pagado,
             s.moneda,
             s.estado,
-            s.auto_renovar,
+
             s.comprobante_pago,
             s.creado_en,
             s.aprobado_por,
@@ -212,7 +326,7 @@ try {
             e.email as escort_email,
             e.telefono,
             e.ciudad,
-            null as foto_principal,
+             e.foto_principal,
             e.verificado,
             e.vip,
             p.nombre as plan_nombre,
@@ -297,7 +411,7 @@ try {
                 'estado' => $s['estado_calculado'],
                 'estado_raw' => $s['estado'],
                 'dias_restantes' => (int)$s['dias_restantes'],
-                'auto_renovar' => (bool)$s['auto_renovar'],
+
                 'comprobante_pago' => !empty($s['comprobante_pago'])
                     ? '/api/serve-upload.php?path=/uploads/comprobantes/' . ltrim($s['comprobante_pago'], '/')
                     : null,
@@ -320,7 +434,8 @@ try {
             SUM(CASE WHEN s.estado = 'cancelada' THEN 1 ELSE 0 END) as canceladas
         FROM suscripciones s
         JOIN escorts e ON e.id = s.escort_id
-        WHERE e.eliminada = 0
+        JOIN planes p ON p.id = s.plan_id
+        WHERE e.eliminada = 0 AND p.tipo = 'base'
     ");
     $counts = $stmtCounts->fetch(PDO::FETCH_ASSOC);
 
@@ -346,7 +461,7 @@ try {
 } catch (PDOException $e) {
     error_log("Error suscripciones.php PDO: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error de base de datos: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error de base de datos']);
 } catch (Throwable $e) {
     error_log("Error suscripciones.php: " . $e->getMessage());
     http_response_code(500);

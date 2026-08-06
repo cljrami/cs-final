@@ -1,8 +1,10 @@
 // src/components/escort/ResumenData.tsx
 import { useState, useEffect } from 'react';
+import { Skeleton } from '../ui/Skeleton';
 import { API_BASE, getEscortHeaders } from '../../lib/escortAuth';
 
 interface EscortData {
+  id: number;
   nombre: string;
   nombreArtistico: string;
   aprobada: number;
@@ -11,228 +13,279 @@ interface EscortData {
   verificado: number;
   vip: number;
   destacado: number;
+  disponibleAhora: number;
   planVencido: boolean;
+  planPausado: boolean;
   planVigente: boolean;
   planNombre: string | null;
   planBadge: string | null;
   planColor: string | null;
   planDiasRestantes: number;
-  fotosCount: number;
-  historiasCount: number;
   visitasHoy: number;
   visitasTotal: number;
-  contactosRecibidos: number;
+  contactosWhatsapp: number;
+  contactosLlamar: number;
   rating: number;
-  totalValoraciones: number;
+  totalValorizaciones: number;
   perfilCompleto: number;
   ciudad: string;
   fotoPrincipal: string | null;
   vipVencido: boolean;
   destacadoVencido: boolean;
+  extraNombre: string | null;
+  pausasUsadas: number;
+  pausasMaximas: number;
+}
+
+interface ToastState {
+  message: string;
+  type: 'success' | 'error';
+  visible: boolean;
 }
 
 export default function ResumenData() {
   const [data, setData] = useState<EscortData | null>(null);
-  const [favoritesCount, setFavoritesCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [togglingDisponible, setTogglingDisponible] = useState(false);
+  const [toast, setToast] = useState<ToastState>({ message: '', type: 'success', visible: false });
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type, visible: true });
+    setTimeout(() => setToast(t => ({ ...t, visible: false })), 2500);
+  };
+
+  const toggleDisponible = async () => {
+    if (!data) return;
+    setTogglingDisponible(true);
+    try {
+      const nuevo = data.disponibleAhora ? 0 : 1;
+      const res = await fetch(`${API_BASE}/disponible.php`, {
+        method: 'POST',
+        headers: { ...getEscortHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disponible_ahora: nuevo })
+      });
+      const d = await res.json();
+      if (d.success) {
+        setData(prev => prev ? { ...prev, disponibleAhora: d.disponible_ahora } : prev);
+        showToast(
+          nuevo ? 'Disponible Ahora activado' : 'Disponible Ahora desactivado',
+          'success'
+        );
+      } else {
+        showToast('Error al actualizar disponibilidad', 'error');
+      }
+    } catch {
+      showToast('Error de conexión', 'error');
+    }
+    setTogglingDisponible(false);
+  };
 
   useEffect(() => {
     fetch(`${API_BASE}/resumen.php?_t=${Date.now()}`, { headers: getEscortHeaders(), cache: 'no-store' })
-      .then(r => r.json())
-      .then(d => {
-        if (d.success) {
-          setData(d.data);
-          if (d.data.id) {
-            fetch(`/api/escorts/favorito.php?id=${d.data.id}`)
-              .then(r => r.json())
-              .then(fd => { if (fd.success) setFavoritesCount(fd.likes ?? 0); })
-              .catch(() => {});
+      .then(async r => {
+        const text = await r.text();
+        try {
+          const d = JSON.parse(text);
+          if (d.success) {
+            setData(d.data);
+          } else {
+            console.error('API error:', d.error || 'unknown');
+            setData(null);
           }
+        } catch {
+          setData(null);
         }
+      })
+      .catch(err => {
+        console.error('Fetch error:', err);
       })
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-10 h-10 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  const cards = [
-    { id: 'perfil', label: 'Editar Perfil', desc: 'Datos, plan, pausas', icon: 'fa-user-edit', color: 'text-red-500', href: '/micuenta/perfil' },
-    { id: 'datos', label: 'Mis Datos', desc: 'Email y contraseña', icon: 'fa-id-card', color: 'text-red-500', href: '/micuenta/datos' },
-    { id: 'fotos', label: 'Galería', desc: 'Fotos y videos', icon: 'fa-images', color: 'text-red-500', href: '/micuenta/fotos' },
-    { id: 'historias', label: 'Historias', desc: 'Contenido temporal', icon: 'fa-history', color: 'text-red-500', href: '/micuenta/historias' },
-  ];
-
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-white">Bienvenida, {data?.nombre || data?.nombreArtistico || 'Analia'}</h1>
-          {data?.ciudad && <p className="text-gray-500 text-sm mt-1"><i className="fas fa-map-marker-alt mr-1"></i>{data.ciudad}</p>}
-        </div>
-        {data?.aprobada ? (
-          <span className="px-4 py-2 bg-green-500/10 text-green-400 rounded-full text-sm font-medium border border-green-500/20">
-            Aprobado
-          </span>
+      <div>
+        <h1 className="text-3xl font-bold text-white flex items-center gap-2">
+          Bienvenida,{loading ? <Skeleton width={140} height={28} /> : data?.nombreArtistico || data?.nombre || data?.email?.split('@')[0] || 'Escort'}
+        </h1>
+        {loading ? (
+          <div className="flex items-center gap-3 mt-2">
+            <Skeleton width={100} height={26} borderRadius={999} />
+            <Skeleton width={120} height={14} />
+          </div>
         ) : (
-          <span className="px-4 py-2 bg-amber-500/10 text-amber-400 rounded-full text-sm font-medium border border-amber-500/20">
-            Pendiente
-          </span>
+          <div className="flex flex-wrap items-center gap-3 mt-2">
+            {data?.planPausado ? (
+              <span className="px-3 py-1 bg-blue-500/10 text-blue-400 rounded-full text-sm font-medium border border-blue-500/20">
+                <i className="fas fa-pause-circle mr-1"></i>Pausado
+              </span>
+            ) : data?.aprobada ? (
+              <span className="px-3 py-1 bg-green-500/10 text-green-400 rounded-full text-sm font-medium border border-green-500/20">Aprobado</span>
+            ) : (
+              <span className="px-3 py-1 bg-amber-500/10 text-amber-400 rounded-full text-sm font-medium border border-amber-500/20">Pendiente</span>
+            )}
+            {data?.ciudad ? (
+              <span className="text-gray-500 text-sm"><i className="fas fa-map-marker-alt mr-1"></i>{data.ciudad}</span>
+            ) : null}
+          </div>
         )}
       </div>
 
       {/* Badges */}
       <div className="flex flex-wrap items-center gap-3">
-        {data?.verificado === 1 && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-500/10 text-blue-400 text-xs font-medium border border-blue-500/20">
-            <i className="fas fa-check-circle"></i> Verificada
-          </span>
-        )}
-        {data?.vip === 1 && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/10 text-amber-400 text-xs font-medium border border-amber-500/20">
-            <i className="fas fa-crown"></i> VIP
-          </span>
-        )}
-        {data?.destacado === 1 && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-red-500/10 text-red-400 text-xs font-medium border border-red-500/20">
-            <i className="fas fa-fire"></i> Destacada
-          </span>
-        )}
-        {data?.planVigente && data?.planNombre && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-medium border border-emerald-500/20">
-            <i className="fas fa-check-circle"></i> {data.planNombre} · {data.planDiasRestantes}d
-          </span>
+        {loading ? (
+          <>
+            <Skeleton width={100} height={24} borderRadius={8} />
+            <Skeleton width={60} height={24} borderRadius={8} />
+          </>
+        ) : (
+          <>
+            {data?.verificado === 1 && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-500/10 text-blue-400 text-xs font-medium border border-blue-500/20">
+                <i className="fas fa-check-circle"></i> Verificada
+              </span>
+            )}
+            {data?.vip === 1 && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/10 text-amber-400 text-xs font-medium border border-amber-500/20">
+                <i className="fas fa-crown"></i> VIP
+              </span>
+            )}
+            {data?.extraNombre && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-red-500/10 text-red-400 text-xs font-medium border border-red-500/20">
+                <i className="fas fa-fire"></i> {data.extraNombre}
+              </span>
+            )}
+            {data?.planVigente && data?.planNombre && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-medium border border-emerald-500/20">
+                <i className="fas fa-check-circle"></i> {data.planNombre} · {data.planDiasRestantes}d
+              </span>
+            )}
+            {data?.planPausado && data?.planNombre && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-500/10 text-blue-400 text-xs font-medium border border-blue-500/20">
+                <i className="fas fa-pause-circle"></i> {data.planNombre} · Pausado
+              </span>
+            )}
+          </>
         )}
       </div>
 
+      {/* Disponible Ahora 🔥 toggle */}
+      {!loading && data && data.aprobada && (
+        <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-all duration-300 ${data.disponibleAhora ? 'bg-red-500/20 text-red-400' : 'bg-gray-800 text-gray-600'}`}>
+              <i className={`fas fa-fire ${data.disponibleAhora ? 'animate-pulse' : ''}`}></i>
+            </div>
+            <div>
+              <p className="text-white font-semibold text-sm">Disponible Ahora 🔥</p>
+              <p className="text-gray-500 text-xs mt-0.5">Muestra que estás disponible en este momento</p>
+            </div>
+          </div>
+          <button
+            onClick={toggleDisponible}
+            disabled={togglingDisponible}
+            className="inline-flex items-center justify-center"
+            title={data.disponibleAhora ? 'Desactivar Disponible Ahora' : 'Activar Disponible Ahora'}
+          >
+            <i className={`fas text-3xl transition-colors ${
+              data.disponibleAhora ? 'fa-toggle-on text-red-400 hover:text-red-300' : 'fa-toggle-off text-gray-600 hover:text-gray-400'
+            }`}></i>
+          </button>
+        </div>
+      )}
+
+      {/* Plan pausado warning */}
+      {!loading && data?.planPausado && (
+        <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-6 text-center">
+          <i className="fas fa-pause-circle text-blue-400 text-3xl mb-3"></i>
+          <h3 className="text-white font-bold mb-1">Plan pausado</h3>
+          <p className="text-gray-400 text-sm mb-4">Tu anuncio no se muestra en el directorio mientras esté pausado</p>
+          <a href="/micuenta/mi-plan" className="inline-block px-6 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-medium transition-all">Ir a mi plan</a>
+        </div>
+      )}
+
       {/* Plan vencido warning */}
-      {data?.planVencido && (
+      {!loading && data?.planVencido && !data?.planPausado && (
         <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-6 text-center">
           <i className="fas fa-exclamation-triangle text-red-500 text-3xl mb-3"></i>
           <h3 className="text-white font-bold mb-1">Tu plan ha vencido</h3>
           <p className="text-gray-400 text-sm mb-4">Tu anuncio ya no aparece en el directorio</p>
-          <a href="/micuenta/planes" className="inline-block px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium transition-all">
-            Renovar plan
-          </a>
+          <a href="/micuenta/planes" className="inline-block px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium transition-all">Renovar plan</a>
         </div>
       )}
 
       {/* Profile completion */}
-      {data && (
+      {!loading && data && (
         <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-2">
             <span className="text-gray-400 text-sm font-medium">Perfil completado</span>
             <span className="text-white text-sm font-bold">{data.perfilCompleto}%</span>
           </div>
           <div className="h-2.5 bg-[#1a1a24] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-red-600 to-red-400 rounded-full transition-all duration-700"
-              style={{ width: `${data.perfilCompleto}%` }}
-            />
+            <div className="h-full bg-gradient-to-r from-red-600 to-red-400 rounded-full transition-all duration-700" style={{ width: `${data.perfilCompleto}%` }} />
           </div>
           {data.perfilCompleto < 100 && (
-            <p className="text-gray-600 text-xs mt-2">
-              <i className="fas fa-info-circle mr-1"></i>
-              Completa tu perfil para aparecer mejor en el directorio
-            </p>
+            <p className="text-gray-600 text-xs mt-2"><i className="fas fa-info-circle mr-1"></i>Completa tu perfil para aparecer mejor en el directorio</p>
           )}
         </div>
       )}
 
-      {/* Quick access cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {cards.map((card) => (
-          <a
-            key={card.id}
-            href={card.href}
-            className="bg-[#13131a] border border-gray-800 hover:border-gray-700 rounded-2xl p-6 text-center transition-all duration-300 hover:scale-[1.02] group"
-          >
-            <div className="w-14 h-14 mx-auto mb-4 bg-[#1a1a24] rounded-2xl flex items-center justify-center group-hover:bg-red-500/10 transition-colors">
-              <i className={`fas ${card.icon} ${card.color} text-2xl`}></i>
-            </div>
-            <h3 className="text-white font-bold mb-1">{card.label}</h3>
-            <p className="text-gray-500 text-sm">{card.desc}</p>
-          </a>
-        ))}
-      </div>
-
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {/* Stats grid: Visitas, Valoración, WhatsApp, Llamar, Perfil */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <i className="fas fa-eye text-blue-400"></i>
-            <span className="text-gray-500 text-xs uppercase tracking-wider">Visitas</span>
+            <span className="text-gray-500 text-xs uppercase tracking-wider">Visitas al perfil</span>
           </div>
-          <p className="text-2xl font-bold text-white">{(data?.visitasTotal || 0).toLocaleString()}</p>
-          <p className="text-gray-600 text-xs mt-1">hoy: {data?.visitasHoy || 0}</p>
-        </div>
-        <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-2">
-            <i className="fas fa-heart text-red-400"></i>
-            <span className="text-gray-500 text-xs uppercase tracking-wider">Favoritos</span>
-          </div>
-          <p className="text-2xl font-bold text-white">{favoritesCount}</p>
-          <p className="text-gray-600 text-xs mt-1">usuarios te agregaron</p>
+          <p className="text-2xl font-bold text-white">{loading ? <Skeleton width={60} height={28} /> : (data?.visitasTotal || 0).toLocaleString()}</p>
+          <p className="text-gray-600 text-xs mt-1">a tu perfil</p>
         </div>
         <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <i className="fas fa-star text-yellow-400"></i>
-            <span className="text-gray-500 text-xs uppercase tracking-wider">Valoración</span>
+            <span className="text-gray-500 text-xs uppercase tracking-wider">Valorización</span>
           </div>
-          <p className="text-2xl font-bold text-white">{data?.rating ? data.rating.toFixed(1) : '—'}</p>
-          <p className="text-gray-600 text-xs mt-1">{data?.totalValoraciones || 0} valoraciones</p>
+          <p className="text-2xl font-bold text-white">{loading ? <Skeleton width={50} height={28} /> : (data?.rating ? data.rating.toFixed(1) : '—')}</p>
+          <p className="text-gray-600 text-xs mt-1">{loading ? <Skeleton width={70} height={14} /> : `${data?.totalValorizaciones || 0} reseñas`}</p>
         </div>
         <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-2">
-            <i className="fas fa-phone text-green-400"></i>
-            <span className="text-gray-500 text-xs uppercase tracking-wider">Contactos</span>
+            <i className="fab fa-whatsapp text-green-400"></i>
+            <span className="text-gray-500 text-xs uppercase tracking-wider">Mensajes</span>
           </div>
-          <p className="text-2xl font-bold text-white">{data?.contactosRecibidos || 0}</p>
-          <p className="text-gray-600 text-xs mt-1">recibidos</p>
+          <p className="text-2xl font-bold text-white">{loading ? <Skeleton width={40} height={28} /> : (data?.contactosWhatsapp ?? 0).toLocaleString()}</p>
+          <p className="text-gray-600 text-xs mt-1">clics recibidos</p>
+        </div>
+        <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <i className="fas fa-phone-alt text-red-400"></i>
+            <span className="text-gray-500 text-xs uppercase tracking-wider">Llamadas</span>
+          </div>
+          <p className="text-2xl font-bold text-white">{loading ? <Skeleton width={40} height={28} /> : (data?.contactosLlamar ?? 0).toLocaleString()}</p>
+          <p className="text-gray-600 text-xs mt-1">clics recibidos</p>
+        </div>
+        <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-2">
+            <i className="fas fa-user-check text-purple-400"></i>
+            <span className="text-gray-500 text-xs uppercase tracking-wider">Perfil</span>
+          </div>
+          <p className="text-2xl font-bold text-white">{loading ? <Skeleton width={40} height={28} /> : `${data?.perfilCompleto ?? 0}%`}</p>
+          <p className="text-gray-600 text-xs mt-1">completado</p>
         </div>
       </div>
 
-      {/* Secondary stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-2">
-            <i className="fas fa-images text-green-400"></i>
-            <span className="text-gray-500 text-xs uppercase tracking-wider">Fotos</span>
-          </div>
-          <p className="text-2xl font-bold text-white">{data?.fotosCount || 0}</p>
-          <p className="text-gray-600 text-xs mt-1">subidas</p>
+      {/* Toast notification */}
+      {toast.visible && (
+        <div className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 transition-all duration-300 ${
+          toast.type === 'success'
+            ? 'bg-green-500/90 text-white'
+            : 'bg-red-500/90 text-white'
+        }`}>
+          <i className={`fas ${toast.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}`}></i>
+          <span className="text-sm font-medium">{toast.message}</span>
         </div>
-        <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-2">
-            <i className="fas fa-history text-purple-400"></i>
-            <span className="text-gray-500 text-xs uppercase tracking-wider">Historias</span>
-          </div>
-          <p className="text-2xl font-bold text-white">{data?.historiasCount || 0}</p>
-          <p className="text-gray-600 text-xs mt-1">activas</p>
-        </div>
-        <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-2">
-            <i className="fas fa-crown text-amber-400"></i>
-            <span className="text-gray-500 text-xs uppercase tracking-wider">VIP</span>
-          </div>
-          <p className="text-2xl font-bold text-white">{data?.vip && !data?.vipVencido ? 'Activo' : '—'}</p>
-          <p className="text-gray-600 text-xs mt-1">{data?.vip && !data?.vipVencido ? 'Badge visible' : 'No activo'}</p>
-        </div>
-        <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-5">
-          <div className="flex items-center gap-2 mb-2">
-            <i className="fas fa-fire text-orange-400"></i>
-            <span className="text-gray-500 text-xs uppercase tracking-wider">Destacado</span>
-          </div>
-          <p className="text-2xl font-bold text-white">{data?.destacado && !data?.destacadoVencido ? 'Activo' : '—'}</p>
-          <p className="text-gray-600 text-xs mt-1">{data?.destacado && !data?.destacadoVencido ? 'En directorio' : 'No activo'}</p>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

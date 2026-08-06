@@ -69,9 +69,6 @@ export default function VerificacionPanel() {
     setModalOpen(false);
     setFotoPerfil(null);
     setPreviewPerfil('');
-    setComprobante(null);
-    setComprobantePreview('');
-    setComprobanteNombre('');
     setError('');
     setSuccess('');
   };
@@ -121,7 +118,7 @@ export default function VerificacionPanel() {
 
       const json = await res.json();
       if (json.success) {
-        setSuccess('¡Solicitud enviada! Tu verificación está en revisión.');
+        setSuccess(puedeReSubir ? (data?.estado === 'aprobada' ? '¡Foto actualizada correctamente!' : '¡Foto actualizada! Tu verificación sigue en revisión.') : '¡Solicitud enviada! Tu verificación está en revisión.');
         setFotoPerfil(null);
         setPreviewPerfil('');
         fetchEstado();
@@ -137,6 +134,10 @@ export default function VerificacionPanel() {
   };
 
   const puedeSolicitar = data?.estado === 'no_solicitado' || data?.estado === 'rechazada';
+  const puedeReSubir = data?.estado === 'pendiente' || data?.estado === 'aprobada';
+  const mostrarFormulario = puedeSolicitar || puedeReSubir;
+  const botonTexto = puedeSolicitar ? 'Solicitar' : puedeReSubir ? 'Re-subir foto' : 'Ver documentos';
+  const botonIcono = puedeSolicitar ? 'fa-paper-plane' : puedeReSubir ? 'fa-upload' : 'fa-eye';
 
   const getEstadoUI = () => {
     if (!data) return null;
@@ -181,15 +182,6 @@ export default function VerificacionPanel() {
 
   const estadoUI = getEstadoUI();
 
-  if (loading) {
-    return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-32 bg-[#1a1a2e] rounded-2xl" />
-        <div className="h-64 bg-[#1a1a2e] rounded-2xl" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div>
@@ -200,31 +192,42 @@ export default function VerificacionPanel() {
       </div>
 
       {/* Status card */}
-      {estadoUI && (
-        <div className="bg-[#1a1a2e] border border-[#2d2d44] rounded-2xl p-6">
-          <div className="flex items-center gap-4">
-            <div className={`w-14 h-14 rounded-xl ${estadoUI.bg} flex items-center justify-center flex-shrink-0`}>
-              <i className={`fas ${estadoUI.icon} ${estadoUI.color} text-2xl`} />
-            </div>
-            <div className="flex-1">
-              <h3 className={`text-lg font-bold ${estadoUI.color}`}>{estadoUI.titulo}</h3>
-              <p className="text-gray-400 text-sm mt-1">{estadoUI.desc}</p>
-              {data?.revisado_en && (
-                <p className="text-gray-600 text-xs mt-2">
-                  Revisado el: {new Date(data.revisado_en).toLocaleDateString('es-CL')}
-                </p>
-              )}
-            </div>
-            <button
-              onClick={abrirModal}
-              className="shrink-0 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2"
-            >
-              <i className={`fas ${puedeSolicitar ? 'fa-paper-plane' : 'fa-eye'}`} />
-              {puedeSolicitar ? 'Solicitar' : 'Ver documentos'}
-            </button>
-          </div>
+      <div className="bg-[#1a1a2e] border border-[#2d2d44] rounded-2xl p-6">
+        <div className="flex items-center gap-4">
+          {loading ? (
+            <>
+              <div className="animate-pulse bg-gray-800 rounded-xl w-14 h-14" />
+              <div className="flex-1 space-y-2">
+                <div className="animate-pulse bg-gray-800 rounded h-6 w-48" />
+                <div className="animate-pulse bg-gray-800 rounded h-4 w-72" />
+              </div>
+              <div className="animate-pulse bg-gray-800 rounded-xl h-10 w-32 shrink-0" />
+            </>
+          ) : estadoUI && (
+            <>
+              <div className={`w-14 h-14 rounded-xl ${estadoUI.bg} flex items-center justify-center flex-shrink-0`}>
+                <i className={`fas ${estadoUI.icon} ${estadoUI.color} text-2xl`} />
+              </div>
+              <div className="flex-1">
+                <h3 className={`text-lg font-bold ${estadoUI.color}`}>{estadoUI.titulo}</h3>
+                <p className="text-gray-400 text-sm mt-1">{estadoUI.desc}</p>
+                {data?.revisado_en && (
+                  <p className="text-gray-600 text-xs mt-2">
+                    Revisado el: {new Date(data.revisado_en).toLocaleDateString('es-CL')}
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={abrirModal}
+                className="shrink-0 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl text-sm font-semibold transition-all shadow-lg shadow-blue-500/20 flex items-center gap-2"
+              >
+                <i className={`fas ${botonIcono}`} />
+                {botonTexto}
+              </button>
+            </>
+          )}
         </div>
-      )}
+      </div>
 
       {data?.estado === 'aprobada' && (
         <div className="bg-[#1a1a2e] border border-[#2d2d44] rounded-2xl p-6">
@@ -264,180 +267,150 @@ export default function VerificacionPanel() {
       {/* ═══════ MODAL ═══════ */}
       {modalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          className="fixed inset-0 z-[200] flex items-center justify-center p-3 lg:p-4 bg-black/70 backdrop-blur-sm"
           onClick={cerrarModal}
         >
           <div
-            className="bg-[#1a1a2e] border border-[#2d2d44] rounded-2xl w-full max-w-lg shadow-2xl"
+            className="bg-[#1a1a2e] border border-[#2d2d44] rounded-2xl w-full max-w-md shadow-2xl p-6 max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="p-6 border-b border-[#2d2d44] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-xl ${estadoUI?.bg || 'bg-gray-500/10'} flex items-center justify-center`}>
-                  <i className={`fas fa-shield-alt ${estadoUI?.color || 'text-gray-400'}`} />
-                </div>
-                <div>
-                  <h3 className="text-white font-bold">
-                    {success ? 'Solicitud enviada' : puedeSolicitar ? 'Solicitar Verificación' : 'Documentos enviados'}
-                  </h3>
-                  <p className="text-gray-500 text-xs">
-                    {success
-                      ? 'Tus documentos están en revisión'
-                      : puedeSolicitar
-                        ? 'Sube tu selfie con la fecha de hoy'
-                        : 'Revisa los documentos que enviaste'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={cerrarModal}
-                className="w-8 h-8 rounded-lg hover:bg-[#252538] flex items-center justify-center text-gray-400 hover:text-white transition-colors"
-              >
-                <i className="fas fa-xmark" />
-              </button>
-            </div>
+            <div className="flex flex-col items-center text-center">
 
-            {/* Body */}
-            <div className="p-6 space-y-5 max-h-[60vh] overflow-y-auto">
+              {/* Icon */}
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-4 ${
+                success ? 'bg-green-500/10' : 'bg-blue-500/10'
+              }`}>
+                <i className={`fas ${
+                  success
+                    ? 'fa-check-circle text-green-400'
+                    : mostrarFormulario && puedeReSubir
+                      ? 'fa-upload text-blue-400'
+                      : 'fa-shield-alt text-blue-400'
+                } text-xl`} />
+              </div>
+
+              {/* Title */}
+              <h3 className="text-lg font-bold text-white mb-1">
+                {success
+                  ? (data?.estado === 'aprobada' ? 'Foto actualizada' : 'Solicitud enviada')
+                  : mostrarFormulario
+                    ? (puedeReSubir ? 'Re-subir foto' : 'Solicitar Verificación')
+                    : 'Documentos enviados'}
+              </h3>
+
+              {/* Subtitle */}
+              <p className="text-gray-400 text-sm mb-5">
+                {success
+                  ? (data?.estado === 'aprobada' ? 'Tu foto se actualizó correctamente' : 'Tus documentos están en revisión')
+                  : mostrarFormulario
+                    ? (puedeReSubir ? 'Si te equivocaste, sube una nueva foto' : 'Sube tu selfie con la fecha de hoy')
+                    : 'Revisa los documentos que enviaste'}
+              </p>
+
+              {/* Error */}
               {error && (
-                <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl flex items-center gap-2 text-sm">
+                <div className="w-full bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl flex items-center gap-2 text-sm mb-4 text-left">
                   <i className="fas fa-exclamation-triangle" />
                   <span className="flex-1">{error}</span>
                   <button onClick={() => setError('')} className="hover:text-red-300">✕</button>
                 </div>
               )}
 
+              {/* Success message */}
               {success && (
-                <div className="bg-green-500/10 border border-green-500/30 text-green-400 px-4 py-3 rounded-xl flex items-center gap-2 text-sm">
+                <div className="w-full bg-green-500/10 border border-green-500/30 text-green-400 px-4 py-3 rounded-xl flex items-center gap-2 text-sm mb-4 text-left">
                   <i className="fas fa-check-circle" />
                   <span className="flex-1">{success}</span>
                 </div>
               )}
 
-              {/* Si hay éxito o estado pendiente → mostrar documentos enviados */}
-              {(success || data?.estado === 'pendiente' || data?.estado === 'aprobada') && data && (
-                <div className="space-y-4">
-                  {data.foto_perfil_real && (
-                    <div>
-                      <div className="text-gray-500 text-xs mb-2 font-medium">Selfie enviada</div>
-                      <a href={data.foto_perfil_real} data-fancybox="verif-modal">
-                        <img
-                          src={data.foto_perfil_real}
-                          alt="Selfie"
-                          className="rounded-xl w-full max-h-48 object-cover cursor-pointer hover:opacity-80 transition-opacity border border-[#2d2d44]"
-                        />
-                      </a>
+              {/* Upload section */}
+              {mostrarFormulario && !success && (
+                <div className="w-full mb-4">
+                  <label className="block text-xs text-gray-400 mb-1.5 text-left">
+                    1. Selfie con tu rostro <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    ref={fileInputPerfil}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
+                  />
+                  {!fotoPerfil ? (
+                    <div
+                      onClick={() => fileInputPerfil.current?.click()}
+                      className="border-2 border-dashed border-[#2d2d44] rounded-xl p-4 text-center cursor-pointer hover:border-gray-500 transition-colors"
+                    >
+                      <i className="fas fa-camera text-gray-500 text-2xl mb-2"></i>
+                      <div className="text-gray-500 text-sm">Click para subir tu selfie</div>
+                      <div className="text-gray-600 text-xs mt-1">JPG, PNG · Max 5MB</div>
                     </div>
-                  )}
-
-                  {data?.estado === 'rechazada' && data.notas_revision && (
-                    <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4">
-                      <div className="text-red-400 text-sm font-semibold mb-1">Motivo del rechazo</div>
-                      <div className="text-gray-400 text-sm">{data.notas_revision}</div>
+                  ) : (
+                    <div className="bg-[#13131a] rounded-xl p-3 flex items-center gap-3">
+                      <a href={previewPerfil} data-fancybox="verif-preview">
+                        <img src={previewPerfil} alt="Preview" className="w-14 h-14 rounded object-cover cursor-pointer" />
+                      </a>
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="text-white text-sm truncate">{fotoPerfil.name}</div>
+                        <div className="text-gray-500 text-xs">{(fotoPerfil.size / 1024).toFixed(1)} KB</div>
+                      </div>
+                      <button onClick={() => { setFotoPerfil(null); setPreviewPerfil(''); }} className="text-red-400 hover:text-red-300">
+                        <i className="fas fa-times"></i>
+                      </button>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Si está en estado no_solicitado o rechazada → mostrar formulario */}
-              {puedeSolicitar && !success && (
-                <>
-                  {/* Selfie */}
-                  <div className="space-y-2">
-                    <label className="block text-gray-400 text-sm font-medium">
-                      1. Selfie con tu rostro <span className="text-red-400">*</span>
-                    </label>
-                    <p className="text-gray-600 text-xs">
-                      Sostén un papel con la fecha de hoy y tu nombre
-                    </p>
-                    <div
-                      onClick={() => fileInputPerfil.current?.click()}
-                      className={`
-                        relative aspect-video rounded-xl border-2 border-dashed cursor-pointer
-                        overflow-hidden transition-all
-                        ${previewPerfil ? 'border-green-500/50' : 'border-gray-700 hover:border-gray-500'}
-                      `}
-                    >
-                      {previewPerfil ? (
-                        <img src={previewPerfil} alt="Preview" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-600">
-                          <i className="fas fa-camera text-3xl mb-2" />
-                          <span className="text-xs">Click para subir</span>
-                        </div>
-                      )}
-                      <input
-                        ref={fileInputPerfil}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
-                      />
-                    </div>
-                  </div>
-
-
-
-                  {/* Requisitos */}
-                  <div className="bg-[#13131a] rounded-xl p-4 space-y-2">
-                    <h4 className="text-gray-400 text-sm font-medium">Requisitos:</h4>
-                    <ul className="text-gray-500 text-xs space-y-1">
-                      <li className="flex items-center gap-2">
-                        <i className="fas fa-check text-green-500 text-[10px]" />
-                        La selfie debe mostrar claramente tu rostro
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <i className="fas fa-check text-green-500 text-[10px]" />
-                        Máximo 5MB por imagen
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <i className="fas fa-check text-green-500 text-[10px]" />
-                        Tus datos son confidenciales
-                      </li>
-                    </ul>
-                  </div>
-                </>
+              {/* Requisitos */}
+              {mostrarFormulario && !success && (
+                <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 mb-5 w-full">
+                  <p className="text-amber-400/80 text-xs text-left flex items-start gap-2">
+                    <i className="fas fa-info-circle mt-0.5 flex-shrink-0" />
+                    Sostén un papel con la fecha de hoy y tu nombre. La selfie debe mostrar claramente tu rostro.
+                  </p>
+                </div>
               )}
-            </div>
 
-            {/* Footer */}
-            <div className="p-6 border-t border-[#2d2d44] flex gap-3 justify-end">
-              {puedeSolicitar && !success && (
+              {/* Buttons */}
+              {success ? (
                 <button
-                  onClick={handleSubmit}
-                  disabled={uploading || !fotoPerfil}
-                  className={`
-                    flex-1 py-3 rounded-xl font-semibold text-sm transition-all
-                    ${!fotoPerfil
-                      ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg shadow-blue-500/20'
-                    }
-                  `}
+                  onClick={cerrarModal}
+                  className="w-full px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-lg transition-all shadow-lg shadow-green-500/20 text-sm"
                 >
-                  {uploading ? (
-                    <span className="flex items-center justify-center gap-2">
+                  Entendido
+                </button>
+              ) : mostrarFormulario ? (
+                <div className="flex gap-3 w-full">
+                  <button
+                    onClick={cerrarModal}
+                    className="flex-1 px-4 py-2.5 bg-[#2d2d44] hover:bg-[#3d3d5c] text-white font-medium rounded-lg transition-colors text-sm"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={uploading || !fotoPerfil}
+                    className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg transition-all shadow-lg shadow-blue-500/20 text-sm flex items-center justify-center gap-2"
+                  >
+                    {uploading ? (
                       <i className="fas fa-circle-notch fa-spin" />
-                      Enviando...
-                    </span>
-                  ) : (
-                    <span className="flex items-center justify-center gap-2">
+                    ) : (
                       <i className="fas fa-shield-alt" />
-                      Enviar Solicitud
-                    </span>
-                  )}
+                    )}
+                    {uploading ? 'Enviando...' : (puedeReSubir ? 'Actualizar foto' : 'Enviar Solicitud')}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={cerrarModal}
+                  className="w-full px-4 py-2.5 bg-[#2d2d44] hover:bg-[#3d3d5c] text-white font-medium rounded-lg transition-colors text-sm"
+                >
+                  Cerrar
                 </button>
               )}
-              <button
-                onClick={cerrarModal}
-                className={`py-3 rounded-xl text-sm font-medium transition-colors ${
-                  puedeSolicitar && !success
-                    ? 'px-5 bg-[#252538] hover:bg-[#30304a] text-gray-400'
-                    : 'flex-1 bg-[#252538] hover:bg-[#30304a] text-white'
-                }`}
-              >
-                Cerrar
-              </button>
+
             </div>
           </div>
         </div>

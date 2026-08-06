@@ -39,32 +39,6 @@ try {
     require_once __DIR__ . '/../bootstrap.php';
 
 $pdo = getDBConnection();
-    // === VERIFICAR ESTADO ACTUAL ===
-
-    $stmt = $pdo->prepare("
-        SELECT e.verificado, v.estado as verif_estado 
-        FROM escorts e 
-        LEFT JOIN verificaciones v ON v.escort_id = e.id AND v.estado = 'aprobada'
-        WHERE e.id = ?
-    ");
-    $stmt->execute([$escortId]);
-    $estadoActual = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($estadoActual && (int)$estadoActual['verificado'] === 1 && $estadoActual['verif_estado'] === 'aprobada') {
-        echo json_encode(['success' => false, 'error' => 'Ya estás verificada']);
-        exit;
-    }
-
-    $stmt = $pdo->prepare("
-        SELECT id FROM verificaciones 
-        WHERE escort_id = ? AND estado IN ('pendiente', 'en_revision')
-    ");
-    $stmt->execute([$escortId]);
-    if ($stmt->fetch()) {
-        echo json_encode(['success' => false, 'error' => 'Ya tienes una solicitud en revisión']);
-        exit;
-    }
-
     // === PROCESAR ARCHIVOS ===
 
     $fotoPerfil = $_FILES['foto_perfil'] ?? null;
@@ -79,8 +53,9 @@ $pdo = getDBConnection();
         exit;
     }
 
-    if (!str_starts_with($fotoPerfil['type'], 'image/')) {
-        echo json_encode(['success' => false, 'error' => 'El archivo debe ser una imagen']);
+    $tiposImg = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!validarMIME($fotoPerfil['tmp_name'], $tiposImg)) {
+        echo json_encode(['success' => false, 'error' => 'El archivo debe ser una imagen (JPG, PNG, WebP o GIF)']);
         exit;
     }
 
@@ -97,8 +72,13 @@ $pdo = getDBConnection();
         }
     }
 
-    // Generar nombres
-    $extPerfil = pathinfo($fotoPerfil['name'], PATHINFO_EXTENSION);
+    // Generar nombres (extensión restringida a tipos de imagen validados)
+    $extPermitidas = ['jpg' => 'jpg', 'jpeg' => 'jpg', 'png' => 'png', 'webp' => 'webp', 'gif' => 'gif'];
+    $extPerfil = $extPermitidas[strtolower(pathinfo($fotoPerfil['name'], PATHINFO_EXTENSION))] ?? '';
+    if ($extPerfil === '') {
+        echo json_encode(['success' => false, 'error' => 'Extensión de imagen no permitida']);
+        exit;
+    }
 
     $nombrePerfil = 'perfil_real.' . $extPerfil;
 
@@ -113,24 +93,24 @@ $pdo = getDBConnection();
 
     // === GUARDAR EN BD ===
 
-    $stmt = $pdo->prepare("SELECT id FROM verificaciones WHERE escort_id = ? AND estado = 'rechazada'");
+    $stmt = $pdo->prepare("SELECT id, estado FROM verificaciones WHERE escort_id = ? AND estado IN ('pendiente', 'en_revision', 'rechazada', 'aprobada') ORDER BY FIELD(estado, 'pendiente', 'en_revision', 'rechazada', 'aprobada') LIMIT 1");
     $stmt->execute([$escortId]);
-    $rechazada = $stmt->fetch(PDO::FETCH_ASSOC);
+    $existente = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($rechazada) {
+    if ($existente) {
+        $nuevoEstado = ($existente['estado'] === 'aprobada') ? 'aprobada' : 'pendiente';
         $stmt = $pdo->prepare("
             UPDATE verificaciones 
-            SET estado = 'pendiente',
+            SET estado = ?,
                 foto_perfil_real = ?,
-                foto_documento = '',
                 notas_revision = NULL,
                 revisado_por = NULL,
                 revisado_en = NULL,
                 creado_en = NOW()
             WHERE id = ?
         ");
-        $stmt->execute([$rutaPerfil, $rechazada['id']]);
-        $verifId = $rechazada['id'];
+        $stmt->execute([$nuevoEstado, $rutaPerfil, $existente['id']]);
+        $verifId = $existente['id'];
     } else {
         $stmt = $pdo->prepare("
             INSERT INTO verificaciones 
@@ -141,6 +121,22 @@ $pdo = getDBConnection();
         $verifId = $pdo->lastInsertId();
     }
 
+    require_once __DIR__ . '/../mail.php';
+    try {
+        $esc = $pdo->prepare("SELECT nombre FROM escorts WHERE id = ?");
+        $esc->execute([$escortId]);
+        $escName = $esc->fetchColumn() ?: "ID {$escortId}";
+        $body = '<p>Una escort ha enviado una <strong style="color:#ffffff">solicitud de verificación de identidad</strong>:</p>';
+        $body .= '<table class="info">';
+        $body .= '<tr><td>Escort:</td><td>' . htmlspecialchars($escName, ENT_QUOTES, 'UTF-8') . '</td></tr>';
+        $body .= '</table>';
+        $body .= '<p>Revisa la foto de perfil real y aprueba o rechaza la solicitud.</p>';
+        $body .= '<p style="text-align:center;margin-top:24px"><a class="btn" href="' . SITE_URL . '/admin/verificaciones">Revisar solicitud</a></p>';
+        sendAdminNotification('verificaciones', 'Nueva solicitud de verificación', $body);
+    } catch (\Throwable $e2) {
+        error_log("solicitar-verificacion notify error: " . $e2->getMessage());
+    }
+
     echo json_encode([
         'success' => true,
         'message' => 'Solicitud enviada correctamente',
@@ -149,5 +145,5 @@ $pdo = getDBConnection();
 } catch (Exception $e) {
     error_log("Error solicitar-verificacion: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }

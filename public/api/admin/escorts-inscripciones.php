@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
@@ -12,10 +12,13 @@ require_once __DIR__ . '/../../bootstrap.php';
 
 $tokenData = requireAuth();
 
+
+requireAdminRole($tokenData);
+
 try {
     $pdo = getDBConnection();
 
-    // Contar escorts inscritas por día en los últimos 7 días
+    // Contar escorts inscritas por díƒÂ­a en los íƒÂºltimos 7 díƒÂ­as
     $stmt = $pdo->prepare("
         SELECT 
             DATE(created_at) as fecha,
@@ -29,9 +32,9 @@ try {
     $stmt->execute();
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Crear array con los 7 días (incluyendo los que tienen 0 inscripciones)
+    // Crear array con los 7 díƒÂ­as (incluyendo los que tienen 0 inscripciones)
     $data = [];
-    $diasSemana = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+    $diasSemana = ['Dom', 'Lun', 'Mar', 'MiíƒÂ©', 'Jue', 'Vie', 'SíƒÂ¡b'];
 
     for ($i = 6; $i >= 0; $i--) {
         $fecha = date('Y-m-d', strtotime("-$i days"));
@@ -58,5 +61,6 @@ try {
     ]);
 } catch (PDOException $e) {
     http_response_code(500);
-    echo json_encode(['error' => 'Error en la base de datos: ' . $e->getMessage()]);
+    echo json_encode(['error' => 'Error de base de datos']);
 }
+

@@ -44,6 +44,11 @@ try {
         $update->execute([(int)$f['orden'], (int)$f['id'], $escortId]);
     }
 
+    require_once __DIR__ . '/../../mail.php';
+    notificarAccionEscort('fotos', $escortId, 'Escort reordenó su galería de fotos', [
+        'Fotos ordenadas' => count($fotos),
+    ]);
+
     echo json_encode(['success' => true]);
 } catch (Throwable $e) {
     error_log("Error fotos/ordenar.php: " . $e->getMessage());

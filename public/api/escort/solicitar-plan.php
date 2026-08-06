@@ -145,20 +145,29 @@ try {
 
     // ---------- PLAN BASE ----------
     if ($plan['tipo'] === 'base') {
-        // No puede tener plan base vigente
-        if ($tienePlanBaseVigente) {
-            echo json_encode([
-                'success' => false,
-                'error' => 'Ya tienes un plan base activo (' . $planBase['plan_nombre'] . '). Debes esperar a que venza el ' . $planBase['fecha_fin'] . ' para cambiar de plan.'
-            ]);
-            exit;
-        }
-
         // Si tiene solicitud pendiente, bloquear
         if ($planBase && $planBase['fecha_aprobacion'] === null) {
             echo json_encode([
                 'success' => false,
                 'error' => 'Tienes una solicitud de plan pendiente de aprobación. Espera la respuesta antes de solicitar otro.'
+            ]);
+            exit;
+        }
+
+        // Si tiene plan pausado, debe reactivarlo primero
+        if ($planBase && $estadoCalculado === 'pausada') {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Tienes un plan pausado (' . $planBase['plan_nombre'] . '). Reactívalo antes de contratar otro.'
+            ]);
+            exit;
+        }
+
+        // Si tiene plan activo, el nuevo plan debe caber en los días restantes
+        if ($tienePlanBaseVigente && (int)$plan['duracion_dias'] > $diasRestantesBase) {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Solo te quedan ' . $diasRestantesBase . ' días de plan base. Este plan requiere ' . (int)$plan['duracion_dias'] . ' días. No puedes solicitarlo.'
             ]);
             exit;
         }
@@ -200,23 +209,23 @@ try {
             exit;
         }
 
-        // Verificar que no tenga ya este mismo extra activo
+        // Verificar que no tenga ya un extra pendiente, pausado o activo.
+        // Solo podrá solicitar otro extra una vez que el vigente venza.
         $stmtExtraActivo = $pdo->prepare("
             SELECT 1 FROM suscripciones s
             JOIN planes p ON p.id = s.plan_id
             WHERE s.escort_id = ? 
               AND p.tipo = 'extra'
-              AND p.id = ?
-              AND s.estado = 'activa'
-              AND s.fecha_aprobacion IS NOT NULL
-              AND s.fecha_fin >= CURDATE()
+              AND (s.estado = 'pendiente_aprobacion'
+                   OR s.estado = 'pausada'
+                   OR (s.estado = 'activa' AND s.fecha_fin >= CURDATE()))
             LIMIT 1
         ");
-        $stmtExtraActivo->execute([$escortId, $planId]);
+        $stmtExtraActivo->execute([$escortId]);
         if ($stmtExtraActivo->fetch()) {
             echo json_encode([
                 'success' => false,
-                'error' => 'Ya tienes este extra activo. No puedes contratarlo dos veces simultáneamente.'
+                'error' => 'Ya tienes un extra pendiente, pausado o activo. Podrás solicitar otro una vez que este venza.'
             ]);
             exit;
         }
@@ -238,10 +247,9 @@ try {
             precio_pagado, 
             moneda, 
             estado, 
-            auto_renovar, 
             comprobante_pago,
             creado_en
-        ) VALUES (?, ?, ?, ?, ?, ?, 'pendiente_aprobacion', 0, ?, NOW())
+        ) VALUES (?, ?, ?, ?, ?, ?, 'pendiente_aprobacion', ?, NOW())
     ");
     $stmtInsert->execute([
         $escortId,
@@ -266,11 +274,12 @@ try {
             ->execute([$planId, $plan['precio'], $suscripcionId, $pagoExistente['id']]);
     } else {
         $pdo->prepare("
-            INSERT INTO pagos (escort_id, plan_id, suscripcion_id, concepto, monto, moneda, metodo_pago, estado_pago, notas, creado_en)
-            VALUES (?, ?, ?, ?, ?, ?, 'transferencia', 'pendiente', ?, NOW())
+            INSERT INTO pagos (escort_id, plan_id, suscripcion_id, concepto, monto, moneda, metodo_pago, estado_pago, comprobante_url, notas, creado_en)
+            VALUES (?, ?, ?, ?, ?, ?, 'transferencia', 'pendiente', ?, ?, NOW())
         ")->execute([
             $escortId, $planId, $suscripcionId, $concepto,
             $plan['precio'], $plan['moneda'],
+            $comprobanteUrl,
             'Pendiente por solicitud de ' . ($plan['tipo'] === 'extra' ? 'extra' : 'plan')
         ]);
     }
@@ -295,7 +304,22 @@ try {
         '/admin/suscripciones'
     ]);
 
+    // Notificación global para admins con foto de la escort
+    $af = $pdo->prepare("SELECT foto_principal, nombre FROM escorts WHERE id = ?");
+    $af->execute([$escortId]);
+    $actor = $af->fetch(PDO::FETCH_ASSOC);
+    $pdo->prepare("INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, url, actor_foto, escort_id) VALUES (NULL, 'sistema', ?, ?, '/admin/suscripciones', ?, ?)")
+        ->execute([$notifTitulo, $notifMensaje, $actor['foto_principal'], $escortId]);
+
     $pdo->commit();
+
+    require_once __DIR__ . '/../mail.php';
+    notificarAccionEscort('pagos', $escortId, $escortNombre . ' solicitó ' . $plan['nombre'], [
+        'Tipo' => $plan['tipo'] === 'extra' ? 'Extra (destacado)' : 'Plan',
+        'Precio' => '$' . number_format((float)$plan['precio'], 0) . ' ' . $plan['moneda'],
+        'Duración' => (int)$plan['duracion_dias'] . ' días',
+        'Método' => $metodoPago,
+    ]);
 
     echo json_encode([
         'success' => true,

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import DataTable from '../ui/DataTable';
 import type { Column, ActionItem } from '../ui/DataTable';
+import StatCard from '../ui/StatCard';
 
 const API_URL = '/api/admin/comentarios.php';
 
@@ -20,6 +21,7 @@ export default function ComentariosData() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [viewComment, setViewComment] = useState<any | null>(null);
 
   const fetchItems = useCallback(async () => {
     setIsLoading(true);
@@ -89,15 +91,16 @@ export default function ComentariosData() {
       key: 'comentario', header: 'Comentario', width: '300',
       render: (item) => (
         <div>
-          <div className="text-sm text-white line-clamp-2">{item.comentario}</div>
+          <div className="text-sm text-white line-clamp-2">{item.comentario || 'Sin comentario'}</div>
           <div className="text-xs text-gray-500 mt-1">
-            por <span className="text-gray-400">{item.usuario}</span>
+            por <span className="text-gray-400">{item.usuario || item.usuario_email || 'Usuario desconocido'}</span>
             {' — '}
-            <a href={`/${item.escort_id}`} target="_blank" className="text-red-400 hover:underline">{item.escort}</a>
+            <a href={`/${item.escort_id}`} target="_blank" className="text-red-400 hover:underline">{item.escort || 'Escort'}</a>
           </div>
         </div>
       ),
     },
+
     {
       key: 'puntuacion', header: 'Punt.', width: '60', align: 'center',
       render: (item) => item.puntuacion ? (
@@ -133,6 +136,7 @@ export default function ComentariosData() {
 
   const getActions = (item: any): ActionItem[] => {
     const actions: ActionItem[] = [];
+    actions.push({ label: 'Ver', icon: 'fa-eye', onClick: () => setViewComment(item) });
     if (!item.aprobado) {
       actions.push({ label: 'Aprobar', icon: 'fa-check', onClick: () => aprobarRechazar(item.id, 'aprobar') });
     } else {
@@ -160,13 +164,19 @@ export default function ComentariosData() {
       {successMsg && <div className="bg-green-500/10 border border-green-500/30 text-green-400 px-4 py-3 rounded-lg flex items-center gap-2"><i className="fas fa-check-circle"></i>{successMsg}</div>}
       {error && <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg flex items-center gap-2"><i className="fas fa-exclamation-triangle"></i>{error} <button onClick={() => setError('')} className="ml-auto"><i className="fas fa-times"></i></button></div>}
 
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <StatCard label="Pendientes" value={stats.pendientes} icon="fa-clock" color="#fbbf24" loading={isLoading} />
+        <StatCard label="Aprobados" value={stats.aprobados} icon="fa-check-circle" color="#10b981" loading={isLoading} />
+        <StatCard label="Total" value={stats.total} icon="fa-comments" color="#a78bfa" loading={isLoading} />
+      </div>
+
       {/* Filtros tabs */}
-      <div className="flex gap-2 border-b border-admin-border pb-3">
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-transparent">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => { setEstado(tab.key); setPage(1); }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${
               estado === tab.key
                 ? 'bg-red-500/10 text-red-400 border border-red-500/20'
                 : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
@@ -185,7 +195,7 @@ export default function ComentariosData() {
         type="text"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="Buscar por comentario, usuario o escort..."
+        placeholder="Buscar por ID de comentario, ID de escort, comentario, usuario o escort..."
         className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2 text-white text-sm outline-none focus:border-red-500/50 transition-colors placeholder-gray-600"
       />
 
@@ -211,6 +221,56 @@ export default function ComentariosData() {
             className="text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed text-sm flex items-center gap-1">
             Siguiente <i className="fas fa-chevron-right"></i>
           </button>
+        </div>
+      )}
+
+      {/* Modal ver comentario completo */}
+      {viewComment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={() => setViewComment(null)}>
+          <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
+                    <i className="fas fa-comment text-yellow-400 text-lg"></i>
+                  </div>
+                  <div>
+                    <h3 className="text-white font-semibold text-sm">Comentario</h3>
+                    <p className="text-gray-500 text-xs">
+                      {viewComment.usuario || viewComment.usuario_email || 'Usuario desconocido'}
+                      {' — '}
+                      <a href={`/${viewComment.escort_id}`} target="_blank" className="text-red-400 hover:underline">{viewComment.escort || 'Escort'}</a>
+                    </p>
+                  </div>
+                </div>
+                <button onClick={() => setViewComment(null)} className="text-gray-500 hover:text-white transition-colors">
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+              <div className="bg-[#252538] rounded-lg p-4 mb-4">
+                <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">{viewComment.comentario || 'Sin comentario'}</p>
+              </div>
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center gap-3">
+                  {viewComment.puntuacion && (
+                    <span className="flex items-center gap-1">
+                      {Array.from({ length: viewComment.puntuacion }).map((_, i) => (
+                        <i key={i} className="fas fa-star text-yellow-400 text-[10px]"></i>
+                      ))}
+                    </span>
+                  )}
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                    viewComment.aprobado
+                      ? 'bg-emerald-500/10 text-emerald-400'
+                      : 'bg-yellow-500/10 text-yellow-400'
+                  }`}>
+                    {viewComment.aprobado ? 'Aprobado' : 'Pendiente'}
+                  </span>
+                </div>
+                <span>{viewComment.created_at ? new Date(viewComment.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

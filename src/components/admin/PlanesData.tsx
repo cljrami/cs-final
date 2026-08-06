@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { SkeletonTheme } from 'react-loading-skeleton';
-import 'react-loading-skeleton/dist/skeleton.css';
+
 import PlanesTable from './PlanesTable';
 import StatCard from '../ui/StatCard';
 
@@ -42,7 +41,6 @@ const statConfig = [
   { key: 'activos' as keyof Stats, icon: 'fa-check-circle', label: 'Activos', color: '#10b981', bgColor: '#1a3d2e' },
   { key: 'inactivos' as keyof Stats, icon: 'fa-times-circle', label: 'Inactivos', color: '#ef4444', bgColor: '#3d1a1a' },
   { key: 'bases' as keyof Stats, icon: 'fa-box', label: 'Planes Base', color: '#8b5cf6', bgColor: '#2e1a3d' },
-  { key: 'extras' as keyof Stats, icon: 'fa-puzzle-piece', label: 'Extras', color: '#f59e0b', bgColor: '#3d3d1a' },
 ];
 
 export default function PlanesData() {
@@ -85,12 +83,11 @@ export default function PlanesData() {
   }
 
   return (
-    <SkeletonTheme baseColor="#1a1a2e" highlightColor="#2d2d44" duration={1.2}>
       <div>
         <h1 className="text-2xl md:text-3xl font-bold mb-2">Gestión de Planes</h1>
         <p className="text-admin-muted mb-8">Administra planes base y extras de suscripción</p>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {statConfig.map((stat) => (
             <StatCard key={stat.key} icon={stat.icon} value={stats?.[stat.key] ?? 0} label={stat.label} color={stat.color} loading={loading} />
           ))}
@@ -98,6 +95,5 @@ export default function PlanesData() {
 
         <PlanesTable planes={planes} loading={loading} onRefresh={fetchData} />
       </div>
-    </SkeletonTheme>
   );
 }

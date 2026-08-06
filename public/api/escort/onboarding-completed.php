@@ -41,6 +41,7 @@ try {
     $newTokenData = [
         'id' => $tokenData['id'],
         'usuario' => $tokenData['usuario'] ?? '',
+        'tipo' => 'escort',
         'primer_login' => 0,
         'exp' => $tokenData['exp']
     ];

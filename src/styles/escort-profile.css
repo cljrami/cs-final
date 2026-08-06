@@ -1,0 +1,10 @@
+@import "./global.css";
+
+/*
+ * CSS de respaldo para public/escort.php (página de perfil público).
+ * Usa @source para que Tailwind escanee las clases usadas en el PHP
+ * y genere SOLO el CSS necesario (sin depender del Play CDN).
+ *
+ * Ver: public/scripts/inject-escort-css.js (post-build, inyecta el hash)
+ */
+@source "../../public/escort.php";

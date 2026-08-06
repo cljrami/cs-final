@@ -51,6 +51,13 @@ try {
     ];
     $token = signToken($tokenData);
 
+    $notif = $pdo->prepare("INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, url) VALUES (NULL, 'sistema', ?, ?, '/admin/usuarios')");
+    $notif->execute(["Nuevo usuario: {$nombre}", $email]);
+
+    require_once __DIR__ . '/../mail.php';
+    sendWelcomeUsuario($nombre, $email);
+    notificarAccionUsuario('usuarios', $newId, 'Nuevo usuario registrado en Kimi');
+
     echo json_encode([
         'success' => true,
         'token' => $token,

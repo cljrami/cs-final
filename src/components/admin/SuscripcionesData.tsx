@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { SkeletonTheme } from 'react-loading-skeleton';
-import Skeleton from 'react-loading-skeleton';
-import 'react-loading-skeleton/dist/skeleton.css';
+import { Skeleton } from '../ui/Skeleton';
 import '@fancyapps/ui/dist/fancybox/fancybox.css';
 import SearchFilters from './SearchFilters';
 import StatCard from '../ui/StatCard';
@@ -37,7 +35,6 @@ interface Suscripcion {
   dias_pausados: number;
   contador_pausas: number;
   max_pausas_permitidas: number;
-  auto_renovar: number;
   comprobante_pago: string | null;
   notas_admin: string | null;
   aprobado_por: number | null;
@@ -68,8 +65,26 @@ interface HistorialPausa {
   realizado_por_nombre: string | null;
 }
 
+interface ExtraInfo {
+  suscripcion_id: number;
+  plan_nombre: string;
+  plan_slug: string;
+  extra_tipo: string;
+  plan_badge: string | null;
+  color_badge: string;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
+  precio_pagado: string;
+  moneda: string;
+  estado: string;
+  estado_calculado: string;
+}
+
 interface SuscripcionDetalle extends Suscripcion {
   historial_pausas: HistorialPausa[];
+  dias_activo: number | null;
+  dias_restantes: number | null;
+  extras: ExtraInfo[];
 }
 
 interface Pagination {
@@ -88,7 +103,8 @@ function getAdminToken(): string {
 
 function formatDate(date: string | null): string {
   if (!date) return '-';
-  return new Date(date).toLocaleDateString('es-CL');
+  const d = date.includes(' ') ? date.split(' ')[0] : date;
+  return new Date(d + 'T12:00:00').toLocaleDateString('es-CL');
 }
 
 function formatMoney(amount: string | number | null | undefined): string {
@@ -102,7 +118,6 @@ const statConfig = [
   { key: 'total' as keyof Stats, icon: 'fa-layer-group', label: 'Total', color: '#3b82f6', bgColor: '#1e3a5f' },
   { key: 'pendientes' as keyof Stats, icon: 'fa-clock', label: 'Pendientes', color: '#f59e0b', bgColor: '#3d3d1a' },
   { key: 'activas' as keyof Stats, icon: 'fa-check-circle', label: 'Activas', color: '#10b981', bgColor: '#1a3d2e' },
-  { key: 'pausadas' as keyof Stats, icon: 'fa-pause-circle', label: 'Pausadas', color: '#f97316', bgColor: '#3d2e1a' },
   { key: 'expiradas' as keyof Stats, icon: 'fa-times-circle', label: 'Expiradas', color: '#ef4444', bgColor: '#3d1a1a' },
 ];
 
@@ -113,7 +128,6 @@ export default function SuscripcionesData() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [filterEstado, setFilterEstado] = useState('todos');
-  const [filterTipo, setFilterTipo] = useState('todos');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
@@ -121,11 +135,7 @@ export default function SuscripcionesData() {
   // Leer parámetros de la URL al montar
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const tipoParam = params.get('tipo');
     const estadoParam = params.get('estado');
-    if (tipoParam && ['base', 'extra'].includes(tipoParam)) {
-      setFilterTipo(tipoParam);
-    }
     if (estadoParam && ['pendiente', 'activa', 'expirada', 'cancelada', 'pausada', 'rechazada'].includes(estadoParam)) {
       setFilterEstado(estadoParam === 'pendiente' ? 'pendientes' : estadoParam);
     }
@@ -194,7 +204,6 @@ export default function SuscripcionesData() {
       dias_pausados: 0,
       contador_pausas: s.suscripcion?.contador_pausas ?? 0,
       max_pausas_permitidas: s.plan?.max_pausas_permitidas ?? 3,
-      auto_renovar: s.suscripcion?.auto_renovar ? 1 : 0,
       comprobante_pago: s.suscripcion?.comprobante_pago ?? null,
       notas_admin: null,
       aprobado_por: null,
@@ -215,7 +224,6 @@ export default function SuscripcionesData() {
         page: String(pageNum),
         limit: '20',
         estado: filterEstado,
-        tipo: filterTipo,
         search: search,
       });
       const res = await fetch(`${API_BASE}?${params.toString()}`, {
@@ -248,12 +256,12 @@ export default function SuscripcionesData() {
     } finally {
       setLoading(false);
     }
-  }, [filterEstado, filterTipo, search]);
+  }, [filterEstado, search]);
 
   useEffect(() => {
     setPage(1);
     fetchData(1, false);
-  }, [filterEstado, filterTipo, search, fetchData]);
+  }, [filterEstado, search]);
 
   const fetchDetalle = async (id: number) => {
     setDetalleLoading(true);
@@ -331,7 +339,7 @@ export default function SuscripcionesData() {
       const res = await fetch(API_BASE, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAdminToken()}` },
-        body: JSON.stringify({ action: 'update', suscripcion_id: editModal.suscripcion_id, precio_pagado: editModal.precio_pagado, fecha_inicio: editModal.fecha_inicio, fecha_fin: editModal.fecha_fin, notas_admin: editModal.notas_admin, auto_renovar: editModal.auto_renovar, max_pausas_permitidas: editModal.max_pausas_permitidas }),
+        body: JSON.stringify({ action: 'update', suscripcion_id: editModal.suscripcion_id, precio_pagado: editModal.precio_pagado, fecha_inicio: editModal.fecha_inicio, fecha_fin: editModal.fecha_fin, notas_admin: editModal.notas_admin, max_pausas_permitidas: editModal.max_pausas_permitidas }),
       });
       const data = await res.json();
       if (data.success) {
@@ -355,28 +363,6 @@ export default function SuscripcionesData() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAdminToken()}` },
         body: JSON.stringify({ suscripcion_id: id }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        fetchData(page, false);
-        window.dispatchEvent(new Event('counts-refresh'));
-      } else {
-        setError(data.error);
-      }
-    } catch {
-      setError('Error de conexión');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handlePausar = async (id: number, notas?: string) => {
-    setActionLoading(id);
-    try {
-      const res = await fetch('/api/admin/suscripciones/pausar.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAdminToken()}` },
-        body: JSON.stringify({ suscripcion_id: id, notas: notas || '' }),
       });
       const data = await res.json();
       if (data.success) {
@@ -444,10 +430,12 @@ export default function SuscripcionesData() {
       expirada: 'bg-red-900/40 text-red-400 border-red-800/50',
       cancelada: 'bg-gray-900/40 text-gray-400 border-gray-700/50',
       rechazada: 'bg-rose-900/40 text-rose-400 border-rose-800/50',
+      sin_plan: 'bg-gray-900/40 text-gray-500 border-gray-700/50',
     };
     const textos: Record<string, string> = {
       pendiente_aprobacion: 'Pendiente', activa: 'Activo', pausada: 'Pausado',
       expirada: 'Expirado', cancelada: 'Cancelado', rechazada: 'Rechazado',
+      sin_plan: 'Sin plan',
     };
     return (
       <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${styles[estado] || styles.expirada}`}>
@@ -460,6 +448,7 @@ export default function SuscripcionesData() {
     const icons: Record<string, string> = {
       pendiente_aprobacion: 'fa-clock', activa: 'fa-check-circle', pausada: 'fa-pause-circle',
       expirada: 'fa-times-circle', cancelada: 'fa-ban', rechazada: 'fa-times-circle',
+      sin_plan: 'fa-question-circle',
     };
     return icons[estado] || 'fa-question-circle';
   };
@@ -473,7 +462,6 @@ export default function SuscripcionesData() {
   }
 
   return (
-    <SkeletonTheme baseColor="#1a1a2e" highlightColor="#2d2d44" duration={1.2}>
       <div>
         <h1 className="text-2xl md:text-3xl font-bold mb-2">Gestión de Suscripciones</h1>
         <p className="text-admin-muted mb-8">Administra las suscripciones de escorts: aprueba, rechaza, pausa y reactiva</p>
@@ -500,34 +488,40 @@ export default function SuscripcionesData() {
           activeFilter={filterEstado}
           onFilterChange={setFilterEstado}
         />
-        <SearchFilters
-          search={search}
-          onSearch={setSearch}
-          placeholder="Buscar escort, email o plan..."
-          hideSearch
-          filters={[
-            { key: 'todos', label: 'Todos los planes' },
-            { key: 'base', label: 'Planes Base' },
-            { key: 'extra', label: 'Planes Extra' },
-          ]}
-          activeFilter={filterTipo}
-          onFilterChange={setFilterTipo}
-        />
-
         {/* Table */}
         <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl overflow-hidden">
-          {loading && suscripciones.length === 0 ? (
-            <div className="p-6">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center gap-4 py-4 border-b border-[#2a2a3e] last:border-0">
-                  <Skeleton width={40} height={40} circle />
-                  <div className="flex-1">
-                    <Skeleton width={150} height={20} className="mb-2" />
-                    <Skeleton width={100} height={14} />
-                  </div>
-                  <Skeleton width={80} height={32} />
-                </div>
-              ))}
+          {loading ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-[#2a2a3e] text-left text-xs text-gray-400 uppercase">
+                    <th className="px-4 py-3">Escort</th>
+                    <th className="px-4 py-3">Plan</th>
+                    <th className="px-4 py-3">Estado</th>
+                    <th className="px-4 py-3">Pago</th>
+                    <th className="px-4 py-3 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...Array(5)].map((_, i) => (
+                    <tr key={i} className="border-b border-[#2a2a3e]">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <Skeleton width={40} height={40} circle />
+                          <div className="flex-1">
+                            <Skeleton width={150} height={20} className="mb-2" />
+                            <Skeleton width={100} height={14} />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3"><Skeleton width={120} height={20} /></td>
+                      <td className="px-4 py-3"><Skeleton width={80} height={20} /></td>
+                      <td className="px-4 py-3"><Skeleton width={100} height={20} /></td>
+                      <td className="px-4 py-3 text-right"><Skeleton width={80} height={32} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : suscripciones.length === 0 ? (
             <div className="p-12 text-center">
@@ -590,7 +584,7 @@ export default function SuscripcionesData() {
                             {s.dias_restantes_calculados !== null && s.estado_calculado === 'activa' && (
                               <span className="text-[11px] text-emerald-400 font-medium">{s.dias_restantes_calculados} días rest.</span>
                             )}
-                            {s.auto_renovar === 1 && <span className="text-[10px] text-blue-400"><i className="fas fa-sync-alt mr-0.5" />Auto</span>}
+
                           </div>
                         </td>
 
@@ -600,7 +594,7 @@ export default function SuscripcionesData() {
                           {s.comprobante_pago && (
                             <a href={s.comprobante_pago} data-fancybox="susc-comprobante"
                               className="text-[10px] text-rose-400 hover:text-rose-300 inline-flex items-center gap-0.5 mt-0.5">
-                              <i className="fas fa-file-image" />Comprobante
+                              {s.comprobante_pago.match(/\.pdf$/i) ? <i className="fas fa-file-pdf" /> : <i className="fas fa-file-image" />}Comprobante
                             </a>
                           )}
                         </td>
@@ -631,12 +625,6 @@ export default function SuscripcionesData() {
 
                             {s.estado_calculado === 'activa' && (
                               <>
-                                {s.plan_tipo === 'base' && s.contador_pausas < s.max_pausas_permitidas && (
-                                  <button onClick={() => confirmAction('¿Pausar esta suscripción?', () => handlePausar(s.suscripcion_id))} disabled={actionLoading === s.suscripcion_id}
-                                    className="px-2.5 py-1 bg-orange-600 hover:bg-orange-700 text-white text-[11px] rounded-md font-medium transition-colors disabled:opacity-50 flex items-center gap-1">
-                                    <i className="fas fa-pause text-[10px]" />Pausar
-                                  </button>
-                                )}
                                 <button onClick={() => confirmAction('¿Cancelar esta suscripción?', () => handleCancelar(s.suscripcion_id))} disabled={actionLoading === s.suscripcion_id}
                                   className="px-2.5 py-1 bg-gray-600 hover:bg-gray-700 text-white text-[11px] rounded-md font-medium transition-colors disabled:opacity-50 flex items-center gap-1">
                                   <i className="fas fa-ban text-[10px]" />Cancelar
@@ -683,7 +671,7 @@ export default function SuscripcionesData() {
               <div className="flex items-center justify-between p-6 border-b border-[#2a2a3e]">
                 <h3 className="text-lg font-semibold text-white">
                   <i className="fas fa-eye mr-2"></i>
-                  Detalle de Suscripción #{detalleModal.suscripcion_id}
+                  {detalleModal.escort_nombre}
                 </h3>
                 <button onClick={() => setDetalleModal(null)} className="text-gray-400 hover:text-white transition-colors">
                   <i className="fas fa-times"></i>
@@ -732,16 +720,34 @@ export default function SuscripcionesData() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           {getEstadoBadge(detalleModal.estado_calculado)}
-                          {detalleModal.dias_restantes_calculados !== null && <span className="text-sm text-emerald-400">({detalleModal.dias_restantes_calculados} días)</span>}
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           <div className="text-gray-500">Creada: <span className="text-gray-300">{formatDate(detalleModal.creado_en)}</span></div>
                           <div className="text-gray-500">Aprobada: <span className="text-gray-300">{formatDate(detalleModal.fecha_aprobacion)}</span></div>
                           <div className="text-gray-500">Inicio: <span className="text-gray-300">{formatDate(detalleModal.fecha_inicio)}</span></div>
                           <div className="text-gray-500">Vence: <span className="text-gray-300">{formatDate(detalleModal.fecha_fin)}</span></div>
-                          <div className="text-gray-500">Pausa: <span className="text-orange-400">{formatDate(detalleModal.fecha_pausa)}</span></div>
-                          <div className="text-gray-500">Reactivación: <span className="text-green-400">{formatDate(detalleModal.fecha_reactivacion)}</span></div>
                           <div className="text-gray-500">Rechazo: <span className="text-rose-400">{formatDate(detalleModal.fecha_rechazo)}</span></div>
+                        </div>
+                        <div className="flex flex-wrap gap-4 mt-3 pt-3 border-t border-[#2a2a3e]">
+                          <div className="flex items-center gap-2">
+                            <i className="fas fa-calendar-alt text-emerald-400 text-xs" />
+                            <span className="text-gray-500 text-xs">Días activo:</span>
+                            <span className="text-emerald-400 font-medium text-sm">
+                              {detalleModal.dias_activo ?? '-'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <i className="fas fa-hourglass-half text-amber-400 text-xs" />
+                            <span className="text-gray-500 text-xs">Días restantes:</span>
+                            <span className="text-amber-400 font-medium text-sm">
+                              {detalleModal.dias_restantes !== null ? detalleModal.dias_restantes : '-'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <i className="fas fa-pause-circle text-orange-400 text-xs" />
+                            <span className="text-gray-500 text-xs">Pausas:</span>
+                            <span className="text-orange-400 font-medium text-sm">{detalleModal.contador_pausas}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -752,7 +758,7 @@ export default function SuscripcionesData() {
                         <div className="text-white font-medium">{formatMoney(detalleModal.precio_pagado)} {detalleModal.moneda}</div>
                         {detalleModal.comprobante_pago && (
                           <a href={detalleModal.comprobante_pago} data-fancybox="susc-comprobante" className="text-rose-400 hover:text-rose-300 text-xs mt-1 inline-block">
-                            <i className="fas fa-file-image mr-1" />Ver comprobante
+                            {detalleModal.comprobante_pago.match(/\.pdf$/i) ? <i className="fas fa-file-pdf mr-1" /> : <i className="fas fa-file-image mr-1" />}Ver comprobante
                           </a>
                         )}
                       </div>
@@ -760,29 +766,107 @@ export default function SuscripcionesData() {
 
                     <div className="bg-[#252538] rounded-lg p-4">
                       <h4 className="text-sm font-bold text-gray-400 uppercase mb-3">Pausas</h4>
-                      <div className="text-sm">
-                        <span className="text-white">{detalleModal.contador_pausas}</span>
-                        <span className="text-gray-500"> usadas de {detalleModal.max_pausas_permitidas} permitidas</span>
-                        {detalleModal.dias_pausados > 0 && <div className="text-xs text-gray-500">{detalleModal.dias_pausados} días pausados acumulados</div>}
+                      <div className="flex items-center gap-3 text-sm mb-3">
+                        <div className="bg-[#1a1a2e] rounded-lg px-3 py-2">
+                          <span className="text-white font-medium">{detalleModal.contador_pausas}</span>
+                          <span className="text-gray-500"> / {detalleModal.max_pausas_permitidas}</span>
+                          <span className="text-gray-500 text-xs ml-1">usadas</span>
+                        </div>
+                        {detalleModal.dias_pausados > 0 && (
+                          <div className="bg-[#1a1a2e] rounded-lg px-3 py-2">
+                            <span className="text-orange-400 font-medium">{detalleModal.dias_pausados}</span>
+                            <span className="text-gray-500 text-xs ml-1">días pausados acumulados</span>
+                          </div>
+                        )}
                       </div>
                       {detalleModal.historial_pausas && detalleModal.historial_pausas.length > 0 && (
-                        <div className="mt-3 space-y-2">
-                          <h5 className="text-xs font-bold text-gray-500 uppercase">Historial</h5>
-                          {detalleModal.historial_pausas.map((h) => (
-                            <div key={h.id} className="flex items-center justify-between text-sm bg-[#1a1a2e] rounded-lg p-2">
-                              <div className="flex items-center gap-2">
-                                <i className={`fas ${h.accion === 'pausa' ? 'fa-pause text-orange-400' : 'fa-play text-green-400'}`} />
-                                <span className="text-gray-300 capitalize">{h.accion}</span>
-                              </div>
-                              <div className="text-gray-500 text-xs">
-                                {formatDate(h.fecha_accion)} · {h.dias_acumulados_pausa} días
-                                {h.realizado_por_nombre && ` · ${h.realizado_por_nombre}`}
-                              </div>
-                            </div>
-                          ))}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-[#2a2a3e] text-xs text-gray-500 uppercase">
+                                <th className="py-2 pr-3 text-left">Acción</th>
+                                <th className="py-2 pr-3 text-left">Fecha</th>
+                                <th className="py-2 pr-3 text-right">Días acum.</th>
+                                <th className="py-2 text-right">Realizado por</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {detalleModal.historial_pausas.map((h) => (
+                                <tr key={h.id} className="border-b border-[#2a2a3e]/50 last:border-0 hover:bg-[#1a1a2e]/50 transition-colors">
+                                  <td className="py-2 pr-3">
+                                    <div className="flex items-center gap-2">
+                                      <i className={`fas ${h.accion === 'pausa' ? 'fa-pause text-orange-400' : 'fa-play text-green-400'} text-[10px]`} />
+                                      <span className={`font-medium capitalize ${h.accion === 'pausa' ? 'text-orange-300' : 'text-green-300'}`}>
+                                        {h.accion}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 pr-3 text-gray-400">{formatDate(h.fecha_accion)}</td>
+                                  <td className="py-2 pr-3 text-right text-gray-400">{h.dias_acumulados_pausa}</td>
+                                  <td className="py-2 text-right text-gray-500">{h.realizado_por_nombre || 'Admin'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
                       )}
                     </div>
+
+                    {detalleModal.extras && detalleModal.extras.length > 0 && (
+                      <div className="bg-[#252538] rounded-lg p-4">
+                        <h4 className="text-sm font-bold text-gray-400 uppercase mb-3">
+                          <i className="fas fa-star text-purple-400 mr-2" />
+                          Planes Extra
+                        </h4>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-[#2a2a3e] text-xs text-gray-500 uppercase">
+                                <th className="py-2 pr-3 text-left">Plan</th>
+                                <th className="py-2 pr-3 text-left">Tipo</th>
+                                <th className="py-2 pr-3 text-left">Estado</th>
+                                <th className="py-2 pr-3 text-left">Inicio</th>
+                                <th className="py-2 pr-3 text-left">Vence</th>
+                                <th className="py-2 text-right">Pago</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {detalleModal.extras.map((ex) => (
+                                <tr key={ex.suscripcion_id} className="border-b border-[#2a2a3e]/50 last:border-0 hover:bg-[#1a1a2e]/50 transition-colors">
+                                  <td className="py-2 pr-3">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-6 h-6 rounded flex items-center justify-center text-white font-bold text-[9px] flex-shrink-0" style={{ backgroundColor: ex.color_badge }}>
+                                        {ex.plan_badge?.charAt(0) || 'E'}
+                                      </div>
+                                      <span className="text-gray-200 font-medium">{ex.plan_nombre}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-2 pr-3 text-gray-400 capitalize">{ex.extra_tipo || 'Extra'}</td>
+                                  <td className="py-2 pr-3">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+                                      ex.estado_calculado === 'activa' ? 'bg-emerald-900/40 text-emerald-400 border-emerald-800/50' :
+                                      ex.estado_calculado === 'pendiente_aprobacion' ? 'bg-yellow-900/40 text-yellow-400 border-yellow-800/50' :
+                                      ex.estado_calculado === 'pausada' ? 'bg-orange-900/40 text-orange-400 border-orange-800/50' :
+                                      'bg-gray-900/40 text-gray-400 border-gray-700/50'
+                                    }`}>
+                                      {ex.estado_calculado === 'activa' ? 'Activo' :
+                                       ex.estado_calculado === 'pendiente_aprobacion' ? 'Pendiente' :
+                                       ex.estado_calculado === 'pausada' ? 'Pausado' : 'Finalizado'}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 pr-3 text-gray-400">{formatDate(ex.fecha_inicio)}</td>
+                                  <td className="py-2 pr-3 text-gray-400">{formatDate(ex.fecha_fin)}</td>
+                                  <td className="py-2 text-right">
+                                    <div className="text-gray-300 font-medium">{formatMoney(ex.precio_pagado)}</div>
+                                    <div className="text-gray-500 text-[10px]">{ex.moneda}</div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
 
                     {detalleModal.notas_admin && (
                       <div className="bg-[#252538] rounded-lg p-4">
@@ -826,11 +910,7 @@ export default function SuscripcionesData() {
                   <input type="number" value={editModal.max_pausas_permitidas} onChange={(e) => setEditModal({ ...editModal, max_pausas_permitidas: parseInt(e.target.value) })}
                     className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500" />
                 </div>
-                <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                  <input type="checkbox" checked={editModal.auto_renovar === 1} onChange={(e) => setEditModal({ ...editModal, auto_renovar: e.target.checked ? 1 : 0 })}
-                    className="w-4 h-4 rounded border-gray-600 text-blue-600 focus:ring-blue-500 bg-[#1a1a2e]" />
-                  Auto-renovar
-                </label>
+
                 <div>
                   <label className="block text-sm text-gray-400 mb-1">Notas admin</label>
                   <textarea value={editModal.notas_admin || ''} onChange={(e) => setEditModal({ ...editModal, notas_admin: e.target.value })} rows={3}
@@ -1001,6 +1081,5 @@ export default function SuscripcionesData() {
           </div>
         )}
       </div>
-    </SkeletonTheme>
   );
 }

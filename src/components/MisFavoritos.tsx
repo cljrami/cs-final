@@ -19,6 +19,7 @@ export default function MisFavoritos() {
   const [favoritos, setFavoritos] = useState<Favorito[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState('');
+  const esTactil = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
   useEffect(() => {
     requireAuth();
@@ -43,25 +44,6 @@ export default function MisFavoritos() {
     }
   };
 
-  if (cargando) {
-    return (
-      <div className="flex justify-center items-center py-24">
-        <div className="animate-spin w-10 h-10 border-4 border-red-500 border-t-transparent rounded-full"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="max-w-4xl mx-auto px-4 py-16 text-center">
-        <div className="text-red-400 text-lg mb-2">
-          <i className="fas fa-exclamation-circle mr-2"></i>{error}
-        </div>
-        <a href="/ingresar" className="text-red-400 hover:text-red-300 underline">Iniciar sesión</a>
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
@@ -72,7 +54,25 @@ export default function MisFavoritos() {
         </h1>
       </div>
 
-      {favoritos.length === 0 ? (
+      {error && (
+        <div className="text-center py-8 text-red-400">
+          <i className="fas fa-exclamation-circle mr-2"></i>{error}
+        </div>
+      )}
+
+      {cargando ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          {[1,2,3,4,5].map(i => (
+            <div key={i} className="bg-[#1a1a2e] rounded-xl overflow-hidden border border-white/5">
+              <div className="aspect-[3/4] bg-gray-800 animate-pulse"></div>
+              <div className="p-3 space-y-2">
+                <div className="h-4 bg-gray-800 rounded animate-pulse w-24"></div>
+                <div className="h-3 bg-gray-800 rounded animate-pulse w-16"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : favoritos.length === 0 ? (
         <div className="text-center py-24">
           <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-[#1a1a2e] flex items-center justify-center">
             <i className="fas fa-heart-broken text-3xl text-gray-600"></i>
@@ -135,7 +135,7 @@ export default function MisFavoritos() {
               </a>
               <button
                 onClick={() => quitarFavorito(f.id)}
-                className="absolute top-3 left-3 w-7 h-7 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-red-500/80 transition-all opacity-0 group-hover:opacity-100"
+                className={`absolute top-3 left-3 w-7 h-7 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-red-500/80 transition-all ${esTactil ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                 title="Quitar de favoritos"
               >
                 <i className="fas fa-times text-white text-xs"></i>

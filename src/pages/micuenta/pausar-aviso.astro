@@ -1,0 +1,18 @@
+---
+import EscortLayout from '../../layouts/EscortLayout.astro';
+import EscortSidebar from '../../components/escort/EscortSidebar';
+import EscortAuthGuard from '../../components/escort/EscortAuthGuard';
+import PausarAviso from '../../components/escort/PausarAviso';
+import AprobacionRequerida from '../../components/escort/AprobacionRequerida';
+---
+
+<EscortLayout title="Pausar Aviso - CS Panel" activePage="pausar-aviso">
+  <EscortSidebar slot="sidebar" activePage="pausar-aviso" client:load />
+  <EscortAuthGuard client:load>
+    <div class="w-full max-w-full">
+      <AprobacionRequerida client:load>
+        <PausarAviso client:load />
+      </AprobacionRequerida>
+    </div>
+  </EscortAuthGuard>
+</EscortLayout>

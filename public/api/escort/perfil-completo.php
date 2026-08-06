@@ -13,6 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 try {
     require_once __DIR__ . '/../bootstrap.php';
+    require_once __DIR__ . '/../lib/gira.php';
 
     $pdo = getDBConnection();
     $headers = getallheaders();
@@ -35,12 +36,15 @@ try {
 
     $escortId = $tokenData['id'];
 
+    limpiar_gira_vencida($pdo);
+
     $stmt = $pdo->prepare("
         SELECT id, nombre, edad, altura, peso, medidas,
-               ciudad, whatsapp, telefono, 
+               ciudad, categoria_id, whatsapp, telefono, 
                nacionalidad, etnia, color_ojos, color_pelo, orientacion, estilo,
                descripcion_corta, descripcion_larga,
-               estado, verificado, vip
+               estado, verificado, vip, privacidad,
+               en_gira, gira_ciudad_id, gira_fecha_inicio, gira_fecha_fin
         FROM escorts 
         WHERE id = ? AND eliminada = 0
     ");
@@ -61,6 +65,17 @@ try {
     ");
     $servStmt->execute([$escortId]);
     $perfil['servicios'] = $servStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Cargar idiomas de la escort
+    $idiomaStmt = $pdo->prepare("
+        SELECT idioma_id AS id
+        FROM escort_idiomas
+        WHERE escort_id = ?
+    ");
+    $idiomaStmt->execute([$escortId]);
+    $perfil['idiomas'] = array_map(function ($r) {
+        return (int) $r['id'];
+    }, $idiomaStmt->fetchAll(PDO::FETCH_ASSOC));
 
     echo json_encode(['success' => true, 'perfil' => $perfil]);
 } catch (Throwable $e) {

@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
@@ -12,7 +12,7 @@ function generarSlug($str)
 {
     $str = strtolower(trim($str));
     $str = str_replace(
-        ['á', 'é', 'í', 'ó', 'ú', 'ñ', 'ü', 'Á', 'Ã‰', 'Í', 'Ó', 'Ãš', 'Ã‘', 'Ãœ', 'Ã ', 'Ã¨', 'Ã¬', 'Ã²', 'Ã¹'],
+        ['íƒÂ¡', 'íƒÂ©', 'íƒÂ­', 'íƒÂ³', 'íƒÂº', 'íƒÂ±', 'íƒÂ¼', 'íƒÂ', 'íƒâ€°', 'íƒÂ', 'íƒâ€œ', 'íƒÅ¡', 'íƒâ€˜', 'íƒÅ“', 'íƒÂ ', 'íƒÂ¨', 'íƒÂ¬', 'íƒÂ²', 'íƒÂ¹'],
         ['a', 'e', 'i', 'o', 'u', 'n', 'u', 'a', 'e', 'i', 'o', 'u', 'n', 'u', 'a', 'e', 'i', 'o', 'u'],
         $str
     );
@@ -24,6 +24,8 @@ require_once __DIR__ . '/../bootstrap.php';
 
 try {
     $tokenData = requireAuth();
+
+    requireAdminRole($tokenData);
     $pdo = getDBConnection();
 
     $method = $_SERVER['REQUEST_METHOD'];
@@ -66,7 +68,7 @@ try {
         $countStmt->execute($params);
         $totalFiltered = (int)$countStmt->fetchColumn();
 
-        // Obtener categorías - USAR ? POSICIONAL para evitar conflictos
+        // Obtener categoríƒÂ­as - USAR ? POSICIONAL para evitar conflictos
         $sql = "
             SELECT 
                 c.id,
@@ -129,16 +131,16 @@ try {
         if (empty($nombre)) {
             $fieldErrors['nombre'] = 'El nombre es obligatorio';
         } elseif (strlen($nombre) < 2) {
-            $fieldErrors['nombre'] = 'Mínimo 2 caracteres';
+            $fieldErrors['nombre'] = 'MíƒÂ­nimo 2 caracteres';
         } elseif (strlen($nombre) > 100) {
-            $fieldErrors['nombre'] = 'Máximo 100 caracteres';
+            $fieldErrors['nombre'] = 'MíƒÂ¡ximo 100 caracteres';
         }
 
         if (empty($fieldErrors['nombre'])) {
             $checkStmt = $pdo->prepare("SELECT id, nombre FROM categorias WHERE LOWER(nombre) = LOWER(?)");
             $checkStmt->execute([$nombre]);
             if ($checkStmt->fetch()) {
-                $fieldErrors['nombre'] = 'Ya existe una categoría con ese nombre';
+                $fieldErrors['nombre'] = 'Ya existe una categoríƒÂ­a con ese nombre';
             }
         }
 
@@ -165,7 +167,7 @@ try {
 
         echo json_encode([
             'success' => true,
-            'message' => 'Categoría creada',
+            'message' => 'CategoríƒÂ­a creada',
             'categoria' => [
                 'id' => (int)$newId,
                 'nombre' => $nombre,
@@ -188,7 +190,7 @@ try {
 
         if ($id <= 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID no válido']);
+            echo json_encode(['success' => false, 'error' => 'ID no víƒÂ¡lido']);
             exit;
         }
 
@@ -207,14 +209,14 @@ try {
         if (isset($input['nombre'])) {
             $nombre = trim($input['nombre']);
             if (empty($nombre)) {
-                $fieldErrors['nombre'] = 'El nombre no puede estar vacío';
+                $fieldErrors['nombre'] = 'El nombre no puede estar vacíƒÂ­o';
             } elseif (strlen($nombre) > 100) {
-                $fieldErrors['nombre'] = 'Máximo 100 caracteres';
+                $fieldErrors['nombre'] = 'MíƒÂ¡ximo 100 caracteres';
             } else {
                 $dupStmt = $pdo->prepare("SELECT id FROM categorias WHERE LOWER(nombre) = LOWER(?) AND id != ?");
                 $dupStmt->execute([$nombre, $id]);
                 if ($dupStmt->fetch()) {
-                    $fieldErrors['nombre'] = 'Ya existe otra categoría con ese nombre';
+                    $fieldErrors['nombre'] = 'Ya existe otra categoríƒÂ­a con ese nombre';
                 } else {
                     $updates[] = 'nombre = ?';
                     $values[] = $nombre;
@@ -296,7 +298,7 @@ try {
 
         if ($id <= 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID no válido']);
+            echo json_encode(['success' => false, 'error' => 'ID no víƒÂ¡lido']);
             exit;
         }
 
@@ -327,13 +329,14 @@ try {
     }
 
     http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+    echo json_encode(['success' => false, 'error' => 'MíƒÂ©todo no permitido']);
 } catch (PDOException $e) {
     error_log("Error categorias.php PDO: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'DB: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error de base de datos']);
 } catch (Throwable $e) {
     error_log("Error categorias.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }
+

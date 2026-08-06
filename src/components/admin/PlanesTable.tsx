@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import Skeleton from 'react-loading-skeleton';
+import { Skeleton } from '../ui/Skeleton';
 import SearchFilters from './SearchFilters';
 
 interface Plan {
@@ -223,43 +223,52 @@ export default function PlanesTable({ planes, loading, onRefresh }: Props) {
 
       {/* Table */}
       <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl overflow-hidden">
-        {loading ? (
-          <div className="p-6">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-center gap-4 py-4 border-b border-[#2a2a3e] last:border-0">
-                <Skeleton width={40} height={40} circle />
-                <div className="flex-1">
-                  <Skeleton width={150} height={20} className="mb-2" />
-                  <Skeleton width={100} height={14} />
-                </div>
-                <Skeleton width={80} height={32} />
-              </div>
-            ))}
-          </div>
-        ) : filteredPlanes.length === 0 ? (
-          <div className="p-12 text-center">
-            <i className="fas fa-crown text-4xl text-gray-600 mb-4"></i>
-            <p className="text-gray-400 mb-4">No hay planes</p>
-            <button onClick={openCreate} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
-              Crear plan
-            </button>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-[#2a2a3e] text-left text-xs text-gray-400 uppercase">
-                  <th className="px-4 py-3">Plan</th>
-                  <th className="px-4 py-3">Tipo</th>
-                  <th className="px-4 py-3">Duración</th>
-                  <th className="px-4 py-3">Precio</th>
-                  <th className="px-4 py-3">Pausas</th>
-                  <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3 text-right">Acciones</th>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-[#2a2a3e] text-left text-xs text-gray-400 uppercase">
+                <th className="px-4 py-3">Plan</th>
+                <th className="px-4 py-3">Tipo</th>
+                <th className="px-4 py-3">Duración</th>
+                <th className="px-4 py-3">Precio</th>
+                <th className="px-4 py-3">Pausas</th>
+                <th className="px-4 py-3">Estado</th>
+                <th className="px-4 py-3 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                [...Array(5)].map((_, i) => (
+                  <tr key={i} className="border-b border-[#2a2a3e]">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <Skeleton width={24} height={24} borderRadius={9999} />
+                        <div>
+                          <Skeleton width={120} height={20} className="mb-1" />
+                          <Skeleton width={60} height={14} />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3"><Skeleton width={60} height={20} borderRadius={9999} /></td>
+                    <td className="px-4 py-3"><Skeleton width={80} height={20} /></td>
+                    <td className="px-4 py-3"><Skeleton width={80} height={20} /></td>
+                    <td className="px-4 py-3"><Skeleton width={50} height={20} /></td>
+                    <td className="px-4 py-3"><Skeleton width={44} height={24} borderRadius={9999} /></td>
+                    <td className="px-4 py-3 text-right"><Skeleton width={64} height={32} borderRadius={6} /></td>
+                  </tr>
+                ))
+              ) : filteredPlanes.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-12 text-center">
+                    <i className="fas fa-crown text-4xl text-gray-600 mb-4"></i>
+                    <p className="text-gray-400 mb-4">No hay planes</p>
+                    <button onClick={openCreate} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+                      Crear plan
+                    </button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredPlanes.map((plan) => (
+              ) : (
+                filteredPlanes.map((plan) => (
                   <tr key={plan.id} className={`border-b border-[#2a2a3e] last:border-0 hover:bg-[#252538] transition-colors ${plan.activo === 0 ? 'opacity-50' : ''}`}>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
@@ -308,11 +317,11 @@ export default function PlanesTable({ planes, loading, onRefresh }: Props) {
                       </div>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Modal Crear/Editar */}

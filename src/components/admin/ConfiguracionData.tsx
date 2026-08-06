@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
-import { SkeletonTheme } from 'react-loading-skeleton';
-import Skeleton from 'react-loading-skeleton';
-import 'react-loading-skeleton/dist/skeleton.css';
+import { Skeleton } from '../ui/Skeleton';
 
 interface ConfigItem {
   valor: string;
@@ -90,7 +88,7 @@ export default function ConfiguracionData() {
   }
 
   return (
-    <SkeletonTheme baseColor="#1a1a2e" highlightColor="#2d2d44" duration={1.2}>
+    <>
       <div>
         <h1 className="text-2xl md:text-3xl font-bold mb-2">Configuración</h1>
         <p className="text-admin-muted mb-8">Ajusta precios y opciones del sistema</p>
@@ -102,50 +100,59 @@ export default function ConfiguracionData() {
             </div>
           )}
 
-          {loading ? (
-            <div className="space-y-4">
-              <Skeleton height={60} />
-              <Skeleton height={60} />
-              <Skeleton height={60} />
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Precio VIP *</label>
-                <p className="text-xs text-gray-500 mb-2">{config?.precio_vip?.descripcion}</p>
+                <p className="text-xs text-gray-500 mb-2">
+                  {loading ? <Skeleton width={200} height={14} /> : config?.precio_vip?.descripcion}
+                </p>
                 <div className="flex gap-3">
                   <div className="relative flex-1">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={formData.precio_vip}
-                      onChange={(e) => setFormData({ ...formData, precio_vip: e.target.value })}
-                      className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg pl-8 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
-                    />
+                    {loading ? (
+                      <Skeleton height={42} className="w-full rounded-lg" />
+                    ) : (
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.precio_vip}
+                        onChange={(e) => setFormData({ ...formData, precio_vip: e.target.value })}
+                        className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg pl-8 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                      />
+                    )}
                   </div>
-                  <select
-                    value={formData.moneda_vip}
-                    onChange={(e) => setFormData({ ...formData, moneda_vip: e.target.value })}
-                    className="bg-[#252538] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
-                  >
-                    <option value="CLP">CLP</option>
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                  </select>
+                  {loading ? (
+                    <Skeleton height={42} width={100} className="rounded-lg" />
+                  ) : (
+                    <select
+                      value={formData.moneda_vip}
+                      onChange={(e) => setFormData({ ...formData, moneda_vip: e.target.value })}
+                      className="bg-[#252538] border border-[#2a2a3e] rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                    >
+                      <option value="CLP">CLP</option>
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                    </select>
+                  )}
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Duración VIP (días)</label>
-                <p className="text-xs text-gray-500 mb-2">{config?.duracion_vip_dias?.descripcion}</p>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.duracion_vip_dias}
-                  onChange={(e) => setFormData({ ...formData, duracion_vip_dias: e.target.value })}
-                  className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
-                />
+                <p className="text-xs text-gray-500 mb-2">
+                  {loading ? <Skeleton width={200} height={14} /> : config?.duracion_vip_dias?.descripcion}
+                </p>
+                {loading ? (
+                  <Skeleton height={42} className="w-full rounded-lg" />
+                ) : (
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.duracion_vip_dias}
+                    onChange={(e) => setFormData({ ...formData, duracion_vip_dias: e.target.value })}
+                    className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                  />
+                )}
                 <p className="text-gray-500 text-xs mt-1">0 = Permanente (no expira)</p>
               </div>
 
@@ -160,7 +167,6 @@ export default function ConfiguracionData() {
                 </button>
               </div>
             </form>
-          )}
         </div>
       </div>
 
@@ -181,6 +187,6 @@ export default function ConfiguracionData() {
           </div>
         </div>
       )}
-    </SkeletonTheme>
+    </>
   );
 }

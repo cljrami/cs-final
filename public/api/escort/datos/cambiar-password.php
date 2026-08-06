@@ -60,6 +60,9 @@ try {
     $update = $pdo->prepare("UPDATE escorts SET password_hash = ? WHERE id = ?");
     $update->execute([$hashed, $escortId]);
 
+    require_once __DIR__ . '/../../mail.php';
+    sendPasswordChanged($escort['email'], $escort['nombre'] ?? $escort['usuario'] ?? '');
+
     echo json_encode(['success' => true, 'message' => 'Contraseña cambiada']);
 } catch (Throwable $e) {
     error_log("Error datos/cambiar-password.php: " . $e->getMessage());

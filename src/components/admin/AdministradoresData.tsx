@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import DataTable from '../ui/DataTable';
 import type { Column, ActionItem } from '../ui/DataTable';
 import ConfirmModal from '../ui/ConfirmModal';
+import StatCard from '../ui/StatCard';
 
 const API_URL = '/api/admin/administradores.php';
 
@@ -22,6 +23,7 @@ interface AdminUser {
 
 export default function AdministradoresData() {
   const [items, setItems] = useState<AdminUser[]>([]);
+  const [stats, setStats] = useState({ total: 0, superadmins: 0, admins: 0, moderadores: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -51,6 +53,7 @@ export default function AdministradoresData() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Error');
       setItems(data.admins || []);
+      setStats(data.stats || { total: 0, superadmins: 0, admins: 0, moderadores: 0 });
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -245,6 +248,13 @@ export default function AdministradoresData() {
 
       {successMsg && <div className="bg-green-500/10 border border-green-500/30 text-green-400 px-4 py-3 rounded-lg flex items-center gap-2"><i className="fas fa-check-circle"></i>{successMsg}</div>}
       {error && <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg flex items-center gap-2"><i className="fas fa-exclamation-triangle"></i>{error} <button onClick={() => setError('')} className="ml-auto"><i className="fas fa-times"></i></button></div>}
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard icon="fa-users" value={stats.total} label="Total" color="#6b7280" loading={isLoading} />
+        <StatCard icon="fa-crown" value={stats.superadmins} label="Superadmins" color="#f59e0b" loading={isLoading} />
+        <StatCard icon="fa-shield-halved" value={stats.admins} label="Admins" color="#3b82f6" loading={isLoading} />
+        <StatCard icon="fa-user-gear" value={stats.moderadores} label="Moderadores" color="#10b981" loading={isLoading} />
+      </div>
 
       <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por nombre o email..." className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2 text-white text-sm outline-none focus:border-red-500/50 transition-colors placeholder-gray-600" />
 

@@ -28,9 +28,11 @@ try {
         $unreadOnly = !empty($_GET['unread_only']);
         $limit = min((int)($_GET['limit'] ?? 20), 50);
 
-        $sql = "SELECT id, tipo, titulo, mensaje, leida, url, created_at 
-                FROM notificaciones 
-                WHERE escort_id = ?";
+        $sql = "SELECT n.id, n.tipo, n.titulo, n.mensaje, n.leida, n.url, n.created_at,
+                       '' as actor_foto,
+                       '' as actor_nombre
+                FROM notificaciones n
+                WHERE n.escort_id = ?";
         $params = [$escortId];
 
         if ($unreadOnly) {
@@ -79,9 +81,29 @@ try {
             $unreadCount = (int)$countStmt->fetchColumn();
 
             echo json_encode(['success' => true, 'unread_count' => $unreadCount]);
+        } elseif ($action === 'delete') {
+            if ($notificacionId) {
+                $stmt = $pdo->prepare("DELETE FROM notificaciones WHERE id = ? AND escort_id = ?");
+                $stmt->execute([$notificacionId, $escortId]);
+                echo json_encode(['success' => true]);
+            } else {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'ID requerido']);
+            }
         } else {
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Acción no válida']);
+        }
+    } elseif ($method === 'DELETE') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $notificacionId = $input['id'] ?? ($_GET['id'] ?? null);
+        if ($notificacionId) {
+            $stmt = $pdo->prepare("DELETE FROM notificaciones WHERE id = ? AND escort_id = ?");
+            $stmt->execute([$notificacionId, $escortId]);
+            echo json_encode(['success' => true]);
+        } else {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'ID requerido']);
         }
     } else {
         http_response_code(405);
@@ -90,9 +112,9 @@ try {
 } catch (PDOException $e) {
     error_log("Error notificaciones.php PDO: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'DB: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error de base de datos']);
 } catch (Throwable $e) {
     error_log("Error notificaciones.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }

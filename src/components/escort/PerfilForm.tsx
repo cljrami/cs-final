@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import SearchAutocomplete from '../ui/SearchAutocomplete';
+import { decodeHtml } from '../../lib/sanitize';
+import GiraActivacionPopup from './GiraActivacionPopup';
 
 const API_BASE = '/api/escort';
 
@@ -14,6 +16,7 @@ function getAuthHeaders(): Record<string, string> {
 interface Ciudad {
   id: number;
   nombre: string;
+  icono: string;
 }
 
 interface Servicio {
@@ -107,27 +110,13 @@ export default function PerfilForm() {
   const [ciudades, setCiudades] = useState<Ciudad[]>([]);
   const [servicios, setServicios] = useState<Servicio[]>([]);
   const [serviciosLoaded, setServiciosLoaded] = useState(false);
-  const [opciones, setOpciones] = useState<Record<string, { id: number; nombre: string }[]>>({});
+  const [opciones, setOpciones] = useState<Record<string, { id: number; nombre: string; icono?: string }[]>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  // Autocomplete ciudades
-  const [ciudadInput, setCiudadInput] = useState('');
-  const [ciudadSugerencias, setCiudadSugerencias] = useState<Ciudad[]>([]);
-  const [showCiudadSugerencias, setShowCiudadSugerencias] = useState(false);
-  const [ciudadSelectedIndex, setCiudadSelectedIndex] = useState(-1);
-  const ciudadInputRef = useRef<HTMLInputElement>(null);
-  const ciudadSugerenciasRef = useRef<HTMLDivElement>(null);
-
   // Autocomplete servicios
-  const [servicioInput, setServicioInput] = useState('');
-  const [servicioSugerencias, setServicioSugerencias] = useState<Servicio[]>([]);
-  const [showServicioSugerencias, setShowServicioSugerencias] = useState(false);
-  const [servicioSelectedIndex, setServicioSelectedIndex] = useState(-1);
-  const servicioInputRef = useRef<HTMLInputElement>(null);
-  const servicioSugerenciasRef = useRef<HTMLDivElement>(null);
 
   // Modal de tipo de servicio
   const [showServicioModal, setShowServicioModal] = useState(false);
@@ -141,6 +130,12 @@ export default function PerfilForm() {
     edad: '',
     ciudadId: '',
     ciudadNombre: '',
+    categoriaId: '',
+    enGira: false,
+    giraCiudadId: '',
+    giraCiudadNombre: '',
+    giraFechaInicio: '',
+    giraFechaFin: '',
     nacionalidad: '',
     etnia: '',
     color_ojos: '',
@@ -152,7 +147,12 @@ export default function PerfilForm() {
     descripcionCorta: '',
     descripcionLarga: '',
     servicios: [] as { id: number; incluido: number }[],
+    idiomas: [] as number[],
+    privacidad: [] as string[],
   });
+
+  const [showGiraPopup, setShowGiraPopup] = useState(false);
+  const giraPopupOpening = useRef<'activate' | 'edit' | null>(null);
 
   // Estados de validación en tiempo real
   const [edadTouched, setEdadTouched] = useState(false);
@@ -216,8 +216,13 @@ export default function PerfilForm() {
   // y no haya sido cargado previamente (evita duplicados y pérdida de datos)
   useEffect(() => {
     if (!quillRef.current || contenidoCargadoRef.current) return;
-    if (form.descripcionLarga === undefined || form.descripcionLarga === null) return;
-    quillRef.current.clipboard.dangerouslyPasteHTML(form.descripcionLarga || '');
+    // No cargar contenido vacío — evita que Quill se inicialice antes de
+    // que fetchData termine y marque contenidoCargado = true sin datos.
+    if (!form.descripcionLarga) return;
+    // Decodificar entidades HTML para que Quill muestre formato real,
+    // incluso si la BD tiene contenido escapado (ej. "&amp;lt;p&amp;gt;").
+    const decoded = decodeHtml(form.descripcionLarga);
+    quillRef.current.clipboard.dangerouslyPasteHTML(decoded);
     contenidoCargadoRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quillReady, form.descripcionLarga]);
@@ -251,6 +256,12 @@ export default function PerfilForm() {
           edad: p.edad?.toString() || '',
           ciudadId: ciudadEncontrada?.id?.toString() || '',
           ciudadNombre: ciudadEncontrada?.nombre || p.ciudad || '',
+          categoriaId: p.categoria_id != null ? p.categoria_id.toString() : '',
+          enGira: (p as any).en_gira == 1,
+          giraCiudadId: (p as any).gira_ciudad_id != null ? (p as any).gira_ciudad_id.toString() : '',
+          giraCiudadNombre: (p as any).gira_ciudad_id ? (ciudadesData.ciudades?.find((c: Ciudad) => c.id == (p as any).gira_ciudad_id)?.nombre || '') : '',
+          giraFechaInicio: (p as any).gira_fecha_inicio || '',
+          giraFechaFin: (p as any).gira_fecha_fin || '',
           nacionalidad: p.nacionalidad || '',
           etnia: p.etnia || '',
           color_ojos: p.color_ojos || '',
@@ -265,12 +276,11 @@ export default function PerfilForm() {
             id: typeof s === 'object' ? s.id : s,
             incluido: typeof s === 'object' ? (s.incluido ?? 1) : 1
           })) || [],
+          idiomas: Array.isArray((p as any).idiomas) ? (p as any).idiomas.map((i: any) => (typeof i === 'object' ? i.id : i)) : [],
+          privacidad: p.privacidad ? (typeof p.privacidad === 'string' ? JSON.parse(p.privacidad) : p.privacidad) : [],
         });
         
-        if (ciudadEncontrada) {
-          setCiudadInput(ciudadEncontrada.nombre);
         }
-      }
 
       if (ciudadesData.success) setCiudades(ciudadesData.ciudades || []);
       if (serviciosData.success) {
@@ -293,94 +303,7 @@ export default function PerfilForm() {
     }
   };
 
-  // ========== AUTOCOMPLETE CIUDADES ==========
-  const filtrarCiudades = useCallback((input: string) => {
-    if (!input.trim()) {
-      setCiudadSugerencias([]);
-      return;
-    }
-    const filtrados = ciudades.filter(c => 
-      c.nombre.toLowerCase().includes(input.toLowerCase())
-    );
-    setCiudadSugerencias(filtrados.slice(0, 6));
-    setCiudadSelectedIndex(-1);
-  }, [ciudades]);
-
-  useEffect(() => {
-    filtrarCiudades(ciudadInput);
-  }, [ciudadInput, filtrarCiudades]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (ciudadSugerenciasRef.current && !ciudadSugerenciasRef.current.contains(e.target as Node) &&
-          ciudadInputRef.current && !ciudadInputRef.current.contains(e.target as Node)) {
-        setShowCiudadSugerencias(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const selectCiudad = (ciudad: Ciudad) => {
-    setForm(prev => ({
-      ...prev,
-      ciudadId: ciudad.id.toString(),
-      ciudadNombre: ciudad.nombre
-    }));
-    setCiudadInput(ciudad.nombre);
-    setShowCiudadSugerencias(false);
-    setFieldErrors(prev => {
-      const { ciudad, ...rest } = prev;
-      return rest;
-    });
-  };
-
-  const handleCiudadKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setCiudadSelectedIndex(prev => Math.min(prev + 1, ciudadSugerencias.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setCiudadSelectedIndex(prev => Math.max(prev - 1, -1));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (ciudadSelectedIndex >= 0 && ciudadSugerencias[ciudadSelectedIndex]) {
-        selectCiudad(ciudadSugerencias[ciudadSelectedIndex]);
-      }
-    } else if (e.key === 'Escape') {
-      setShowCiudadSugerencias(false);
-    }
-  };
-
-  // ========== AUTOCOMPLETE SERVICIOS ==========
-  const filtrarServicios = useCallback((input: string) => {
-    if (!input.trim()) {
-      setServicioSugerencias([]);
-      return;
-    }
-    const idsSeleccionados = form.servicios.map(s => s.id);
-    const filtrados = servicios.filter(s => 
-      s.nombre.toLowerCase().includes(input.toLowerCase()) &&
-      !idsSeleccionados.includes(s.id)
-    );
-    setServicioSugerencias(filtrados.slice(0, 8));
-    setServicioSelectedIndex(-1);
-  }, [servicios, form.servicios]);
-
-  useEffect(() => {
-    filtrarServicios(servicioInput);
-  }, [servicioInput, filtrarServicios]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (servicioSugerenciasRef.current && !servicioSugerenciasRef.current.contains(e.target as Node) &&
-          servicioInputRef.current && !servicioInputRef.current.contains(e.target as Node)) {
-        setShowServicioSugerencias(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  
 
   const addServicio = (servicioId: number, incluido: number) => {
     const yaExiste = form.servicios.some(s => s.id === servicioId);
@@ -390,9 +313,6 @@ export default function PerfilForm() {
         servicios: [...prev.servicios, { id: servicioId, incluido }] 
       }));
     }
-    setServicioInput('');
-    setShowServicioSugerencias(false);
-    servicioInputRef.current?.focus();
   };
 
   const removeServicio = (servicioId: number) => {
@@ -411,24 +331,6 @@ export default function PerfilForm() {
           : s
       )
     }));
-  };
-
-  const handleServicioKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setServicioSelectedIndex(prev => Math.min(prev + 1, servicioSugerencias.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setServicioSelectedIndex(prev => Math.max(prev - 1, -1));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (servicioSelectedIndex >= 0 && servicioSugerencias[servicioSelectedIndex]) {
-        setSelectedServicioForModal(servicioSugerencias[servicioSelectedIndex]);
-        setShowServicioModal(true);
-      }
-    } else if (e.key === 'Escape') {
-      setShowServicioSugerencias(false);
-    }
   };
 
   // ========== HANDLERS DE TELÉFONO ==========
@@ -496,10 +398,54 @@ export default function PerfilForm() {
     setTimeout(() => setSuccessMsg(''), 3000);
   };
 
+  const saveForm = async (showMsg = true, overrides?: Partial<typeof form>) => {
+    const dataToSave = overrides ? { ...form, ...overrides } : form;
+    const latestHtml = quillRef.current ? quillRef.current.root.innerHTML : dataToSave.descripcionLarga;
+
+    setSaving(true);
+    setError('');
+
+    try {
+      const res = await fetch(`${API_BASE}/perfil-guardar.php`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          ...dataToSave,
+          descripcionLarga: latestHtml,
+          ciudadId: parseInt(dataToSave.ciudadId),
+          categoriaId: dataToSave.categoriaId ? parseInt(dataToSave.categoriaId) : null,
+          enGira: dataToSave.enGira ? 1 : 0,
+          giraCiudadId: dataToSave.enGira && dataToSave.giraCiudadId ? parseInt(dataToSave.giraCiudadId) : null,
+          giraFechaInicio: dataToSave.enGira ? dataToSave.giraFechaInicio : null,
+          giraFechaFin: dataToSave.enGira ? dataToSave.giraFechaFin : null,
+          idiomas: dataToSave.idiomas,
+          privacidad: dataToSave.privacidad
+        })
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        if (data.fieldErrors) {
+          setFieldErrors(data.fieldErrors);
+          setSaving(false);
+          return false;
+        }
+        throw new Error(data.error || 'Error al guardar');
+      }
+
+      if (showMsg) showNotification('Perfil guardado correctamente');
+      return true;
+    } catch (err: any) {
+      setError(err.message);
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validar todo antes de enviar
     const errors: Record<string, string> = {};
     
     if (!form.nombre.trim()) errors.nombre = 'Nombre artístico requerido';
@@ -527,40 +473,7 @@ export default function PerfilForm() {
     }
 
     setFieldErrors({});
-    setSaving(true);
-    setError('');
-
-    // Sincronizar el HTML más reciente del editor antes de enviar
-    if (quillRef.current) {
-      form.descripcionLarga = quillRef.current.root.innerHTML;
-    }
-
-    try {
-      const res = await fetch(`${API_BASE}/perfil-guardar.php`, {
-        method: 'PUT',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          ...form,
-          ciudadId: parseInt(form.ciudadId)
-        })
-      });
-      const data = await res.json();
-
-      if (!data.success) {
-        if (data.fieldErrors) {
-          setFieldErrors(data.fieldErrors);
-          setSaving(false);
-          return;
-        }
-        throw new Error(data.error || 'Error al guardar');
-      }
-
-      showNotification('Perfil guardado correctamente');
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
+    await saveForm();
   };
 
   // Servicios seleccionados con datos completos
@@ -596,7 +509,7 @@ export default function PerfilForm() {
         <p className="text-gray-500 mt-1 text-sm sm:text-base">Completa tu ficha para aparecer en el directorio</p>
       </div>
 
-      {/* On Tour - Intro */}
+      {/* On Tour - En Gira */}
       <div className="bg-gradient-to-r from-purple-900/40 via-fuchsia-900/30 to-purple-900/40 border border-purple-500/30 rounded-2xl p-5 md:p-7">
         <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
           <div className="w-12 h-12 md:w-14 md:h-14 bg-gradient-to-br from-purple-500 to-fuchsia-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-purple-500/20">
@@ -604,20 +517,93 @@ export default function PerfilForm() {
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-base md:text-lg font-bold text-white flex items-center gap-2">
-              ¿Estás de viaje?
+              ¿Vas a visitar otra ciudad?
               <span className="text-xs font-normal text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded-full">NUEVO</span>
             </h2>
             <p className="text-sm text-gray-400 mt-1">
-              Activa el modo <strong className="text-purple-300">En Gira</strong> para mostrar que estás disponible en otra ciudad. 
-              Los clientes podrán ver tu ubicación actual y tus fechas disponibles.
+              ¿Vas a estar en otra ciudad por algún tiempo? Actívalo y durante ese período tu perfil
+              aparecerá en la <strong className="text-purple-300">ciudad destino</strong>. Al terminar, volverás automáticamente a tu ciudad.
             </p>
           </div>
           <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
-            <input type="checkbox" className="sr-only peer" />
+            <input
+              type="checkbox"
+              className="sr-only peer"
+              checked={form.enGira}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  giraPopupOpening.current = 'activate';
+                  setShowGiraPopup(true);
+                } else {
+                  const giraClear = { enGira: false, giraCiudadId: '', giraCiudadNombre: '', giraFechaInicio: '', giraFechaFin: '' };
+                  setForm(prev => ({ ...prev, ...giraClear }));
+                  saveForm(false, giraClear).then(ok => {
+                    if (ok) showNotification('Has vuelto a tu ciudad');
+                  });
+                }
+              }}
+            />
             <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-purple-500 peer-checked:to-fuchsia-600"></div>
-            <span className="ms-3 text-sm font-medium text-purple-300">En Gira</span>
+            <span className="ms-3 text-sm font-medium text-purple-300">En otra ciudad</span>
           </label>
         </div>
+
+        {/* Resumen cuando está en gira */}
+        {form.enGira && form.giraCiudadNombre && (
+          <div className="mt-5 pt-5 border-t border-purple-500/20">
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <span className="inline-flex items-center gap-1.5 text-purple-300 bg-purple-500/10 px-3 py-1.5 rounded-lg">
+                <i className="fas fa-map-marker-alt"></i>{form.giraCiudadNombre}
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-gray-400">
+                <i className="fas fa-calendar"></i>{form.giraFechaInicio}
+              </span>
+              <span className="text-gray-600">→</span>
+              <span className="inline-flex items-center gap-1.5 text-gray-400">
+                <i className="fas fa-calendar-check"></i>{form.giraFechaFin}
+              </span>
+              <button
+                type="button"
+                onClick={() => { giraPopupOpening.current = 'edit'; setShowGiraPopup(true); }}
+                className="ml-auto text-xs text-purple-400 hover:text-purple-300 underline"
+              >
+                Editar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Popup de activación */}
+        <GiraActivacionPopup
+          open={showGiraPopup}
+          onClose={() => {
+            setShowGiraPopup(false);
+            if (giraPopupOpening.current === 'activate' && !form.enGira) {
+              setForm(prev => ({ ...prev, enGira: false }));
+            }
+            giraPopupOpening.current = null;
+          }}
+          onConfirm={async (data) => {
+            giraPopupOpening.current = null;
+            const ciudad = ciudades.find(c => c.id.toString() === data.ciudadId);
+            const giraOverrides = {
+              enGira: true,
+              giraCiudadId: data.ciudadId,
+              giraCiudadNombre: ciudad?.nombre || '',
+              giraFechaInicio: data.fechaInicio,
+              giraFechaFin: data.fechaFin,
+            };
+            setForm(prev => ({ ...prev, ...giraOverrides }));
+            setShowGiraPopup(false);
+            await saveForm(false, giraOverrides);
+            showNotification('Ciudad de visita activada correctamente');
+          }}
+          initialCiudadId={form.giraCiudadId}
+          initialFechaInicio={form.giraFechaInicio}
+          initialFechaFin={form.giraFechaFin}
+          ciudades={ciudades}
+          miCiudadId={form.ciudadId}
+        />
       </div>
 
       {/* Alerts */}
@@ -846,75 +832,24 @@ export default function PerfilForm() {
             Ubicación
           </h2>
 
-          <div className="max-w-md relative" ref={ciudadSugerenciasRef}>
-            <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">
-              Ciudad donde atiendes
-              {fieldErrors.ciudad && (
-                <span className="text-red-400 ml-2 text-xs normal-case">
-                  <i className="fas fa-exclamation-circle"></i> {fieldErrors.ciudad}
-                </span>
-              )}
-            </label>
-            <div className="relative">
-              <i className="fas fa-map-marker-alt absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
-              <input
-                ref={ciudadInputRef}
-                type="text"
-                value={ciudadInput}
-                onChange={(e) => {
-                  setCiudadInput(e.target.value);
-                  setShowCiudadSugerencias(true);
-                  if (!e.target.value.trim()) {
-                    setForm(prev => ({ ...prev, ciudadId: '', ciudadNombre: '' }));
-                  }
-                }}
-                onFocus={() => setShowCiudadSugerencias(true)}
-                onKeyDown={handleCiudadKeyDown}
-                placeholder="Escribe para buscar tu ciudad..."
-                className={`w-full bg-[#1a1a24] border ${fieldErrors.ciudad ? 'border-red-500 ring-1 ring-red-500/20' : 'border-gray-700'} rounded-xl py-3 pl-11 pr-10 text-white placeholder-gray-600 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/30 transition-all text-sm`}
-              />
-              {ciudadInput && (
-                <button
-                  type="button"
-                  onClick={() => { 
-                    setCiudadInput(''); 
-                    setForm(prev => ({ ...prev, ciudadId: '', ciudadNombre: '' }));
-                    setShowCiudadSugerencias(false); 
-                  }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
-                >
-                  <i className="fas fa-times"></i>
-                </button>
-              )}
-            </div>
-
-            {/* Dropdown ciudades */}
-            {showCiudadSugerencias && ciudadSugerencias.length > 0 && (
-              <div className="absolute z-50 w-full mt-1 bg-[#1a1a24] border border-gray-700 rounded-xl shadow-2xl shadow-black/50 overflow-hidden max-h-64 overflow-y-auto">
-                {ciudadSugerencias.map((ciudad, index) => (
-                  <button
-                    key={ciudad.id}
-                    type="button"
-                    onClick={() => selectCiudad(ciudad)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-all ${
-                      index === ciudadSelectedIndex 
-                        ? 'bg-red-500/10 text-red-400' 
-                        : 'text-gray-300 hover:bg-gray-800'
-                    }`}
-                  >
-                    <i className="fas fa-city text-gray-500 text-xs"></i>
-                    <span className="flex-1 text-sm">{ciudad.nombre}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {showCiudadSugerencias && ciudadInput && ciudadSugerencias.length === 0 && (
-              <div className="absolute z-50 w-full mt-1 bg-[#1a1a24] border border-gray-700 rounded-xl shadow-2xl p-4 text-center text-gray-500 text-sm">
-                <i className="fas fa-search mb-2 block text-lg"></i>
-                No se encontraron ciudades
-              </div>
-            )}
+          <div className="max-w-md">
+            <SearchAutocomplete
+              label="Ciudad donde atiendes"
+              icon="fa-map-marker-alt"
+              itemIcon="fa-city"
+              placeholder="Busca tu ciudad..."
+              options={ciudades.map(c => ({ id: c.id, nombre: c.nombre, icono: c.icono }))}
+              value={form.ciudadNombre}
+              selectedIcon={ciudades.find(c => c.id.toString() === form.ciudadId)?.icono}
+              onChange={(v) => {
+                if (!v) { setForm(prev => ({ ...prev, ciudadId: '', ciudadNombre: '' })); }
+              }}
+              onSelect={(opt) => {
+                setForm(prev => ({ ...prev, ciudadId: opt.id.toString(), ciudadNombre: opt.nombre }));
+                setFieldErrors(prev => { const { ciudad, ...rest } = prev; return rest; });
+              }}
+              error={fieldErrors.ciudad}
+            />
           </div>
         </div>
 
@@ -934,6 +869,7 @@ export default function PerfilForm() {
                 placeholder="Busca tu nacionalidad..."
                 options={opciones.nacionalidades || []}
                 value={form.nacionalidad}
+                selectedIcon={opciones.nacionalidades?.find(o => o.nombre === form.nacionalidad)?.icono}
                 onChange={(v) => setForm(prev => ({ ...prev, nacionalidad: v }))}
               />
             </div>
@@ -945,6 +881,7 @@ export default function PerfilForm() {
                 placeholder="Busca tu etnia..."
                 options={opciones.etnias || []}
                 value={form.etnia}
+                selectedIcon={opciones.etnias?.find(o => o.nombre === form.etnia)?.icono}
                 onChange={(v) => setForm(prev => ({ ...prev, etnia: v }))}
               />
             </div>
@@ -956,6 +893,7 @@ export default function PerfilForm() {
                 placeholder="Busca color de ojos..."
                 options={opciones.colores_ojos || []}
                 value={form.color_ojos}
+                selectedIcon={opciones.colores_ojos?.find(o => o.nombre === form.color_ojos)?.icono}
                 onChange={(v) => setForm(prev => ({ ...prev, color_ojos: v }))}
               />
             </div>
@@ -967,6 +905,7 @@ export default function PerfilForm() {
                 placeholder="Busca color de pelo..."
                 options={opciones.colores_pelo || []}
                 value={form.color_pelo}
+                selectedIcon={opciones.colores_pelo?.find(o => o.nombre === form.color_pelo)?.icono}
                 onChange={(v) => setForm(prev => ({ ...prev, color_pelo: v }))}
               />
             </div>
@@ -978,19 +917,80 @@ export default function PerfilForm() {
                 placeholder="Busca tu orientación..."
                 options={opciones.orientaciones || []}
                 value={form.orientacion}
+                selectedIcon={opciones.orientaciones?.find(o => o.nombre === form.orientacion)?.icono}
                 onChange={(v) => setForm(prev => ({ ...prev, orientacion: v }))}
               />
             </div>
             <div className="relative">
               <SearchAutocomplete
                 label="Estilo"
-                icon="fa-sparkles"
-                itemIcon="fa-sparkles"
+                icon="fa-wand-magic-sparkles"
+                itemIcon="fa-wand-magic-sparkles"
                 placeholder="Busca tu estilo..."
                 options={opciones.estilos || []}
                 value={form.estilo}
+                selectedIcon={opciones.estilos?.find(o => o.nombre === form.estilo)?.icono}
                 onChange={(v) => setForm(prev => ({ ...prev, estilo: v }))}
               />
+            </div>
+            <div className="relative">
+              <SearchAutocomplete
+                label="Categoría"
+                icon="fa-tag"
+                itemIcon="fa-tag"
+                placeholder="Selecciona una categoría..."
+                options={opciones.categorias || []}
+                value={opciones.categorias?.find(c => c.id.toString() === form.categoriaId)?.nombre || ''}
+                onChange={() => {}}
+                onSelect={(opt) => setForm(prev => ({ ...prev, categoriaId: opt.id.toString() }))}
+              />
+            </div>
+
+            {/* Idiomas */}
+            <div className="sm:col-span-2 lg:col-span-3">
+              <div className="mb-4">
+                <SearchAutocomplete
+                  label="Idiomas que hablas"
+                  icon="fa-language"
+                  itemIcon="fa-language"
+                  placeholder="Busca y agrega un idioma..."
+                  options={(opciones.idiomas || [])
+                    .filter(i => !form.idiomas.includes(i.id))
+                    .map(i => ({ id: i.id, nombre: i.nombre, icono: 'fa-language' }))}
+                  value=""
+                  onChange={() => {}}
+                  onSelect={(opt) => {
+                    setForm(prev =>
+                      prev.idiomas.includes(opt.id)
+                        ? prev
+                        : { ...prev, idiomas: [...prev.idiomas, opt.id] }
+                    );
+                  }}
+                  clearable={false}
+                />
+              </div>
+              {form.idiomas.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {(opciones.idiomas || [])
+                    .filter(i => form.idiomas.includes(i.id))
+                    .map((idioma) => (
+                      <span
+                        key={idioma.id}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-200 text-sm"
+                      >
+                        <i className="fas fa-language text-red-400 text-xs"></i>
+                        {idioma.nombre}
+                        <button
+                          type="button"
+                          onClick={() => setForm(prev => ({ ...prev, idiomas: prev.idiomas.filter(id => id !== idioma.id) }))}
+                          className="text-red-300 hover:text-white transition-colors"
+                        >
+                          <i className="fas fa-times text-xs"></i>
+                        </button>
+                      </span>
+                    ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1007,86 +1007,49 @@ export default function PerfilForm() {
             )}
           </h2>
 
-          {/* Input de búsqueda */}
+          {/* Buscador de servicios con popup */}
           {!serviciosLoaded ? (
             <div className="flex items-center gap-3 py-4 text-gray-500">
               <i className="fas fa-circle-notch fa-spin"></i>
               <span className="text-sm">Cargando servicios...</span>
             </div>
           ) : (
-          <div className="relative mb-4 md:mb-6" ref={servicioSugerenciasRef}>
-            <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">Buscar y agregar servicios</label>
-            <div className="relative">
-              <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
-              <input
-                ref={servicioInputRef}
-                type="text"
-                value={servicioInput}
-                onChange={(e) => {
-                  setServicioInput(e.target.value);
-                  setShowServicioSugerencias(true);
+            <div className="mb-4 md:mb-6">
+              <SearchAutocomplete
+                label="Agregar servicio"
+                icon="fa-concierge-bell"
+                itemIcon="fa-concierge-bell"
+                placeholder="Escribe para buscar..."
+                options={servicios.filter(s => !form.servicios.some(sel => sel.id === s.id)).map(s => ({
+                  id: s.id,
+                  nombre: s.nombre,
+                  icono: s.icono
+                }))}
+                value=""
+                onChange={() => {}}
+                onSelect={(opt) => {
+                  const serv = servicios.find(s => s.id === opt.id);
+                  if (serv) {
+                    setSelectedServicioForModal(serv);
+                    setShowServicioModal(true);
+                  }
                 }}
-                onFocus={() => setShowServicioSugerencias(true)}
-                onKeyDown={handleServicioKeyDown}
-                placeholder="Escribe para buscar servicios..."
-                className="w-full bg-[#1a1a24] border border-gray-700 rounded-xl py-3 pl-11 pr-4 text-white placeholder-gray-600 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/30 transition-all text-sm"
+                clearable={false}
               />
-              {servicioInput && (
-                <button
-                  type="button"
-                  onClick={() => { setServicioInput(''); setShowServicioSugerencias(false); }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
-                >
-                  <i className="fas fa-times"></i>
-                </button>
-              )}
             </div>
-
-            {showServicioSugerencias && servicioSugerencias.length > 0 && (
-              <div className="absolute z-50 w-full mt-1 bg-[#1a1a24] border border-gray-700 rounded-xl shadow-2xl shadow-black/50 overflow-hidden max-h-72 overflow-y-auto">
-                {servicioSugerencias.map((servicio, index) => (
-                  <div
-                    key={servicio.id}
-                    onClick={() => {
-                      setSelectedServicioForModal(servicio);
-                      setShowServicioModal(true);
-                    }}
-                    className={`flex items-center gap-2 px-4 py-2.5 transition-all cursor-pointer ${
-                      index === servicioSelectedIndex 
-                        ? 'bg-red-500/10' 
-                        : 'hover:bg-gray-800'
-                    }`}
-                  >
-                    <span 
-                      className="w-2 h-2 rounded-full flex-shrink-0" 
-                      style={{ backgroundColor: servicio.color || '#6366f1' }}
-                    ></span>
-                    <span className="flex-1 text-sm text-gray-300">{servicio.nombre}</span>
-                    <span className="text-[10px] text-gray-500 capitalize mr-1 hidden sm:inline">{GRUPOS_SERVICIOS[servicio.grupo]?.label || servicio.grupo}</span>
-                    <span className="text-[11px] text-purple-400 font-semibold flex items-center gap-1">
-                      <i className="fas fa-plus"></i> Elegir tipo
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {showServicioSugerencias && servicioInput && servicioSugerencias.length === 0 && (
-              <div className="absolute z-50 w-full mt-1 bg-[#1a1a24] border border-gray-700 rounded-xl shadow-2xl p-4 text-center text-gray-500 text-sm">
-                <i className="fas fa-search mb-2 block text-lg"></i>
-                No se encontraron servicios
-              </div>
-            )}
-          </div>
           )}
 
           {/* MODAL TIPO DE SERVICIO */}
           {showServicioModal && selectedServicioForModal && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <div className="fixed inset-0 z-[210] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
               <div className="bg-[#1a1a24] border border-gray-700 rounded-2xl w-full max-w-sm shadow-2xl shadow-black/50 overflow-hidden">
                 <div className="px-5 pt-5 pb-2">
                   <div className="flex items-center gap-3 mb-1">
-                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: selectedServicioForModal.color || '#6366f1' }}></span>
+                    {selectedServicioForModal.icono ? (
+                      <i className={`fas ${selectedServicioForModal.icono} text-lg`} style={{ color: selectedServicioForModal.color || '#6366f1' }}></i>
+                    ) : (
+                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: selectedServicioForModal.color || '#6366f1' }}></span>
+                    )}
                     <h3 className="text-lg font-bold text-white">Agregar servicio</h3>
                   </div>
                   <p className="text-gray-400 text-sm ml-6">
@@ -1283,6 +1246,58 @@ export default function PerfilForm() {
               />
               <p className="text-gray-600 text-xs mt-1 text-right">{form.descripcionLarga.length} caracteres</p>
             </div>
+          </div>
+        </div>
+
+        {/* Privacidad */}
+        <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-4 md:p-6">
+          <h2 className="text-red-400 text-sm font-bold uppercase tracking-wider mb-4 md:mb-6 flex items-center gap-2">
+            <span className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center text-xs">
+              <i className="fas fa-eye-slash text-[10px]"></i>
+            </span>
+            Privacidad
+          </h2>
+          <p className="text-gray-500 text-xs mb-4">Marca los campos que NO quieres mostrar en tu perfil público</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {[
+              { key: 'nacionalidad', label: 'Nacionalidad' },
+              { key: 'orientacion', label: 'Orientación' },
+              { key: 'etnia', label: 'Etnia' },
+              { key: 'medidas', label: 'Medidas' },
+              { key: 'servicios', label: 'Servicios' },
+            ].map(item => (
+              <label
+                key={item.key}
+                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border cursor-pointer transition-all ${
+                  form.privacidad.includes(item.key)
+                    ? 'bg-red-500/10 border-red-500/30 text-red-400'
+                    : 'bg-[#1a1a24] border-gray-700 text-gray-400 hover:border-gray-600'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={form.privacidad.includes(item.key)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setForm(prev => ({ ...prev, privacidad: [...prev.privacidad, item.key] }));
+                    } else {
+                      setForm(prev => ({ ...prev, privacidad: prev.privacidad.filter(k => k !== item.key) }));
+                    }
+                  }}
+                  className="sr-only"
+                />
+                <div className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${
+                  form.privacidad.includes(item.key)
+                    ? 'bg-red-500 border-red-500'
+                    : 'bg-transparent border-gray-600'
+                }`}>
+                  {form.privacidad.includes(item.key) && (
+                    <i className="fas fa-eye-slash text-[8px] text-white"></i>
+                  )}
+                </div>
+                <span className="text-xs font-medium">{item.label}</span>
+              </label>
+            ))}
           </div>
         </div>
 

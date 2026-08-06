@@ -8,7 +8,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 try {
     $pdo = getDBConnection();
-    $stmt = $pdo->query("SELECT id, nombre, region FROM ciudades WHERE activa = 1 ORDER BY orden, nombre");
+    $stmt = $pdo->query("SELECT id, nombre, region, icono FROM ciudades WHERE activa = 1 ORDER BY orden, nombre");
     jsonResponse(true, ['ciudades' => $stmt->fetchAll()]);
 } catch (Exception $e) {
     jsonError('Error: ' . $e->getMessage(), 500);

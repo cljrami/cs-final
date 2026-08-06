@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 header('Content-Type: application/json');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') { http_response_code(405); echo json_encode(['success' => false, 'error' => 'Método no permitido']); exit; }
@@ -13,7 +13,7 @@ try {
 
     if ($escortId > 0) {
         $stmt = $pdo->prepare("
-            SELECT c.id, c.comentario, c.puntuacion, c.created_at, u.nombre as usuario_nombre
+            SELECT c.id, c.comentario, c.puntuacion, c.cita_verificada, c.created_at, u.nombre as usuario_nombre
             FROM comentarios c
             JOIN usuarios u ON u.id = c.usuario_id
             WHERE c.escort_id = ? AND c.aprobado = 1
@@ -36,6 +36,7 @@ try {
                     'id' => (int)$c['id'],
                     'comentario' => $c['comentario'],
                     'puntuacion' => $c['puntuacion'] ? (int)$c['puntuacion'] : null,
+                    'cita_verificada' => (int)($c['cita_verificada'] ?? 0),
                     'usuario' => $c['usuario_nombre'],
                     'created_at' => $c['created_at'],
                 ];
@@ -69,3 +70,4 @@ try {
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }
+

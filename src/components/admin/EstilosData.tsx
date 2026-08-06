@@ -4,10 +4,12 @@ import DataTable from '../ui/DataTable';
 import type { Column, ActionItem } from '../ui/DataTable';
 import ConfirmModal from '../ui/ConfirmModal';
 import SearchFilters from './SearchFilters';
+import IconPicker from '../ui/IconPicker';
 
 interface Estilo {
   id: number;
   nombre: string;
+  icono: string;
   orden: number;
   activo: number;
   total_escorts: number;
@@ -48,7 +50,7 @@ export default function EstilosData() {
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [editingItem, setEditingItem] = useState<Estilo | null>(null);
-  const [formData, setFormData] = useState({ nombre: '', orden: 0, activo: 1 });
+  const [formData, setFormData] = useState({ nombre: '', icono: 'fa-wand-magic-sparkles', orden: 0, activo: 1 });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
@@ -96,7 +98,7 @@ export default function EstilosData() {
 
   const openCreateModal = () => {
     setModalMode('create');
-    setFormData({ nombre: '', orden: 0, activo: 1 });
+    setFormData({ nombre: '', icono: 'fa-wand-magic-sparkles', orden: 0, activo: 1 });
     setEditingItem(null);
     setFieldErrors({});
     setShowModal(true);
@@ -104,7 +106,7 @@ export default function EstilosData() {
 
   const openEditModal = (item: Estilo) => {
     setModalMode('edit');
-    setFormData({ nombre: item.nombre, orden: item.orden || 0, activo: item.activo });
+    setFormData({ nombre: item.nombre, icono: item.icono || 'fa-wand-magic-sparkles', orden: item.orden || 0, activo: item.activo });
     setEditingItem(item);
     setFieldErrors({});
     setShowModal(true);
@@ -171,7 +173,7 @@ export default function EstilosData() {
       render: (item: Estilo) => (
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-pink-500/10 flex items-center justify-center">
-            <i className="fas fa-sparkles text-pink-400"></i>
+            <i className={`fas ${item.icono || 'fa-wand-magic-sparkles'} text-pink-400`}></i>
           </div>
           <div>
             <div className="font-medium text-white text-sm">{item.nombre}</div>
@@ -217,7 +219,7 @@ export default function EstilosData() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-            <i className="fas fa-sparkles text-pink-400"></i> Estilos
+            <i className="fas fa-wand-magic-sparkles text-pink-400"></i> Estilos
           </h1>
           <p className="text-gray-400 mt-1">Administra los estilos disponibles en la plataforma</p>
         </div>
@@ -227,7 +229,7 @@ export default function EstilosData() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard label="Total Estilos" value={stats.total} icon="fa-sparkles" color="#ec4899" loading={isLoading} />
+        <StatCard label="Total Estilos" value={stats.total} icon="fa-wand-magic-sparkles" color="#ec4899" loading={isLoading} />
         <StatCard label="Activos" value={stats.activos} icon="fa-toggle-on" color="#22c55e" loading={isLoading} />
         <StatCard label="Inactivos" value={stats.inactivos} icon="fa-toggle-off" color="#6b7280" loading={isLoading} />
       </div>
@@ -254,7 +256,7 @@ export default function EstilosData() {
         loading={isLoading}
         skeletonRows={5}
         emptyMessage={search ? 'No se encontraron estilos' : 'No hay estilos registrados'}
-        emptyIcon="fa-sparkles"
+        emptyIcon="fa-wand-magic-sparkles"
         getRowKey={(item) => item.id}
         getActions={getActions}
       />
@@ -295,6 +297,7 @@ export default function EstilosData() {
                   className={`w-full px-4 py-2.5 bg-[#0f0f23] border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-pink-500 transition-colors ${fieldErrors.nombre ? 'border-red-500' : 'border-gray-700'}`} />
                 {fieldErrors.nombre && <p className="mt-1.5 text-sm text-red-400 flex items-center gap-1"><i className="fas fa-exclamation-circle text-xs"></i>{fieldErrors.nombre}</p>}
               </div>
+              <IconPicker value={formData.icono} onChange={(icon) => setFormData(prev => ({ ...prev, icono: icon }))} error={!!fieldErrors.icono} />
               <div className="grid grid-cols-2 gap-4">
                 <div><label className="block text-sm font-medium text-gray-300 mb-1.5">Orden</label><input type="number" value={formData.orden} onChange={(e) => setFormData(prev => ({ ...prev, orden: parseInt(e.target.value) || 0 }))} className="w-full px-4 py-2.5 bg-[#0f0f23] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-pink-500 transition-colors" /></div>
                 <div><label className="block text-sm font-medium text-gray-300 mb-1.5">Estado</label><select value={formData.activo} onChange={(e) => setFormData(prev => ({ ...prev, activo: parseInt(e.target.value) }))} className="w-full px-4 py-2.5 bg-[#0f0f23] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-pink-500 transition-colors"><option value={1}>Activo</option><option value={0}>Inactivo</option></select></div>

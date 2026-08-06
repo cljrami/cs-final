@@ -33,3 +33,35 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# Clave secreta JWT (duplicado de .env)
+key
+
+# ============================================
+# Datos reales / scripts de depuración local
+# (nunca versionar; contienen datos o tokens)
+# ============================================
+kimi_app.sql
+sql/actual.sql
+sql/DB.sql
+sql/RESPALDOBASE.sql
+sql/amorcito.sql
+migrate_sticky_posiciones.sql
+
+# config local del agente (opencode)
+.opencode/
+
+# scripts de depuración y utilidades locales
+test_token.php
+check_fk.php
+check_schema.php
+create_password_resets_table.php
+fix_encoding.php
+fix_sticky_posiciones.php
+fix_sticky_positions_v2.php
+run_migration.php
+sync_pausadas.php
+_ftp-download.js
+deploy.sh
+build_log.txt
+deploy_log.txt

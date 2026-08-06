@@ -1,0 +1,53 @@
+---
+// src/pages/ciudad/[slug].astro
+// Página SEO por ciudad: /ciudad/{slug} → ciudad/{slug}/index.html
+import Layout from "../../layouts/Layout.astro";
+import CiudadEscorts from "../../components/CiudadEscorts";
+
+interface Ciudad {
+  slug: string;
+  nombre: string;
+}
+
+export async function getStaticPaths() {
+  const SOURCES = [
+    "http://localhost/api/ciudades/listado.php",
+    "https://kimi.zona8.cl/api/ciudades/listado.php",
+  ];
+  const slugify = (nombre: string) =>
+    nombre
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  let ciudades: Ciudad[] = [];
+  for (const src of SOURCES) {
+    try {
+      const res = await Promise.race([
+        fetch(src),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 8000)),
+      ]);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+        ciudades = data.data
+          .filter((c: any) => c && c.nombre)
+          .map((c: any) => ({
+            slug: c.slug || slugify(c.nombre),
+            nombre: c.nombre,
+          }));
+        break;
+      }
+    } catch (e) {}
+  }
+  return ciudades.map((c) => ({ params: { slug: c.slug }, props: { ciudad: c.nombre } }));
+}
+
+const { ciudad } = Astro.props as { ciudad: string };
+---
+
+<Layout title="Escorts por Ciudad" page="ciudad" vars={{ ciudad }}>
+  <main class="min-h-screen bg-page">
+    <CiudadEscorts client:only="react" ciudadInicial={ciudad} />
+  </main>
+</Layout>

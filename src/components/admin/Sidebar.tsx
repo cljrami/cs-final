@@ -13,10 +13,12 @@ const menuItems = [
   { id: 'verificaciones', label: 'Verificaciones', icon: 'fa-id-card', href: '/admin/verificaciones', countKey: 'verificaciones' },
   { id: 'solicitudes-vip', label: 'Solicitudes VIP', icon: 'fa-crown', href: '/admin/solicitudes-vip', countKey: 'solicitudesVip' },
   { id: 'vip-activos', label: 'VIP Activos', icon: 'fa-star', href: '/admin/vip-activos', countKey: null },
-  { id: 'solicitudes-extras', label: 'Solicitudes Extras', icon: 'fa-plus-circle', href: '/admin/suscripciones?tipo=extra&estado=pendiente', countKey: 'extrasPendientes' },
+  { id: 'sticky', label: 'Sticky', icon: 'fa-thumbtack', href: '/admin/sticky', countKey: null },
+  { id: 'solicitudes-extras', label: 'Solicitudes Extras', icon: 'fa-plus-circle', href: '/admin/solicitudes-extras', countKey: 'extrasPendientes' },
   { id: 'pagos', label: 'Pagos', icon: 'fa-receipt', href: '/admin/pagos', countKey: 'pagosPendientes' },
   { id: 'comentarios', label: 'Comentarios', icon: 'fa-comments', href: '/admin/comentarios', countKey: 'comentariosPendientes' },
-  { id: 'valoraciones', label: 'Valoraciones', icon: 'fa-star', href: '/admin/valoraciones', countKey: null },
+  { id: 'reportes', label: 'Reportes', icon: 'fa-flag', href: '/admin/reportes', countKey: 'reportesPendientes' },
+  { id: 'notificaciones', label: 'Notificaciones', icon: 'fa-bell', href: '/admin/notificaciones', countKey: null },
 ];
 
 const configItems = [
@@ -28,11 +30,16 @@ const configItems = [
   { id: 'etnias', label: 'Etnias', icon: 'fa-users', href: '/admin/etnias', countKey: 'etnias' },
   { id: 'colores', label: 'Colores', icon: 'fa-palette', href: '/admin/colores', countKey: 'colores' },
   { id: 'estilos', label: 'Estilos', icon: 'fa-magic', href: '/admin/estilos', countKey: 'estilos' },
+  { id: 'idiomas', label: 'Idiomas', icon: 'fa-language', href: '/admin/idiomas', countKey: 'idiomas' },
   { id: 'planes', label: 'Planes', icon: 'fa-gem', href: '/admin/planes', countKey: 'planes' },
   { id: 'extras', label: 'Extras', icon: 'fa-puzzle-piece', href: '/admin/extras', countKey: 'extras' },
   { id: 'auditoria', label: 'Auditoría', icon: 'fa-history', href: '/admin/auditoria', countKey: null },
   { id: 'administradores', label: 'Administradores', icon: 'fa-user-shield', href: '/admin/administradores', countKey: null },
   { id: 'configuracion', label: 'Configuración', icon: 'fa-cog', href: '/admin/configuracion', countKey: null },
+  { id: 'contenido', label: 'Contenido del sitio', icon: 'fa-file-lines', href: '/admin/contenido', countKey: null },
+  { id: 'seo', label: 'SEO / Sitemap', icon: 'fa-sitemap', href: '/admin/seo', countKey: null },
+  { id: 'configuracion-email', label: 'Email', icon: 'fa-envelope', href: '/admin/configuracion-email', countKey: null },
+  { id: 'notificaciones-email', label: 'Notificaciones Email', icon: 'fa-bell', href: '/admin/notificaciones-email', countKey: null },
 ];
 
 export default function Sidebar({ activePage = 'dashboard', loading }: SidebarProps) {
@@ -215,7 +222,7 @@ export default function Sidebar({ activePage = 'dashboard', loading }: SidebarPr
 
         {/* Footer - fijo abajo */}
         <div className="p-3 md:p-4 border-t border-admin-border flex-shrink-0 bg-[#1a1a2e]">
-          <div className="flex items-center gap-3 p-2 rounded-lg bg-[#2d2d44]">
+          <a href="/admin/mi-perfil" onClick={closeMobile} className="flex items-center gap-3 p-2 rounded-lg bg-[#2d2d44] hover:bg-[#3d3d5c] transition-colors cursor-pointer">
             <div className="w-8 h-8 md:w-9 md:h-9 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0">
               <i className="fas fa-user"></i>
             </div>
@@ -223,7 +230,8 @@ export default function Sidebar({ activePage = 'dashboard', loading }: SidebarPr
               <div className="text-sm font-medium truncate">{adminUser?.nombre || 'Admin'}</div>
               <div className="text-xs text-admin-muted capitalize">{adminUser?.rol || 'Administrador'}</div>
             </div>
-          </div>
+            <i className="fas fa-chevron-right text-gray-600 text-xs"></i>
+          </a>
 
           <button 
             onClick={handleLogoutClick}

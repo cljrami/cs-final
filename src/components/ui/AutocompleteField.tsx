@@ -12,9 +12,10 @@ interface Props {
   options: Option[];
   value: string;
   onChange: (value: string) => void;
+  onSelect?: (option: Option) => void;
 }
 
-export default function AutocompleteField({ label, icon, placeholder = 'Escribe para buscar...', options, value, onChange }: Props) {
+export default function AutocompleteField({ label, icon, placeholder = 'Escribe para buscar...', options, value, onChange, onSelect }: Props) {
   const [input, setInput] = useState(value);
   const [sugerencias, setSugerencias] = useState<Option[]>([]);
   const [show, setShow] = useState(false);
@@ -55,6 +56,7 @@ export default function AutocompleteField({ label, icon, placeholder = 'Escribe 
   const seleccionar = (opt: Option) => {
     setInput(opt.nombre);
     onChange(opt.nombre);
+    onSelect?.(opt);
     setShow(false);
   };
 

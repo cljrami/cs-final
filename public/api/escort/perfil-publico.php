@@ -3,8 +3,10 @@
 // Endpoint público - NO requiere autenticación
 
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../lib/gira.php';
 
 header('Content-Type: application/json');
+header('Cache-Control: no-store, no-cache, must-revalidate');
 
 $slug = $_GET['slug'] ?? '';
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
@@ -17,31 +19,27 @@ if (empty($slug) && !$id) {
 try {
     $pdo = getDBConnection();
 
+    $baseSql = "
+        SELECT 
+            e.*,
+            c.nombre as categoria_nombre,
+            p.nombre as plan_nombre,
+            p.precio as plan_precio,
+            gc.nombre as gira_ciudad,
+            " . gira_activa() . " as gira_activa,
+            " . efectiva_ciudad() . " as ciudad_efectiva
+        FROM escorts e
+        LEFT JOIN categorias c ON e.categoria_id = c.id
+        LEFT JOIN suscripciones s ON s.escort_id = e.id AND s.estado IN ('activa', 'pausada')
+        LEFT JOIN planes p ON p.id = s.plan_id
+        LEFT JOIN ciudades gc ON gc.id = e.gira_ciudad_id
+        WHERE e.activa = 1
+    ";
     if ($id) {
-        $stmt = $pdo->prepare("
-            SELECT 
-                e.*,
-                p.nombre as plan_nombre,
-                p.precio as plan_precio
-            FROM escorts e
-            LEFT JOIN planes p ON e.plan_id = p.id
-            WHERE e.id = :id 
-            AND e.activa = 1
-            LIMIT 1
-        ");
+        $stmt = $pdo->prepare($baseSql . " AND e.id = :id LIMIT 1");
         $stmt->execute([':id' => $id]);
     } else {
-        $stmt = $pdo->prepare("
-            SELECT 
-                e.*,
-                p.nombre as plan_nombre,
-                p.precio as plan_precio
-            FROM escorts e
-            LEFT JOIN planes p ON e.plan_id = p.id
-            WHERE e.slug = :slug 
-            AND e.activa = 1
-            LIMIT 1
-        ");
+        $stmt = $pdo->prepare($baseSql . " AND e.slug = :slug LIMIT 1");
         $stmt->execute([':slug' => $slug]);
     }
     $perfil = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -97,6 +95,19 @@ try {
         $horarios = [];
     }
 
+    // Aplicar privacidad: ocultar campos según JSON almacenado
+    $camposOcultos = [];
+    if (!empty($perfil['privacidad'])) {
+        $decoded = json_decode($perfil['privacidad'], true);
+        if (is_array($decoded)) {
+            $camposOcultos = $decoded;
+        }
+    }
+
+    $ocultar = function($campo) use ($camposOcultos, $perfil) {
+        return in_array($campo, $camposOcultos) ? null : $perfil[$campo];
+    };
+
     // Construir respuesta
     $response = [
         'success' => true,
@@ -110,36 +121,32 @@ try {
             'edad' => (int)$perfil['edad'],
             'altura' => $perfil['altura'] ? (int)$perfil['altura'] : null,
             'peso' => $perfil['peso'] ? (int)$perfil['peso'] : null,
-            'medidas' => $perfil['medidas'],
-            'ciudad' => $perfil['ciudad'],
-            'nacionalidad' => $perfil['nacionalidad'],
+            'medidas' => $ocultar('medidas'),
+            'rating' => (float)($perfil['rating'] ?? 0),
+            'total_valoraciones' => (int)($perfil['total_valoraciones'] ?? 0),
+            'ciudad' => $perfil['ciudad_efectiva'],
+            'ciudad_base' => $perfil['ciudad'],
+            'en_gira' => (int)$perfil['en_gira'],
+            'gira_activa' => (int)$perfil['gira_activa'],
+            'gira_ciudad' => $perfil['gira_ciudad'],
+            'gira_fecha_inicio' => $perfil['gira_fecha_inicio'] ?? null,
+            'gira_fecha_fin' => $perfil['gira_fecha_fin'] ?? null,
+            'categoria_nombre' => $perfil['categoria_nombre'] ?? null,
+            'nacionalidad' => $ocultar('nacionalidad'),
             'idiomas' => $perfil['idiomas'],
-            'orientacion' => $perfil['orientacion'],
-            'etnia' => $perfil['etnia'],
+            'orientacion' => $ocultar('orientacion'),
+            'etnia' => $ocultar('etnia'),
             'color_ojos' => $perfil['color_ojos'],
             'color_pelo' => $perfil['color_pelo'],
             'estilo' => $perfil['estilo'],
             'descripcion_corta' => $perfil['descripcion_corta'],
             'descripcion_larga' => $perfil['descripcion_larga'],
-            'foto_principal' => $perfil['foto_principal'],
-            'video_presentacion' => $perfil['video_presentacion'],
-            'estado' => $perfil['estado'],
-            'verificado' => (int)$perfil['verificado'],
-            'vip' => (int)$perfil['vip'],
-            'vip_expira' => $perfil['vip_expira'],
-            'destacado' => (int)$perfil['destacado'],
-            'sticky' => (int)$perfil['sticky'],
-            'activa' => (int)$perfil['activa'],
-            'plan_id' => $perfil['plan_id'] ? (int)$perfil['plan_id'] : null,
-            'visitas_perfil' => (int)$perfil['visitas_perfil'] + 1, // +1 porque ya incrementamos
-            'contactos_recibidos' => (int)$perfil['contactos_recibidos'],
-            'rating' => $perfil['rating'] ?? '0.0',
-            'total_valoraciones' => (int)$perfil['total_valoraciones'],
+            'privacidad' => $perfil['privacidad'] ?? null,
             'plan' => $perfil['plan_nombre'] ? [
                 'nombre' => $perfil['plan_nombre'],
                 'precio' => (float)$perfil['plan_precio']
             ] : null,
-            'servicios' => $servicios,
+            'servicios' => in_array('servicios', $camposOcultos) ? [] : $servicios,
             'fotos' => $fotos,
             'horarios' => $horarios,
         ]

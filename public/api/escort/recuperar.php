@@ -46,11 +46,17 @@ try {
     $resetToken = bin2hex(random_bytes(32));
     $expira = date('Y-m-d H:i:s', time() + 3600);
 
-    // Guardar token en tabla (necesitas crear esta tabla o usar otra lógica)
-    // Por ahora, simulamos éxito
+    // Limpiar tokens anteriores para este email
+    $clean = $pdo->prepare("DELETE FROM password_resets WHERE email = ? AND tipo = 'escort'");
+    $clean->execute([$email]);
 
-    // Aquí deberías enviar el email real con PHPMailer o similar
-    // mail($email, 'Recuperar contraseña', 'Tu enlace: https://tusitio.com/micuenta/reset?token=' . $resetToken);
+    // Guardar token
+    $insert = $pdo->prepare("INSERT INTO password_resets (email, token, tipo, expira_en) VALUES (?, ?, 'escort', ?)");
+    $insert->execute([$email, $resetToken, $expira]);
+
+    // Enviar email
+    require_once __DIR__ . '/../mail.php';
+    sendRecovery($email, $resetToken, 'escort');
 
     echo json_encode([
         'success' => true,

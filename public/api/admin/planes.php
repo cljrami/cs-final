@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
@@ -12,6 +12,8 @@ require_once __DIR__ . '/../bootstrap.php';
 
 try {
     $tokenData = requireAuth();
+
+    requireAdminRole($tokenData);
     $pdo = getDBConnection();
 
     $method = $_SERVER['REQUEST_METHOD'];
@@ -143,9 +145,9 @@ try {
         if (empty($nombre)) {
             $fieldErrors['nombre'] = 'El nombre es obligatorio';
         } elseif (strlen($nombre) < 2) {
-            $fieldErrors['nombre'] = 'Mínimo 2 caracteres';
+            $fieldErrors['nombre'] = 'MíƒÂ­nimo 2 caracteres';
         } elseif (strlen($nombre) > 100) {
-            $fieldErrors['nombre'] = 'Máximo 100 caracteres';
+            $fieldErrors['nombre'] = 'MíƒÂ¡ximo 100 caracteres';
         }
 
         if (empty($slug)) {
@@ -156,7 +158,7 @@ try {
         if (empty($slug)) {
             $fieldErrors['slug'] = 'El slug es obligatorio';
         } elseif (strlen($slug) > 100) {
-            $fieldErrors['slug'] = 'Máximo 100 caracteres';
+            $fieldErrors['slug'] = 'MíƒÂ¡ximo 100 caracteres';
         }
 
         if (empty($fieldErrors['nombre'])) {
@@ -258,7 +260,7 @@ try {
 
         if ($id <= 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID no válido']);
+            echo json_encode(['success' => false, 'error' => 'ID no víƒÂ¡lido']);
             exit;
         }
 
@@ -277,11 +279,11 @@ try {
         if (isset($input['nombre'])) {
             $nombre = trim($input['nombre']);
             if (empty($nombre)) {
-                $fieldErrors['nombre'] = 'El nombre no puede estar vacío';
+                $fieldErrors['nombre'] = 'El nombre no puede estar vacíƒÂ­o';
             } elseif (strlen($nombre) < 2) {
-                $fieldErrors['nombre'] = 'Mínimo 2 caracteres';
+                $fieldErrors['nombre'] = 'MíƒÂ­nimo 2 caracteres';
             } elseif (strlen($nombre) > 100) {
-                $fieldErrors['nombre'] = 'Máximo 100 caracteres';
+                $fieldErrors['nombre'] = 'MíƒÂ¡ximo 100 caracteres';
             } else {
                 $dupStmt = $pdo->prepare("SELECT id FROM planes WHERE LOWER(nombre) = LOWER(?) AND id != ?");
                 $dupStmt->execute([$nombre, $id]);
@@ -297,9 +299,9 @@ try {
         if (isset($input['slug'])) {
             $slug = strtolower(trim(preg_replace('/[^a-zA-Z0-9-]+/', '-', trim($input['slug'])), '-'));
             if (empty($slug)) {
-                $fieldErrors['slug'] = 'Slug vacío';
+                $fieldErrors['slug'] = 'Slug vacíƒÂ­o';
             } elseif (strlen($slug) > 100) {
-                $fieldErrors['slug'] = 'Máximo 100 caracteres';
+                $fieldErrors['slug'] = 'MíƒÂ¡ximo 100 caracteres';
             } else {
                 $dupSlugStmt = $pdo->prepare("SELECT id FROM planes WHERE slug = ? AND id != ?");
                 $dupSlugStmt->execute([$slug, $id]);
@@ -400,7 +402,7 @@ try {
 
         if ($id <= 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID no válido']);
+            echo json_encode(['success' => false, 'error' => 'ID no víƒÂ¡lido']);
             exit;
         }
 
@@ -422,7 +424,7 @@ try {
             http_response_code(409);
             echo json_encode([
                 'success' => false,
-                'error' => ($susCount === 1 ? "Tiene $susCount suscripción activa" : "Tiene $susCount suscripciones activas")
+                'error' => ($susCount === 1 ? "Tiene $susCount suscripciíƒÂ³n activa" : "Tiene $susCount suscripciones activas")
             ]);
             exit;
         }
@@ -439,9 +441,10 @@ try {
 } catch (PDOException $e) {
     error_log("Error planes.php PDO: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'DB: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error de base de datos']);
 } catch (Throwable $e) {
     error_log("Error planes.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }
+

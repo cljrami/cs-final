@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once __DIR__ . '/../bootstrap.php';
 header('Content-Type: application/json');
 
@@ -57,6 +57,14 @@ try {
         $countStmt->execute([$id]);
         $likes = (int)$countStmt->fetchColumn();
 
+        require_once __DIR__ . '/../mail.php';
+        $escortStmt = $pdo->prepare("SELECT nombre FROM escorts WHERE id = ?");
+        $escortStmt->execute([$id]);
+        $nombreEscort = $escortStmt->fetchColumn() ?: 'Escort';
+        notificarAccionUsuario('favoritos', $usuarioId, 'Agregó a ' . $nombreEscort . ' a sus favoritos', [
+            'Escort' => $nombreEscort . ' (ID ' . $id . ')',
+        ]);
+
         echo json_encode(['success' => true, 'likes' => $likes, 'favorito' => true]);
         exit;
     }
@@ -75,6 +83,14 @@ try {
         $countStmt->execute([$id]);
         $likes = (int)$countStmt->fetchColumn();
 
+        require_once __DIR__ . '/../mail.php';
+        $escortStmt = $pdo->prepare("SELECT nombre FROM escorts WHERE id = ?");
+        $escortStmt->execute([$id]);
+        $nombreEscort = $escortStmt->fetchColumn() ?: 'Escort';
+        notificarAccionUsuario('favoritos', $usuarioId, 'Quitó de favoritos a ' . $nombreEscort, [
+            'Escort' => $nombreEscort . ' (ID ' . $id . ')',
+        ]);
+
         echo json_encode(['success' => true, 'likes' => $likes, 'favorito' => false]);
         exit;
     }
@@ -85,3 +101,4 @@ try {
     error_log("Error favorito.php: " . $e->getMessage());
     echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }
+

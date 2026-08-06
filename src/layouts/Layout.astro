@@ -1,42 +1,331 @@
 ---
 // src/layouts/Layout.astro
-import "@fortawesome/fontawesome-free/css/all.min.css";
+import "@fortawesome/fontawesome-free/css/fontawesome.min.css";
+import "../styles/fa-fontfaces.css";
+import "../styles/global.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import AgeGate from "../components/AgeGate";
 
 interface Props {
   title: string;
   description?: string;
   showNavFooter?: boolean;
+  page?: string;
+  vars?: Record<string, string>;
 }
 
-const { title, description = "Directorio Premium de Escorts en Chile", showNavFooter = true } =
+const { title, description = "Directorio Premium de Escorts en Chile", showNavFooter = true, page = "", vars = {} } =
   Astro.props;
 
-let siteName = "CSEscorts";
+let siteConfig: Record<string, any> = {
+  site_nombre: "CSEscorts",
+  site_descripcion: "Directorio Premium de Escorts en Chile",
+  seo_description: "Directorio Premium de Escorts en Chile",
+  seo_keywords: "escorts, chile, acompañantes, escort, modelo",
+  seo_url: "https://kimi.zona8.cl/",
+  seo_canonical: "https://kimi.zona8.cl/",
+  seo_robots: "INDEX, FOLLOW",
+  seo_author: "Kimi",
+  seo_publisher: "Kimi",
+  seo_lang: "es",
+};
 try {
   const res = await fetch("http://localhost/api/config/site.php");
   const data = await res.json();
-  if (data.success) siteName = data.data.site_nombre;
+  if (data.success) siteConfig = { ...siteConfig, ...data.data };
 } catch (e) {}
+if (!siteConfig.site_nombre || siteConfig.site_nombre === "CSEscorts") {
+  try {
+    const res = await fetch("https://kimi.zona8.cl/api/config/site.php");
+    const data = await res.json();
+    if (data.success) siteConfig = { ...siteConfig, ...data.data };
+  } catch (e) {}
+}
+
+let siteName = siteConfig.site_nombre;
+let siteDescripcion = siteConfig.site_descripcion;
+
+// Sustituye {placeholder} por vars conocidos; si queda un placeholder sin resolver, devuelve ""
+function resolveTpl(tpl: string): string {
+  const resolved = tpl.replace(/\{(\w+)\}/g, (m, k: string) =>
+    vars[k] !== undefined && vars[k] !== "" ? String(vars[k]) : m
+  );
+  return resolved.includes("{") ? "" : resolved;
+}
+
+const tplTitle = page ? (siteConfig["seo_" + page + "_titulo"] as string) : "";
+const resolvedTitle = tplTitle ? resolveTpl(tplTitle) : "";
+const finalTitle = resolvedTitle || (title ? `${title} | ${siteName}` : siteName);
+
+const tplDesc = page ? (siteConfig["seo_" + page + "_description"] as string) : "";
+const resolvedDesc = tplDesc ? resolveTpl(tplDesc) : "";
+const seoDescription = resolvedDesc || description || siteConfig.seo_description;
+const seoKeywords = siteConfig.seo_keywords;
+const seoUrl = siteConfig.seo_url;
+const seoBase = (siteConfig.seo_url as string) || "https://kimi.zona8.cl/";
+const seoCanonical = Astro.url?.pathname
+  ? new URL(Astro.url.pathname, seoBase).href
+  : siteConfig.seo_canonical || seoUrl || seoBase;
+const seoRobots = siteConfig.seo_robots;
+const seoAuthor = siteConfig.seo_author;
+const seoPublisher = siteConfig.seo_publisher;
+const seoLang = siteConfig.seo_lang || "es";
+const ogLocale = seoLang === "es" ? "es_CL" : seoLang;
+
+// Open Graph / Schema
+// La imagen OG configurada en Contenido aplica solo a la home (las escorts usan la suya)
+function resolverUrlAbsoluta(ruta: string): string {
+  if (!ruta) return "";
+  if (/^https?:\/\//i.test(ruta)) return ruta;
+  return new URL(ruta.startsWith("/") ? ruta : "/" + ruta, seoBase).href;
+}
+
+const ogImageRaw =
+  page === "inicio"
+    ? (siteConfig.og_imagen as string) || (siteConfig.schema_imagen as string) || ""
+    : "";
+const ogImage = resolverUrlAbsoluta(ogImageRaw);
+
+function fnv1a(str: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = (h + (((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24)) >>> 0)) >>> 0;
+  }
+  return h.toString(36);
+}
+const ogVer = ogImageRaw ? fnv1a(ogImageRaw) : "";
+const ogEndpoint = ogImageRaw
+  ? `${seoBase.replace(/\/+$/, "")}/uploads/og/current-og.jpg?v=${ogVer}`
+  : "";
+
+type ImageSize = { width: number; height: number };
+
+function readU16(b: Uint8Array, o: number): number {
+  return (b[o] << 8) | b[o + 1];
+}
+function readU32(b: Uint8Array, o: number): number {
+  return ((b[o] << 24) | (b[o + 1] << 16) | (b[o + 2] << 8) | b[o + 3]) >>> 0;
+}
+
+function parseImageSize(buf: Uint8Array): ImageSize | null {
+  try {
+    if (buf.length < 24) return null;
+    // PNG
+    if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+      return { width: readU32(buf, 16), height: readU32(buf, 20) };
+    }
+    // WebP
+    if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) {
+      const tag = String.fromCharCode(buf[12], buf[13], buf[14], buf[15]);
+      if (tag === "VP8X" && buf.length >= 30) {
+        return {
+          width: (buf[24] | (buf[25] << 8) | (buf[26] << 16)) + 1,
+          height: (buf[27] | (buf[28] << 8) | (buf[29] << 16)) + 1,
+        };
+      }
+      if (tag === "VP8 " && buf.length >= 30) {
+        const k = buf[23] === 0x9d && buf[24] === 0x01 && buf[25] === 0x2a ? 26 : 23;
+        return {
+          width: buf[k] | ((buf[k + 1] & 0x3f) << 8),
+          height: ((buf[k + 1] >> 6) | (buf[k + 2] << 2)) & 0x3fff,
+        };
+      }
+      if (tag === "VP8L" && buf.length >= 25 && buf[20] === 0x2f) {
+        const v = buf[21] | (buf[22] << 8) | (buf[23] << 16) | (buf[24] << 24);
+        return { width: (v & 0x3fff) + 1, height: ((v >>> 14) & 0x3fff) + 1 };
+      }
+      return null;
+    }
+    // JPEG
+    if (buf[0] === 0xff && buf[1] === 0xd8) {
+      let i = 2;
+      while (i + 9 < buf.length) {
+        if (buf[i] !== 0xff) { i++; continue; }
+        const m = buf[i + 1];
+        if (m === 0xd8 || m === 0x01 || m === 0xff || (m >= 0xd0 && m <= 0xd7)) { i += 2; continue; }
+        const len = (buf[i + 2] << 8) | buf[i + 3];
+        const isSof =
+          (m >= 0xc0 && m <= 0xc3) ||
+          (m >= 0xc5 && m <= 0xc7) ||
+          (m >= 0xc9 && m <= 0xcb) ||
+          (m >= 0xcd && m <= 0xcf);
+        if (isSof && len >= 7) {
+          return { height: readU16(buf, i + 5), width: readU16(buf, i + 7) };
+        }
+        i += 2 + len;
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
+async function detectImageSize(url: string): Promise<ImageSize | null> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return null;
+    const buf = new Uint8Array(await res.arrayBuffer());
+    return parseImageSize(buf);
+  } catch (e) {
+    return null;
+  }
+}
+
+const ogSize = ogImage ? await detectImageSize(ogImage) : null;
+const ogWidth = ogSize?.width || 1200;
+const ogHeight = ogSize?.height || 630;
+
+const ogType = (siteConfig.og_type as string) || "website";
+const twitterHandle = (siteConfig.twitter_handle as string) || "";
+const ogFbAppId = (siteConfig.og_fb_app_id as string) || "";
+const schemaHabilitado = Number(siteConfig.schema_habilitado ?? 1) === 1;
+
+let schemaOrg: Record<string, unknown> | null = null;
+if (schemaHabilitado) {
+  const sameAsRaw = (siteConfig.schema_sameAs as string) || "";
+  let sameAs: string[] | null = null;
+  if (sameAsRaw) {
+    try {
+      const parsed = JSON.parse(sameAsRaw);
+      if (Array.isArray(parsed)) sameAs = parsed.map(String);
+    } catch (e) {}
+  }
+  const schema: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": siteConfig.schema_tipo || "Organization",
+    name: siteConfig.schema_nombre || siteName,
+    url: siteConfig.schema_url || seoUrl,
+  };
+  if (siteConfig.schema_description) schema.description = siteConfig.schema_description;
+  if (siteConfig.schema_logo) schema.logo = siteConfig.schema_logo;
+  if (siteConfig.schema_imagen) schema.image = resolverUrlAbsoluta(String(siteConfig.schema_imagen));
+  if (siteConfig.schema_email) schema.email = siteConfig.schema_email;
+  if (siteConfig.schema_telefono) schema.telephone = siteConfig.schema_telefono;
+  if (sameAs) schema.sameAs = sameAs;
+  if (siteConfig.schema_localidad || siteConfig.schema_pais) {
+    const addr: Record<string, string> = { "@type": "PostalAddress" };
+    if (siteConfig.schema_localidad) addr.addressLocality = siteConfig.schema_localidad;
+    if (siteConfig.schema_pais) addr.addressCountry = siteConfig.schema_pais;
+    schema.address = addr;
+  }
+  schemaOrg = schema;
+}
 ---
 
 <!doctype html>
-<html lang="es">
+<html lang={seoLang}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content={description} />
-    <title>{title} | {siteName}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <meta name="description" content={seoDescription} />
+    <script is:inline>
+      (function () {
+        var t, m;
+        try { t = localStorage.getItem('theme'); } catch (e) {}
+        if (t === 'light' || t === 'dark') {
+          document.documentElement.dataset.theme = t;
+        } else {
+          document.documentElement.dataset.theme = 'dark';
+        }
+      })();
+    </script>
+    {seoKeywords && <meta name="keywords" content={seoKeywords} />}
+    <title>{finalTitle}</title>
+
+    <link rel="canonical" href={seoCanonical} />
+    <meta name="robots" content={seoRobots.toLowerCase()} />
+    {seoAuthor && <meta name="author" content={seoAuthor} />}
+
+    <!-- Open Graph / Social Media -->
+    <meta property="og:title" content={finalTitle} />
+    <meta property="og:description" content={seoDescription} />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:url" content={seoCanonical} />
+    <meta property="og:site_name" content={siteName} />
+    <meta property="og:locale" content={ogLocale} />
+    {ogEndpoint && <meta property="og:image" content={ogEndpoint} />}
+    {ogEndpoint && <meta property="og:image:width" content={`${ogWidth}`} />}
+    {ogEndpoint && <meta property="og:image:height" content={`${ogHeight}`} />}
+    {ogFbAppId && <meta property="fb:app_id" content={ogFbAppId} />}
+    {seoPublisher && <meta property="og:publisher" content={seoPublisher} />}
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={finalTitle} />
+    <meta name="twitter:description" content={seoDescription} />
+    {twitterHandle && <meta name="twitter:site" content={twitterHandle} />}
+    {seoAuthor && <meta name="twitter:creator" content={seoAuthor} />}
+    {ogEndpoint && <meta name="twitter:image" content={ogEndpoint} />}
+
+    {schemaOrg && (
+      <script type="application/ld+json" set:html={JSON.stringify(schemaOrg)}></script>
+    )}
+
+    <script is:inline data-seo-page={page}>
+      (function () {
+        var page = document.currentScript && document.currentScript.getAttribute('data-seo-page');
+        if (!page) return;
+        var keys = {
+          titulo: 'seo_' + page + '_titulo',
+          descripcion: 'seo_' + page + '_description'
+        };
+        function resolver(texto) {
+          if (!texto) return '';
+          var resuelto = texto.replace(/\{(\w+)\}/g, function (m, k) {
+            var v = window.__SEO_VARS__ && window.__SEO_VARS__[k];
+            return v !== undefined && v !== '' ? String(v) : m;
+          });
+          return resuelto.indexOf('{') === -1 ? resuelto : '';
+        }
+        function aplicar() {
+          fetch('/api/config/site.php', { cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              if (!d.success) return;
+              var cfg = d.data || {};
+              var t = resolver(cfg[keys.titulo]);
+              if (!t) return;
+              document.title = t;
+              var og = document.querySelector('meta[property="og:title"]');
+              if (og) og.setAttribute('content', t);
+              var tw = document.querySelector('meta[name="twitter:title"]');
+              if (tw) tw.setAttribute('content', t);
+              var dsc = resolver(cfg[keys.descripcion]);
+              if (dsc) {
+                var md = document.querySelector('meta[name="description"]');
+                if (md) md.setAttribute('content', dsc);
+                var od = document.querySelector('meta[property="og:description"]');
+                if (od) od.setAttribute('content', dsc);
+              }
+              if (page === 'inicio' && cfg.og_imagen) {
+                var ep = window.location.origin + '/uploads/og/current-og.jpg?v=${ogVer}';
+                var ogImg = document.querySelector('meta[property="og:image"]');
+                if (ogImg) ogImg.setAttribute('content', ep);
+                var ogW = document.querySelector('meta[property="og:image:width"]');
+                if (ogW) ogW.setAttribute('content', '${ogWidth}');
+                var ogH = document.querySelector('meta[property="og:image:height"]');
+                if (ogH) ogH.setAttribute('content', '${ogHeight}');
+                var twImg = document.querySelector('meta[name="twitter:image"]');
+                if (twImg) twImg.setAttribute('content', ep);
+              }
+            })
+            .catch(function () {});
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', aplicar);
+        } else {
+          aplicar();
+        }
+      })();
+    </script>
+    
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+      rel="preload"
+      href="/fonts/inter-latin-variable.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
     <style is:inline>
       .quill-dark .ql-toolbar.ql-snow { border-color: #2d2d44; background: #13131a; border-radius: 0.75rem 0.75rem 0 0; }
@@ -53,7 +342,7 @@ try {
     </style>
   </head>
   <body
-    class="bg-[#0f0f1a] text-white antialiased font-['Inter',system-ui,-apple-system,sans-serif] overflow-x-hidden"
+    class="bg-page text-ink antialiased font-['Inter',system-ui,-apple-system,sans-serif] overflow-x-hidden"
   >
     {
       showNavFooter && (
@@ -61,32 +350,32 @@ try {
       )
     }
     <div class={showNavFooter ? "pt-16 min-h-screen" : ""}>
-      <slot />
-    </div>
+        <slot />
+      </div>
     {
       showNavFooter && (
         <Footer client:load />
       )
     }
+    <AgeGate client:load />
   </body>
 </html>
 
 <style is:global>
-  @import "tailwindcss";
 
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
   ::-webkit-scrollbar-track {
-    background: #0f0f1a;
+    background: var(--color-page);
   }
   ::-webkit-scrollbar-thumb {
-    background: #2d2d44;
+    background: var(--color-edge);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #3d3d5c;
+    background: var(--color-raised);
   }
 
   html {

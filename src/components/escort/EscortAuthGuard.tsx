@@ -48,8 +48,23 @@ export default function EscortAuthGuard({ children }: Props) {
         return;
       }
 
-      // Todo OK
-      setAuthState('auth');
+      // Verificar contra el servidor que la cuenta siga activa
+      fetch('/api/escort/verificar-sesion.php', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      })
+        .then(res => {
+          if (!res.ok) throw new Error('Cuenta no disponible');
+          return res.json();
+        })
+        .then(data => {
+          if (!data.success) throw new Error('Cuenta no disponible');
+          setAuthState('auth');
+        })
+        .catch(() => {
+          localStorage.removeItem('escort_token');
+          localStorage.removeItem('escort_data');
+          window.location.replace('/micuenta/login');
+        });
     } catch {
       localStorage.removeItem('escort_token');
       localStorage.removeItem('escort_data');

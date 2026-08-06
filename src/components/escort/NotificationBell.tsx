@@ -98,6 +98,26 @@ export default function NotificationBell() {
     }
   };
 
+  const deleteNotification = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      const token = localStorage.getItem('escort_token') || '';
+      await fetch('/api/escort/notificaciones.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action: 'delete', id }),
+      });
+      setNotificaciones(prev => prev.filter(n => n.id !== id));
+      setUnreadCount(prev => Math.max(0, prev - (notificaciones.find(n => n.id === id)?.leida ? 0 : 1)));
+    } catch (err) {
+      console.error('Error deleting notification:', err);
+      setError('Error al eliminar notificación');
+    }
+  };
+
   useEffect(() => {
     fetchNotificaciones();
 
@@ -194,7 +214,7 @@ export default function NotificationBell() {
               notificaciones.map((n) => (
                 <div
                   key={n.id}
-                  className={`px-4 py-3 border-b border-escort-border last:border-0 hover:bg-[#1a1a24] transition-colors cursor-pointer ${!n.leida ? 'bg-red-500/5' : ''}`}
+                  className={`group px-4 py-3 border-b border-escort-border last:border-0 hover:bg-[#1a1a24] transition-colors cursor-pointer ${!n.leida ? 'bg-red-500/5' : ''}`}
                   onClick={() => { if (!n.leida) markRead(n.id); if (n.url) window.location.href = n.url; }}
                 >
                   <div className="flex items-start gap-3">
@@ -206,9 +226,18 @@ export default function NotificationBell() {
                         <p className={`text-sm truncate ${!n.leida ? 'text-white font-medium' : 'text-gray-300'}`}>
                           {n.titulo}
                         </p>
-                        {!n.leida && (
-                          <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></span>
-                        )}
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {!n.leida && (
+                            <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                          )}
+                          <button
+                            onClick={(e) => deleteNotification(n.id, e)}
+                            className="opacity-0 group-hover:opacity-100 w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                            title="Eliminar"
+                          >
+                            <i className="fas fa-times text-[10px]"></i>
+                          </button>
+                        </div>
                       </div>
                       {n.mensaje && (
                         <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.mensaje}</p>

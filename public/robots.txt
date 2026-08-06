@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /micuenta/
+Sitemap: https://kimi.zona8.cl/sitemap.xml

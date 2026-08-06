@@ -1,0 +1,200 @@
+---
+import UserLayout from "../layouts/UserLayout.astro";
+---
+<UserLayout title="Mis Reportes" activePage="reportes">
+  <div class="mb-8">
+    <h1 class="text-2xl font-bold text-white flex items-center gap-3">
+      <i class="fas fa-flag text-red-400"></i>Mis Reportes
+    </h1>
+    <p class="text-gray-500 mt-1 text-sm">Reportes que has enviado sobre perfiles sospechosos</p>
+  </div>
+
+  <div id="loading" class="flex items-center justify-center h-64">
+    <div class="w-10 h-10 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+  </div>
+
+  <div id="noAuth" class="hidden text-center py-16">
+    <i class="fas fa-user-lock text-4xl text-gray-600 mb-4"></i>
+    <p class="text-gray-500 mb-4">Debes iniciar sesión</p>
+    <a href="/ingresar" class="inline-flex items-center gap-2 px-6 py-3 bg-red-500 text-white rounded-xl font-semibold">Iniciar Sesión</a>
+  </div>
+
+  <div id="empty" class="hidden text-center py-16">
+    <i class="fas fa-flag text-4xl text-gray-600 mb-3 opacity-30"></i>
+    <p class="text-gray-500">No has enviado reportes aún</p>
+    <a href="/" class="text-red-400 text-sm mt-2 inline-block hover:text-red-300">Explorar escorts</a>
+  </div>
+
+  <div id="list" class="hidden space-y-4"></div>
+
+  <!-- Confirm Modal -->
+  <div id="confirmModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+    <div class="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl w-full max-w-sm">
+      <div class="p-6">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center flex-shrink-0">
+            <i class="fas fa-exclamation-triangle text-red-400 text-lg"></i>
+          </div>
+          <div>
+            <h3 class="text-white font-semibold text-sm">Confirmar</h3>
+            <p class="text-gray-400 text-sm leading-relaxed mt-0.5" id="modalMessage"></p>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3">
+          <button id="modalCancel" class="px-4 py-2 bg-[#2a2a3e] hover:bg-[#353550] text-gray-300 rounded-lg text-sm font-medium transition-colors">Cancelar</button>
+          <button id="modalConfirm" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors">Confirmar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alert Modal -->
+  <div id="alertModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70">
+    <div class="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl w-full max-w-sm">
+      <div class="p-6">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+            <i class="fas fa-info-circle text-blue-400 text-lg"></i>
+          </div>
+          <div>
+            <h3 class="text-white font-semibold text-sm">Información</h3>
+            <p class="text-gray-400 text-sm leading-relaxed mt-0.5" id="alertMessage"></p>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3">
+          <button id="alertConfirm" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">Entendido</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</UserLayout>
+
+<script is:inline>
+(function() {
+  const token = localStorage.getItem('usuario_token');
+  const userDataRaw = localStorage.getItem('usuario_data');
+  if (!token || !userDataRaw) {
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('noAuth').classList.remove('hidden');
+    return;
+  }
+
+  const estadoConfig = {
+    pending: { label: 'Pendiente', cls: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20', icon: 'fa-clock' },
+    reviewed: { label: 'Revisado', cls: 'bg-green-500/10 text-green-400 border-green-500/20', icon: 'fa-check' },
+    dismissed: { label: 'Desestimado', cls: 'bg-gray-500/10 text-gray-400 border-gray-500/20', icon: 'fa-times' },
+  };
+
+  function cargarReportes() {
+    document.getElementById('loading').classList.remove('hidden');
+    document.getElementById('list').classList.add('hidden');
+    document.getElementById('empty').classList.add('hidden');
+
+    fetch('/api/reportes/mis-reportes.php', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      document.getElementById('loading').classList.add('hidden');
+      if (!data.success || !data.reportes || data.reportes.length === 0) {
+        document.getElementById('empty').classList.remove('hidden');
+        return;
+      }
+      const list = document.getElementById('list');
+      list.classList.remove('hidden');
+
+      data.reportes.forEach(function(r) {
+        const st = estadoConfig[r.estado] || estadoConfig.pending;
+        var escortAvatar = r.foto_principal
+          ? '<img src="' + r.foto_principal + '" alt="" class="w-10 h-10 rounded-lg object-cover" loading="lazy" onerror="this.style.display=\'none\'" />'
+          : '<div class="w-10 h-10 rounded-lg bg-[#2a2a3e] flex items-center justify-center"><i class="fas fa-user text-gray-600 text-xs"></i></div>';
+        var detalle = r.detalle
+          ? '<p class="text-gray-400 text-sm leading-relaxed mt-2">' + r.detalle.replace(/</g, '&lt;').replace(/\n/g, '<br/>') + '</p>'
+          : '';
+        var card = document.createElement('div');
+        card.className = 'bg-[#1a1a2e] border border-white/5 rounded-xl p-4';
+        card.innerHTML =
+          '<div class="flex items-start justify-between gap-3">' +
+            '<div class="flex items-center gap-3 min-w-0">' +
+              escortAvatar +
+              '<div class="min-w-0">' +
+                '<a href="/' + (r.escort_id || '') + '" target="_blank" class="text-white text-sm font-medium truncate block hover:text-red-400">' + (r.escort_nombre || 'Escort #' + r.escort_id) + '</a>' +
+                '<span class="text-gray-600 text-xs block mt-0.5">Reporte #' + r.id + ' • ' + new Date(r.created_at).toLocaleDateString('es-CL') + '</span>' +
+              '</div>' +
+            '</div>' +
+            '<span class="inline-flex items-center gap-1 text-[0.6rem] px-2 py-0.5 rounded-full border font-medium shrink-0 ' + st.cls + '">' +
+              '<i class="fas ' + st.icon + '"></i>' + st.label +
+            '</span>' +
+          '</div>' +
+          '<div class="mt-3 pt-3 border-t border-white/5">' +
+            '<p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Motivo</p>' +
+            '<p class="text-gray-300 text-sm">' + r.motivo.replace(/</g, '&lt;') + '</p>' +
+            detalle +
+          '</div>' +
+          '<div class="mt-3 flex justify-end">' +
+            '<button onclick="confirmarEliminarReporte(' + r.id + ')" class="text-xs text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 px-3 py-1.5 rounded-lg transition-colors">' +
+              '<i class="fas fa-trash-alt mr-1"></i>Eliminar reporte' +
+            '</button>' +
+          '</div>';
+        list.appendChild(card);
+      });
+    })
+    .catch(function() {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('empty').classList.remove('hidden');
+    });
+  }
+
+  cargarReportes();
+})();
+
+let pendingDeleteId = null;
+
+function confirmarEliminarReporte(id) {
+  pendingDeleteId = id;
+  document.getElementById('modalMessage').textContent = '¿Eliminar este reporte? No se puede deshacer.';
+  document.getElementById('confirmModal').classList.remove('hidden');
+}
+
+document.getElementById('modalCancel').addEventListener('click', function() {
+  document.getElementById('confirmModal').classList.add('hidden');
+  pendingDeleteId = null;
+});
+
+document.getElementById('modalConfirm').addEventListener('click', function() {
+  if (pendingDeleteId === null) return;
+  const id = pendingDeleteId;
+  pendingDeleteId = null;
+  document.getElementById('confirmModal').classList.add('hidden');
+  eliminarReporte(id);
+});
+
+document.getElementById('alertConfirm').addEventListener('click', function() {
+  document.getElementById('alertModal').classList.add('hidden');
+});
+
+function showAlert(message) {
+  document.getElementById('alertMessage').textContent = message;
+  document.getElementById('alertModal').classList.remove('hidden');
+}
+
+function eliminarReporte(id) {
+  const token = localStorage.getItem('usuario_token');
+  fetch('/api/reportes/mis-reportes.php', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ id: id })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.success) {
+      window.location.reload();
+    } else {
+      showAlert(data.error || 'Error al eliminar el reporte');
+    }
+  })
+  .catch(function() {
+    showAlert('Error al eliminar el reporte');
+  });
+}
+</script>

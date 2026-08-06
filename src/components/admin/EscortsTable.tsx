@@ -1,7 +1,7 @@
 // src/components/admin/EscortsTable.tsx
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import Skeleton from 'react-loading-skeleton';
+import { Skeleton } from '../ui/Skeleton';
 
 interface Escort {
   id: number;
@@ -140,9 +140,35 @@ export default function EscortsTable({ escorts, loading, onRefresh }: EscortsTab
       case 'rechazar':
         confirmAction('¿Rechazar esta escort?', () => callApi('escort-rechazar', { id: escortId }));
         break;
-      case 'editar':
-        window.location.href = `/admin/escorts/editar/${escortId}`;
+      case 'editar': {
+        const adminToken = localStorage.getItem('admin_token');
+        if (!adminToken) {
+          setApiError('Sesión de administrador no encontrada');
+          break;
+        }
+        setApiError('');
+        setActionLoading(true);
+        (async () => {
+          try {
+            const res = await fetch(`/api/admin/escort-login-as.php?id=${escortId}`, {
+              headers: { Authorization: 'Bearer ' + adminToken },
+            });
+            const data = await res.json();
+            if (data.success) {
+              localStorage.setItem('escort_token', data.token);
+              localStorage.setItem('escort_data', JSON.stringify(data.escort || { id: escortId }));
+              window.open('/micuenta/perfil', '_blank');
+            } else {
+              setApiError(data.error || 'No se pudo abrir el editor');
+            }
+          } catch (e) {
+            setApiError('Error de conexión');
+          } finally {
+            setActionLoading(false);
+          }
+        })();
         break;
+      }
       case 'eliminar':
         confirmAction('¿Eliminar esta escort?', () => callApi('escort-eliminar', { id: escortId }));
         break;

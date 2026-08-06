@@ -54,6 +54,9 @@ try {
     );
     $update->execute([$escortId]);
 
+    require_once __DIR__ . '/../../mail.php';
+    notificarAccionEscort('cuentas', $escortId, 'Escort eliminó su cuenta');
+
     echo json_encode(['success' => true, 'message' => 'Cuenta eliminada']);
 } catch (Throwable $e) {
     error_log("Error datos/eliminar-cuenta.php: " . $e->getMessage());

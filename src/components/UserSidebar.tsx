@@ -9,6 +9,8 @@ const menuItems = [
   { id: 'favoritos', label: 'Mis Favoritos', icon: 'fa-heart', href: '/mis-favoritos' },
   { id: 'perfil', label: 'Mi Perfil', icon: 'fa-user-edit', href: '/mi-perfil' },
   { id: 'valoraciones', label: 'Mis Valoraciones', icon: 'fa-star', href: '/mis-valoraciones' },
+  { id: 'comentarios', label: 'Mis Comentarios', icon: 'fa-comments', href: '/mis-comentarios' },
+  { id: 'reportes', label: 'Mis Reportes', icon: 'fa-flag', href: '/mis-reportes' },
 ];
 
 export default function UserSidebar({ activePage = 'dashboard' }: UserSidebarProps) {

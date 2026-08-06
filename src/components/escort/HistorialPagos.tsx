@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import Skeleton from 'react-loading-skeleton';
-import 'react-loading-skeleton/dist/skeleton.css';
+import { Skeleton } from '../ui/Skeleton';
 
 interface Pago {
   id: number;
@@ -94,39 +93,40 @@ export default function HistorialPagos() {
       )}
 
       <div className="bg-[#13131a] border border-gray-800 rounded-2xl overflow-hidden">
-        {loading ? (
-          <div className="p-6 space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center gap-4">
-                <Skeleton width={100} height={16} />
-                <Skeleton width={120} height={16} />
-                <Skeleton width={80} height={16} />
-                <Skeleton width={100} height={16} />
-                <Skeleton width={90} height={24} borderRadius={12} />
-              </div>
-            ))}
-          </div>
-        ) : pagos.length === 0 ? (
-          <div className="text-center py-16 text-gray-500">
-            <i className="fas fa-receipt text-4xl mb-4 opacity-50"></i>
-            <p className="text-lg font-medium">No hay pagos registrados</p>
-            <p className="text-sm mt-1">Los pagos aparecerán aquí cuando solicites un plan</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-800">
-                  <th className="text-left text-gray-500 font-medium px-3 sm:px-5 py-3 whitespace-nowrap text-xs sm:text-sm">Fecha</th>
-                  <th className="text-left text-gray-500 font-medium px-3 sm:px-5 py-3 whitespace-nowrap text-xs sm:text-sm">Concepto</th>
-                  <th className="text-left text-gray-500 font-medium px-3 sm:px-5 py-3 whitespace-nowrap text-xs sm:text-sm">Monto</th>
-                  <th className="text-left text-gray-500 font-medium px-3 sm:px-5 py-3 whitespace-nowrap text-xs sm:text-sm">Vencimiento</th>
-                  <th className="text-center text-gray-500 font-medium px-3 sm:px-5 py-3 whitespace-nowrap text-xs sm:text-sm">Estado</th>
-                  <th className="text-left text-gray-500 font-medium px-3 sm:px-5 py-3 whitespace-nowrap text-xs sm:text-sm">Comp.</th>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-800">
+                <th className="text-left text-gray-500 font-medium px-3 sm:px-5 py-3 whitespace-nowrap text-xs sm:text-sm">Fecha</th>
+                <th className="text-left text-gray-500 font-medium px-3 sm:px-5 py-3 whitespace-nowrap text-xs sm:text-sm">Concepto</th>
+                <th className="text-left text-gray-500 font-medium px-3 sm:px-5 py-3 whitespace-nowrap text-xs sm:text-sm">Monto</th>
+                <th className="text-left text-gray-500 font-medium px-3 sm:px-5 py-3 whitespace-nowrap text-xs sm:text-sm">Vencimiento</th>
+                <th className="text-center text-gray-500 font-medium px-3 sm:px-5 py-3 whitespace-nowrap text-xs sm:text-sm">Estado</th>
+                <th className="text-left text-gray-500 font-medium px-3 sm:px-5 py-3 whitespace-nowrap text-xs sm:text-sm">Comp.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                [1, 2, 3, 4, 5].map((i) => (
+                  <tr key={i} className="border-b border-gray-800/50">
+                    <td className="px-3 sm:px-5 py-3 sm:py-4"><Skeleton width={80} height={14} /></td>
+                    <td className="px-3 sm:px-5 py-3 sm:py-4"><Skeleton width={60} height={14} /></td>
+                    <td className="px-3 sm:px-5 py-3 sm:py-4"><Skeleton width={70} height={14} /></td>
+                    <td className="px-3 sm:px-5 py-3 sm:py-4"><Skeleton width={80} height={14} /></td>
+                    <td className="px-3 sm:px-5 py-3 sm:py-4 text-center"><Skeleton width={80} height={22} borderRadius={12} className="inline-block" /></td>
+                    <td className="px-3 sm:px-5 py-3 sm:py-4"><Skeleton width={20} height={14} /></td>
+                  </tr>
+                ))
+              ) : pagos.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-16 text-gray-500">
+                    <i className="fas fa-receipt text-4xl mb-4 opacity-50"></i>
+                    <p className="text-lg font-medium">No hay pagos registrados</p>
+                    <p className="text-sm mt-1">Los pagos aparecerán aquí cuando solicites un plan</p>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {pagos.map((pago) => {
+              ) : (
+                pagos.map((pago) => {
                   const cfg = estadoConfig[pago.estado_pago] || estadoConfig.pendiente;
                   const vencido = isVencido(pago.vencimiento);
                   return (
@@ -154,35 +154,41 @@ export default function HistorialPagos() {
                           <span className="text-gray-600">—</span>
                         )}
                       </td>
-                      <td className="px-3 sm:px-5 py-3 sm:py-4 text-center">
-                        <span className={`inline-flex items-center gap-1 px-2 sm:gap-1.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium whitespace-nowrap ${cfg.bg} ${cfg.text}`}>
-                          <i className={`fas ${cfg.icon} text-[0.5rem] sm:text-[0.6rem]`}></i>
-                          <span className="hidden sm:inline">{cfg.label}</span>
-                          <span className="sm:hidden">{cfg.label.charAt(0)}</span>
-                        </span>
-                      </td>
-                      <td className="px-3 sm:px-5 py-3 sm:py-4">
-                        {pago.comprobante_url ? (
-                          <a
-                            href={pago.comprobante_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-400 hover:text-blue-300 text-[10px] sm:text-xs flex items-center gap-1 sm:gap-1.5"
-                          >
-                            <i className="fas fa-file-image"></i>
-                            <span className="hidden sm:inline">Ver</span>
-                          </a>
-                        ) : (
-                          <span className="text-gray-600 text-[10px] sm:text-xs">—</span>
-                        )}
-                      </td>
+                       <td className="px-3 sm:px-5 py-3 sm:py-4 text-center">
+                         <span className={`inline-flex items-center gap-1 px-2 sm:gap-1.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium whitespace-nowrap ${cfg.bg} ${cfg.text}`}>
+                           <i className={`fas ${cfg.icon} text-[0.5rem] sm:text-[0.6rem]`}></i>
+                           <span className="hidden sm:inline">{cfg.label}</span>
+                           <span className="sm:hidden">{cfg.label.charAt(0)}</span>
+                         </span>
+                       </td>
+                       <td className="px-3 sm:px-5 py-3 sm:py-4">
+                          {pago.comprobante_url ? (
+                            <div className="flex items-center justify-center gap-1.5">
+                              <a
+                                href={pago.comprobante_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-400 hover:text-blue-300 text-[10px] sm:text-xs"
+                                title="Comprobante de pago"
+                              >
+                                {pago.comprobante_url.match(/\.pdf$/i) ? (
+                                  <i className="fas fa-file-pdf text-red-400"></i>
+                                ) : (
+                                  <i className="fas fa-file-image"></i>
+                                )}
+                              </a>
+                            </div>
+                          ) : (
+                            <span className="text-gray-600 text-[10px] sm:text-xs">—</span>
+                          )}
+                        </td>
                     </tr>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

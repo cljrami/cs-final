@@ -1,0 +1,197 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+<Layout title="Restablecer Contraseña" showNavFooter={false} page="recuperar">
+  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-page to-surface">
+    <div class="w-full max-w-md mx-4 bg-admin-card rounded-2xl p-8 md:p-10">
+      <div id="loadingState" class="text-center py-8">
+        <i class="fas fa-spinner fa-spin text-3xl text-red-400 mb-4"></i>
+        <p class="text-muted">Validando enlace...</p>
+      </div>
+
+      <div id="formContainer" class="hidden">
+        <div class="text-center mb-8">
+          <div class="w-16 h-16 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4">
+            <i class="fas fa-lock text-ink"></i>
+          </div>
+          <h1 class="text-2xl font-bold mb-2 text-ink">Nueva Contraseña</h1>
+          <p class="text-admin-muted text-sm">Ingresa tu nueva contraseña</p>
+        </div>
+
+        <form id="resetForm" class="space-y-5">
+          <input type="hidden" id="tokenField" />
+          <input type="hidden" id="tipoField" />
+
+          <div>
+            <label class="block text-sm text-admin-muted mb-2"><i class="fas fa-lock mr-2"></i>Nueva Contraseña</label>
+            <div class="flex items-center bg-page rounded-xl px-4 focus-within:bg-raised transition-colors">
+              <i class="fas fa-lock text-muted"></i>
+              <input type="password" id="password" class="flex-1 bg-transparent border-none text-ink px-4 py-3 outline-none" placeholder="Mínimo 8 caracteres" required />
+            </div>
+            <p id="passwordError" class="text-red-500 text-xs mt-1 hidden"></p>
+          </div>
+
+          <div>
+            <label class="block text-sm text-admin-muted mb-2"><i class="fas fa-check-circle mr-2"></i>Confirmar Contraseña</label>
+            <div class="flex items-center bg-page rounded-xl px-4 focus-within:bg-raised transition-colors">
+              <i class="fas fa-check-circle text-muted"></i>
+              <input type="password" id="password_confirm" class="flex-1 bg-transparent border-none text-ink px-4 py-3 outline-none" placeholder="Repite la contraseña" required />
+            </div>
+            <p id="passwordConfirmError" class="text-red-500 text-xs mt-1 hidden"></p>
+          </div>
+
+          <div id="generalError" class="hidden text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+            <i class="fas fa-exclamation-circle mr-2"></i><span id="generalErrorText"></span>
+          </div>
+
+          <button type="submit" id="submitBtn"
+            class="w-full bg-gradient-to-r from-red-500 to-red-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity cursor-pointer">
+            <i class="fas fa-save"></i>
+            <span>Cambiar Contraseña</span>
+          </button>
+        </form>
+      </div>
+
+      <div id="successMsg" class="hidden text-center py-8">
+        <div class="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i class="fas fa-check-circle text-green-400 text-3xl"></i>
+        </div>
+        <h3 class="text-ink font-bold text-xl mb-2">¡Contraseña Actualizada!</h3>
+        <p class="text-muted text-sm mb-6">Tu contraseña se ha cambiado correctamente.</p>
+        <a href="/ingresar" class="inline-flex items-center gap-2 px-6 py-3 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition-all">
+          <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
+        </a>
+      </div>
+
+      <div id="errorState" class="hidden text-center py-8">
+        <div class="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i class="fas fa-times-circle text-red-400 text-3xl"></i>
+        </div>
+        <h3 class="text-ink font-bold text-xl mb-2">Enlace Inválido</h3>
+        <p id="errorStateText" class="text-muted text-sm mb-6">El enlace ha expirado o no es válido.</p>
+        <a href="/recuperar" class="inline-flex items-center gap-2 px-6 py-3 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition-all">
+          <i class="fas fa-key"></i> Solicitar nuevo enlace
+        </a>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script is:inline>
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('token');
+  const tipo = params.get('tipo');
+
+  const loadingState = document.getElementById('loadingState');
+  const formContainer = document.getElementById('formContainer');
+  const errorState = document.getElementById('errorState');
+  const errorStateText = document.getElementById('errorStateText');
+  const successMsg = document.getElementById('successMsg');
+  const resetForm = document.getElementById('resetForm');
+  const tokenField = document.getElementById('tokenField');
+  const tipoField = document.getElementById('tipoField');
+  const password = document.getElementById('password');
+  const passwordConfirm = document.getElementById('password_confirm');
+  const submitBtn = document.getElementById('submitBtn');
+  const generalError = document.getElementById('generalError');
+  const generalErrorText = document.getElementById('generalErrorText');
+  const passwordError = document.getElementById('passwordError');
+  const passwordConfirmError = document.getElementById('passwordConfirmError');
+
+  if (!token || !tipo) {
+    loadingState.classList.add('hidden');
+    errorState.classList.remove('hidden');
+    errorStateText.textContent = 'Enlace inválido. Falta información.';
+    return;
+  }
+
+  tokenField.value = token;
+  tipoField.value = tipo;
+
+  fetch('/api/recuperar-clave.php?token=' + encodeURIComponent(token) + '&tipo=' + encodeURIComponent(tipo))
+    .then(r => r.json())
+    .then(data => {
+      loadingState.classList.add('hidden');
+      if (data.success) {
+        formContainer.classList.remove('hidden');
+      } else {
+        errorState.classList.remove('hidden');
+        errorStateText.textContent = data.error || 'El enlace ha expirado o no es válido.';
+      }
+    })
+    .catch(() => {
+      loadingState.classList.add('hidden');
+      errorState.classList.remove('hidden');
+      errorStateText.textContent = 'Error al validar el enlace.';
+    });
+
+  function hideErrors() {
+    passwordError.classList.add('hidden');
+    passwordConfirmError.classList.add('hidden');
+    generalError.classList.add('hidden');
+  }
+
+  resetForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideErrors();
+
+    if (password.value.length < 8) {
+      passwordError.textContent = 'Mínimo 8 caracteres';
+      passwordError.classList.remove('hidden');
+      return;
+    }
+    if (password.value !== passwordConfirm.value) {
+      passwordConfirmError.textContent = 'Las contraseñas no coinciden';
+      passwordConfirmError.classList.remove('hidden');
+      return;
+    }
+
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cambiando...';
+    submitBtn.disabled = true;
+
+    try {
+      const res = await fetch('/api/recuperar-clave.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: tokenField.value,
+          tipo: tipoField.value,
+          password: password.value,
+          password_confirm: passwordConfirm.value,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        formContainer.classList.add('hidden');
+        successMsg.classList.remove('hidden');
+      } else {
+        if (data.fieldErrors) {
+          if (data.fieldErrors.password) {
+            passwordError.textContent = data.fieldErrors.password;
+            passwordError.classList.remove('hidden');
+          }
+          if (data.fieldErrors.password_confirm) {
+            passwordConfirmError.textContent = data.fieldErrors.password_confirm;
+            passwordConfirmError.classList.remove('hidden');
+          }
+          if (data.fieldErrors.general) {
+            generalErrorText.textContent = data.fieldErrors.general;
+            generalError.classList.remove('hidden');
+          }
+        } else {
+          generalErrorText.textContent = data.error || 'Error al cambiar la contraseña';
+          generalError.classList.remove('hidden');
+        }
+      }
+    } catch (err) {
+      generalErrorText.textContent = 'Error de conexión';
+      generalError.classList.remove('hidden');
+    } finally {
+      submitBtn.innerHTML = originalText;
+      submitBtn.disabled = false;
+    }
+  });
+})();
+</script>

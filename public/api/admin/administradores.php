@@ -129,6 +129,17 @@ try {
     $stmt->execute($params);
     $admins = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Stats
+    $stmtStats = $pdo->query("
+        SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN rol = 'superadmin' THEN 1 ELSE 0 END) as superadmins,
+            SUM(CASE WHEN rol = 'admin' THEN 1 ELSE 0 END) as admins,
+            SUM(CASE WHEN rol = 'moderador' THEN 1 ELSE 0 END) as moderadores
+        FROM admins
+    ");
+    $stats = $stmtStats->fetch();
+
     echo json_encode([
         'success' => true,
         'admins' => array_map(function ($a) {
@@ -147,6 +158,12 @@ try {
             'page' => $page,
             'per_page' => $perPage,
             'total_pages' => max(1, ceil($total / $perPage)),
+        ],
+        'stats' => [
+            'total' => (int)$stats['total'],
+            'superadmins' => (int)$stats['superadmins'],
+            'admins' => (int)$stats['admins'],
+            'moderadores' => (int)$stats['moderadores'],
         ],
     ]);
 } catch (Throwable $e) {

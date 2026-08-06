@@ -23,7 +23,7 @@ try {
         exit;
     }
 
-    // Obtener escort con TODOS los campos
+    // Obtener escort con TODOS los campos (columnas reales de la tabla escorts)
     $stmt = $pdo->prepare("
         SELECT 
             id, nombre, edad, ciudad, 
@@ -31,7 +31,7 @@ try {
             telefono, whatsapp, foto_principal, 
             verificado, vip, activa, destacado,
             estado, altura, peso,
-            tarifa_30min, tarifa_1h, tarifa_2h, tarifa_noche,
+            rating, total_valoraciones,
             created_at
         FROM escorts 
         WHERE id = ? AND activa = 1 
@@ -50,13 +50,11 @@ try {
     unset($escort['activa']);
 
     // === FOTOS desde tabla escort_fotos ===
-    // Nota: la columna de visibilidad es `visibilidad` (no `tipo`, que indica
-    // imagen/video). Filtramos por 'publica' y ordenamos portada primero.
     $stmtFotos = $pdo->prepare("
         SELECT id, url, tipo, es_portada
         FROM escort_fotos
-        WHERE escort_id = ? AND visibilidad = 'publica'
-        ORDER BY es_portada DESC, orden ASC, created_at ASC
+        WHERE escort_id = ?
+        ORDER BY es_portada DESC, orden ASC
     ");
     $stmtFotos->execute(array($id));
     $fotosRows = $stmtFotos->fetchAll(PDO::FETCH_ASSOC);

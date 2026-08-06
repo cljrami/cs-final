@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import DataTable from '../ui/DataTable';
 import type { Column, ActionItem } from '../ui/DataTable';
-import SearchFilters from './SearchFilters';
+import StatCard from '../ui/StatCard';
+import ConfirmModal from '../ui/ConfirmModal';
 
 const API_URL = '/api/admin/usuarios.php';
 
@@ -12,6 +13,7 @@ function getAuthHeaders(): Record<string, string> {
 
 export default function UsuariosData() {
   const [items, setItems] = useState<any[]>([]);
+  const [stats, setStats] = useState({ total: 0, activos: 0, inactivos: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -19,6 +21,7 @@ export default function UsuariosData() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [deleteModal, setDeleteModal] = useState<{ id: number; nombre: string } | null>(null);
 
   const fetchItems = useCallback(async () => {
     setIsLoading(true);
@@ -29,6 +32,7 @@ export default function UsuariosData() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Error');
       setItems(data.usuarios || []);
+      setStats(data.stats || { total: 0, activos: 0, inactivos: 0 });
       setTotal(data.pagination?.total || 0);
       setTotalPages(data.pagination?.total_pages || 1);
     } catch (err: any) {
@@ -64,8 +68,14 @@ export default function UsuariosData() {
     }
   };
 
-  const eliminar = async (id: number, nombre: string) => {
-    if (!confirm(`¿Eliminar usuario "${nombre}"? Esta acción no se puede deshacer.`)) return;
+  const confirmarEliminar = (id: number, nombre: string) => {
+    setDeleteModal({ id, nombre });
+  };
+
+  const eliminar = async () => {
+    if (!deleteModal) return;
+    const { id } = deleteModal;
+    setDeleteModal(null);
     try {
       const res = await fetch(API_URL, {
         method: 'DELETE',
@@ -124,7 +134,7 @@ export default function UsuariosData() {
       label: 'Eliminar',
       icon: 'fa-trash-alt',
       danger: true,
-      onClick: () => eliminar(item.id, item.nombre),
+      onClick: () => confirmarEliminar(item.id, item.nombre),
     },
   ];
 
@@ -137,9 +147,10 @@ export default function UsuariosData() {
         <p className="text-gray-400 mt-1">Gestiona los usuarios registrados en el sitio</p>
       </div>
 
-      <div className="flex items-center gap-3 text-sm">
-        <span className="text-gray-500">Total:</span>
-        <span className="text-white font-semibold">{total}</span>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <StatCard label="Total" value={stats.total} icon="fa-users" color="#a78bfa" loading={isLoading} />
+        <StatCard label="Activos" value={stats.activos} icon="fa-check-circle" color="#10b981" loading={isLoading} />
+        <StatCard label="Inactivos" value={stats.inactivos} icon="fa-pause-circle" color="#6b7280" loading={isLoading} />
       </div>
 
       {successMsg && <div className="bg-green-500/10 border border-green-500/30 text-green-400 px-4 py-3 rounded-lg flex items-center gap-2"><i className="fas fa-check-circle"></i>{successMsg}</div>}
@@ -158,6 +169,16 @@ export default function UsuariosData() {
         emptyIcon="fa-user"
         getRowKey={(item) => item.id}
         getActions={getActions}
+      />
+
+      <ConfirmModal
+        isOpen={deleteModal !== null}
+        title="Eliminar Usuario"
+        message={deleteModal ? `¿Eliminar usuario "${deleteModal.nombre}"? Esta acción no se puede deshacer.` : ''}
+        confirmText="Eliminar"
+        variant="danger"
+        onConfirm={eliminar}
+        onCancel={() => setDeleteModal(null)}
       />
 
       {totalPages > 1 && !isLoading && (

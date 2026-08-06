@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
@@ -12,23 +12,25 @@ require_once __DIR__ . '/../bootstrap.php';
 
 try {
     $tokenData = requireAuth();
+
+    requireAdminRole($tokenData);
     $adminId = $tokenData['id'] ?? 0;
     if ($adminId <= 0) {
-        throw new Exception('Token inválido');
+        throw new Exception('Token invíƒÂ¡lido');
     }
 
     $pdo = getDBConnection();
     if (!$pdo) {
-        throw new Exception('Error de conexión a la base de datos');
+        throw new Exception('Error de conexiíƒÂ³n a la base de datos');
     }
 
     $input = json_decode(file_get_contents('php://input'), true);
     $solicitudId = (int)($input['solicitud_id'] ?? 0);
     $escortId = (int)($input['escort_id'] ?? 0);
     $accion = $input['accion'] ?? '';
-    $notas = trim($input['notas'] ?? '');
+    $notas = htmlspecialchars(trim($input['notas'] ?? ''), ENT_QUOTES, 'UTF-8');
 
-    if (!$solicitudId || !$escortId || !in_array($accion, ['aprobar', 'rechazar', 'borrar'])) {
+    if (!$solicitudId || !$escortId || !in_array($accion, ['aprobar', 'rechazar', 'borrar', 'volver_revision'])) {
         throw new Exception('Datos inválidos');
     }
 
@@ -44,7 +46,7 @@ try {
         $stmtCheck->execute([$solicitudId]);
         $estadoSolicitud = $stmtCheck->fetchColumn();
 
-        // Eliminar físicamente la solicitud
+        // Eliminar fíƒÂ­sicamente la solicitud
         $stmt = $pdo->prepare("DELETE FROM escort_vip_solicitudes WHERE id = ?");
         $stmt->execute([$solicitudId]);
 
@@ -65,6 +67,47 @@ try {
             ");
             $stmt->execute([$escortId]);
         }
+    } elseif ($accion === 'volver_revision') {
+        // Devolver la solicitud a estado de revisión (enviado).
+        // Primero revisar el estado actual para saber si hay que revocar VIP.
+        $stmtCheck = $pdo->prepare("SELECT estado FROM escort_vip_solicitudes WHERE id = ?");
+        $stmtCheck->execute([$solicitudId]);
+        $estadoActual = $stmtCheck->fetchColumn();
+
+        // Volver a enviado, limpiar notas y fecha de respuesta
+        $stmt = $pdo->prepare("
+            UPDATE escort_vip_solicitudes 
+            SET estado = 'enviado', 
+                admin_notas = NULL, 
+                fecha_respuesta = NULL,
+                revisado_por = NULL
+            WHERE id = ?
+        ");
+        $stmt->execute([$solicitudId]);
+
+        // Si la solicitud estaba aprobada, revocar el VIP de la escort
+        if ($estadoActual === 'aprobado') {
+            $stmt = $pdo->prepare("
+                UPDATE escorts 
+                SET vip = 0, 
+                    fecha_vip_expira = NULL
+                WHERE id = ?
+            ");
+            $stmt->execute([$escortId]);
+
+            $stmt = $pdo->prepare("
+                INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url, created_at) 
+                VALUES (?, 'sistema', 'VIP revocado a revisión', 'Tu solicitud VIP fue devuelta a revisión por un administrador. Vuelve a revisar el comprobante y espera la aprobación.', '/micuenta/vip', NOW())
+            ");
+            $stmt->execute([$escortId]);
+        } else {
+            // Notificar que volvió a revisión
+            $stmt = $pdo->prepare("
+                INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url, created_at) 
+                VALUES (?, 'sistema', 'Solicitud VIP en revisión', 'Tu solicitud VIP fue devuelta a estado de revisión por un administrador.', '/micuenta/vip', NOW())
+            ");
+            $stmt->execute([$escortId]);
+        }
     } else {
         // Actualizar estado de la solicitud
         $nuevoEstado = $accion === 'aprobar' ? 'aprobado' : 'rechazado';
@@ -81,7 +124,7 @@ try {
 
         // Si se aprueba, activar VIP en escorts
         if ($accion === 'aprobar') {
-            // Obtener duración del plan VIP
+            // Obtener duraciíƒÂ³n del plan VIP
             $stmtPlan = $pdo->prepare("SELECT plan FROM escort_vip_solicitudes WHERE id = ?");
             $stmtPlan->execute([$solicitudId]);
             $plan = $stmtPlan->fetchColumn();
@@ -104,10 +147,10 @@ try {
             ");
             $stmt->execute([$fechaExpira, $escortId]);
 
-            // Crear notificación para la escort
+            // Crear notificaciíƒÂ³n para la escort
             $stmt = $pdo->prepare("
                 INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url, created_at) 
-                VALUES (?, 'vip_aprobado', 'Â¡VIP Aprobado!', 'Tu solicitud VIP ha sido aprobada.', '/micuenta/vip', NOW())
+                VALUES (?, 'vip_aprobado', 'í‚Â¡VIP Aprobado!', 'Tu solicitud VIP ha sido aprobada.', '/micuenta/vip', NOW())
             ");
             $stmt->execute([$escortId]);
         } else {
@@ -128,5 +171,6 @@ try {
         $pdo->rollBack();
     }
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }
+

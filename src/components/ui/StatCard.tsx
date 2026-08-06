@@ -1,7 +1,5 @@
 // src/components/ui/StatsCards.tsx
 
-import DataCell from './DataCell';
-
 interface StatCardProps {
   icon: string;
   value: number | string;
@@ -29,11 +27,9 @@ export default function StatCard({ icon, value, label, color, loading }: StatCar
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-xl md:text-2xl font-bold leading-none">
-          <DataCell value={value} loading={loading} width={50} height={28} />
+          {loading ? <div className="animate-pulse bg-gray-800 rounded-lg" style={{ width: 50, height: 28 }} /> : value}
         </div>
-        <div className="text-xs md:text-sm text-admin-muted mt-1 truncate">
-          <DataCell value={label} loading={loading} width={90} height={14} />
-        </div>
+        <div className="text-xs md:text-sm text-admin-muted mt-1 truncate">{label}</div>
       </div>
     </div>
   );

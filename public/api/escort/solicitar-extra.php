@@ -136,6 +136,12 @@ try {
         '/admin/extras'
     ]);
 
+    require_once __DIR__ . '/../mail.php';
+    notificarAccionEscort('pagos', $escortId, $escortNombre . ' solicitó el extra ' . $plan['nombre'], [
+        'Precio' => '$' . number_format((float)$plan['precio'], 0) . ' ' . $plan['moneda'],
+        'Duración' => (int)$plan['duracion_dias'] . ' días',
+    ]);
+
     echo json_encode([
         'success' => true,
         'message' => 'Solicitud de extra enviada correctamente',

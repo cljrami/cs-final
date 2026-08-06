@@ -33,7 +33,10 @@ try {
         exit;
     }
 
-    $stmt = $pdo->prepare("SELECT id, usuario, email, password_hash, nombre, primer_login, activa, verificado, vip FROM escorts WHERE usuario = ? OR email = ?");
+    // Rate limit: máx 10 intentos por IP cada 15 minutos
+    rateLimitLogin('login_escort', 10, 15, strtolower($usuario));
+
+    $stmt = $pdo->prepare("SELECT id, usuario, email, password_hash, nombre, primer_login, activa, eliminada, verificado, vip FROM escorts WHERE usuario = ? OR email = ?");
     $stmt->execute([$usuario, $usuario]);
     $escort = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -49,15 +52,18 @@ try {
         exit;
     }
 
-    if ((int)$escort['activa'] !== 1) {
+    if ((int)$escort['eliminada'] === 1) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'error' => 'Cuenta inactiva o suspendida']);
+        echo json_encode(['success' => false, 'error' => 'Cuenta eliminada']);
         exit;
     }
+
+    rateLimitReset('login_escort', strtolower($usuario));
 
     $tokenData = [
         'id' => $escort['id'],
         'usuario' => $escort['usuario'],
+        'tipo' => 'escort',
         'primer_login' => (int)$escort['primer_login'],
         'exp' => time() + (7 * 24 * 60 * 60)
     ];

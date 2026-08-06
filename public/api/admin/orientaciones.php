@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
@@ -100,7 +100,7 @@ try {
     }
 
     // ============================================
-    // POST - CREAR ORIENTACIÓN
+    // POST - CREAR ORIENTACIí“N
     // ============================================
     if ($method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);
@@ -167,7 +167,7 @@ try {
     }
 
     // ============================================
-    // PUT - ACTUALIZAR ORIENTACIÓN (parcial)
+    // PUT - ACTUALIZAR ORIENTACIí“N (parcial)
     // ============================================
     if ($method === 'PUT') {
         $input = json_decode(file_get_contents('php://input'), true);
@@ -204,7 +204,7 @@ try {
         if (isset($input['nombre'])) {
             $nombre = trim($input['nombre']);
             if (empty($nombre)) {
-                $fieldErrors['nombre'] = 'El nombre no puede estar vacío';
+                $fieldErrors['nombre'] = 'El nombre no puede estar vací­o';
             } elseif (strlen($nombre) > 100) {
                 $fieldErrors['nombre'] = 'Máximo 100 caracteres';
             } else {
@@ -268,7 +268,7 @@ try {
     }
 
     // ============================================
-    // DELETE - ELIMINAR ORIENTACIÓN ($_GET)
+    // DELETE - ELIMINAR ORIENTACIí“N ($_GET)
     // ============================================
     if ($method === 'DELETE') {
         $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
@@ -314,9 +314,10 @@ try {
 } catch (PDOException $e) {
     error_log("Error orientaciones.php PDO: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error de base de datos: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error de base de datos']);
 } catch (Throwable $e) {
     error_log("Error orientaciones.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error interno: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }
+

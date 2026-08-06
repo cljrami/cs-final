@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import Skeleton from 'react-loading-skeleton';
+import { Skeleton } from '../ui/Skeleton';
 import SearchFilters from './SearchFilters';
 import '@fancyapps/ui/dist/fancybox/fancybox.css';
 
@@ -105,38 +105,45 @@ export default function PagosTable({ pagos, loading }: Props) {
 
       {/* Table */}
       <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl overflow-hidden">
-        {loading ? (
-          <div className="p-6">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-center gap-4 py-4 border-b border-[#2a2a3e] last:border-0">
-                <Skeleton width={40} height={40} circle />
-                <div className="flex-1">
-                  <Skeleton width={150} height={20} className="mb-2" />
-                  <Skeleton width={200} height={14} />
-                </div>
-                <Skeleton width={80} height={32} />
-              </div>
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="p-12 text-center">
-            <i className="fas fa-receipt text-4xl text-gray-600 mb-4"></i>
-            <p className="text-gray-400">No hay pagos registrados</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-[#2a2a3e] text-left text-xs text-gray-400 uppercase">
-                  <th className="px-4 py-3">Escort</th>
-                  <th className="px-4 py-3">Concepto</th>
-                  <th className="px-4 py-3">Monto</th>
-                  <th className="px-4 py-3">Estado</th>
-                  <th className="px-4 py-3">Comprobante</th>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-[#2a2a3e] text-left text-xs text-gray-400 uppercase">
+                <th className="px-4 py-3">Escort</th>
+                <th className="px-4 py-3">Concepto</th>
+                <th className="px-4 py-3">Monto</th>
+                <th className="px-4 py-3">Estado</th>
+                <th className="px-4 py-3">Comprobante</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                [...Array(5)].map((_, i) => (
+                  <tr key={i} className="border-b border-[#2a2a3e]">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <Skeleton width={40} height={40} circle />
+                        <div className="flex-1">
+                          <Skeleton width={150} height={20} className="mb-2" />
+                          <Skeleton width={200} height={14} />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3"><Skeleton width={80} height={20} /></td>
+                    <td className="px-4 py-3"><Skeleton width={100} height={20} /></td>
+                    <td className="px-4 py-3"><Skeleton width={80} height={24} borderRadius={9999} /></td>
+                    <td className="px-4 py-3"><Skeleton width={60} height={16} /></td>
+                  </tr>
+                ))
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-12 text-center">
+                    <i className="fas fa-receipt text-4xl text-gray-600 mb-4"></i>
+                    <p className="text-gray-400">No hay pagos registrados</p>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filtered.map((p) => (
+              ) : (
+                filtered.map((p) => (
                   <tr key={p.id} className="border-b border-[#2a2a3e] last:border-0 hover:bg-[#252538] transition-colors">
                     <td className="px-4 py-3">
                       <div className="text-white text-sm font-medium">{p.escort_nombre}</div>
@@ -159,11 +166,11 @@ export default function PagosTable({ pagos, loading }: Props) {
                       )}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

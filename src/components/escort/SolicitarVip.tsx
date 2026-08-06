@@ -13,11 +13,18 @@ interface PlanBase {
 
 interface Solicitud {
   id: number;
-  estado: 'enviado' | 'en_revision' | 'aprobado' | 'rechazado';
+  estado: 'enviado' | 'aprobado' | 'rechazado';
   comprobante_pago: string | null;
   admin_notas: string | null;
   fecha_respuesta: string | null;
   created_at: string;
+}
+
+interface SolicitudAprobada {
+  id: number;
+  estado: 'aprobado';
+  comprobante_pago: string | null;
+  fecha_respuesta: string | null;
 }
 
 interface Config {
@@ -28,6 +35,29 @@ interface Config {
 const formatDate = (dateStr: string | null) => {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('es-CL');
+};
+
+const MAX_COMPROBANTE_SIZE = 5 * 1024 * 1024;
+const TIPOS_ADMITIDOS = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+
+const esPdf = (nombre?: string | null) => {
+  if (!nombre) return false;
+  return /\.pdf$/i.test(nombre);
+};
+
+const formatearBytes = (bytes: number) => {
+  if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  return (bytes / 1024).toFixed(1) + ' KB';
+};
+
+const validarArchivo = (file: File): string | null => {
+  if (!TIPOS_ADMITIDOS.includes(file.type)) {
+    return 'Formato no permitido. Usa: JPG, PNG, GIF, WEBP o PDF.';
+  }
+  if (file.size > MAX_COMPROBANTE_SIZE) {
+    return 'El archivo no puede superar los 5 MB.';
+  }
+  return null;
 };
 
 type EstadoPantalla =
@@ -49,6 +79,7 @@ export default function SolicitarVip() {
 
   const [planBase, setPlanBase] = useState<PlanBase | null>(null);
   const [solicitud, setSolicitud] = useState<Solicitud | null>(null);
+  const [solicitudAprobada, setSolicitudAprobada] = useState<SolicitudAprobada | null>(null);
   const [config, setConfig] = useState<Config | null>(null);
   const [puedeSolicitar, setPuedeSolicitar] = useState(false);
 
@@ -64,6 +95,9 @@ export default function SolicitarVip() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const token = typeof window !== 'undefined' ? localStorage.getItem('escort_token') : '';
+
+  const [dragging, setDragging] = useState(false);
+  const [reuploadDragging, setReuploadDragging] = useState(false);
 
   const [modalVer, setModalVer] = useState(false);
 
@@ -102,6 +136,7 @@ export default function SolicitarVip() {
         setFechaVipExpira(data.escort.fecha_vip_expira ?? null);
         setPlanBase(data.plan_base ?? null);
         setSolicitud(data.solicitud ?? null);
+        setSolicitudAprobada(data.solicitud_aprobada ?? null);
         setConfig(data.config ?? null);
         setPuedeSolicitar(data.puede_solicitar ?? false);
       } else {
@@ -137,7 +172,7 @@ export default function SolicitarVip() {
   // ═══════════════════════════════════════════════════════════
   const getEstadoPantalla = (): EstadoPantalla => {
     if (vipActivo) return 'vip_activo';
-    if (solicitud && (solicitud.estado === 'enviado' || solicitud.estado === 'en_revision')) return 'solicitud_pendiente';
+    if (solicitud && solicitud.estado === 'enviado') return 'solicitud_pendiente';
     if (solicitud && solicitud.estado === 'rechazado') return 'solicitud_rechazada';
 
     // Si tiene plan base activo que permite VIP → formulario
@@ -155,18 +190,16 @@ export default function SolicitarVip() {
 
   const estadoPantalla = getEstadoPantalla();
 
+  const solicitudObjetivo = solicitud ?? solicitudAprobada;
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
-    if (!allowed.includes(file.type)) {
-      setError('Formato no permitido. Usa: JPG, PNG, GIF, PDF, WEBP');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setError('El archivo no puede superar los 5MB');
+    const err = validarArchivo(file);
+    if (err) {
+      setError(err);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
 
@@ -180,6 +213,58 @@ export default function SolicitarVip() {
     } else {
       setComprobantePreview(null);
     }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    const err = validarArchivo(file);
+    if (err) {
+      setError(err);
+      return;
+    }
+
+    setComprobanteFile(file);
+    setError('');
+
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setComprobantePreview(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setComprobantePreview(null);
+    }
+  };
+
+  const handleReuploadFile = (file: File) => {
+    const err = validarArchivo(file);
+    if (err) {
+      setError(err);
+      if (reuploadInputRef.current) reuploadInputRef.current.value = '';
+      return;
+    }
+
+    setReuploadFile(file);
+    setError('');
+
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setReuploadPreview(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setReuploadPreview(null);
+    }
+  };
+
+  const handleReuploadDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setReuploadDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    handleReuploadFile(file);
   };
 
   const handleSubmit = async () => {
@@ -227,14 +312,14 @@ export default function SolicitarVip() {
   };
 
   const handleReuploadComprobante = async () => {
-    if (!solicitud || !reuploadFile) return;
+    if (!solicitudObjetivo || !reuploadFile) return;
     setReuploadLoading(true);
     setError('');
     try {
       const formData = new FormData();
       formData.append('comprobante', reuploadFile);
       formData.append('tipo', 'vip');
-      formData.append('id', String(solicitud.id));
+      formData.append('id', String(solicitudObjetivo.id));
       const res = await fetch('/api/escort/subir-comprobante.php', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
@@ -428,6 +513,18 @@ export default function SolicitarVip() {
             ))}
           </div>
         </div>
+
+        {solicitudObjetivo && (
+          <div className="mt-6 pt-5 border-t border-admin-border/50 flex justify-end gap-3">
+            <button
+              onClick={() => setShowReuploadModal(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 rounded-xl text-sm font-medium transition-all"
+            >
+              <i className="fas fa-upload" />
+              {solicitudObjetivo.comprobante_pago ? 'Re-subir' : 'Subir'} comprobante
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -521,6 +618,34 @@ export default function SolicitarVip() {
           </div>
         </InfoBlock>
 
+        <InfoBlock
+          icon="fa-receipt"
+          iconColor={solicitud?.comprobante_pago ? 'text-green-400' : 'text-amber-400'}
+          iconBg={solicitud?.comprobante_pago ? 'bg-green-500/10' : 'bg-amber-500/10'}
+          title="Comprobante de pago"
+        >
+          {solicitud?.comprobante_pago ? (
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-400">
+                <i className="fas fa-check-circle text-[0.6rem]" /> Adjunto
+              </span>
+              <a href={`/${solicitud.comprobante_pago}`} data-fancybox="vip-comprobante"
+                className="inline-flex items-center gap-1.5 text-blue-400 hover:text-blue-300 text-xs">
+                <i className="fas fa-eye" /> Ver comprobante
+              </a>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400">
+                <i className="fas fa-exclamation-triangle text-[0.6rem]" /> No adjunto
+              </span>
+              <span className="text-gray-500 text-xs">
+                Sube el comprobante para agilizar la aprobación.
+              </span>
+            </div>
+          )}
+        </InfoBlock>
+
         <div className="mt-6 pt-5 border-t border-admin-border/50 flex justify-end gap-3">
           <button
             onClick={() => setShowReuploadModal(true)}
@@ -597,6 +722,34 @@ export default function SolicitarVip() {
           <div className="text-gray-500 text-sm">
             Puedes enviar una nueva solicitud corrigiendo lo indicado. Revisa que el comprobante de pago sea válido y el monto correcto.
           </div>
+        </InfoBlock>
+
+        <InfoBlock
+          icon="fa-receipt"
+          iconColor={solicitud?.comprobante_pago ? 'text-green-400' : 'text-amber-400'}
+          iconBg={solicitud?.comprobante_pago ? 'bg-green-500/10' : 'bg-amber-500/10'}
+          title="Comprobante de pago"
+        >
+          {solicitud?.comprobante_pago ? (
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-400">
+                <i className="fas fa-check-circle text-[0.6rem]" /> Adjunto
+              </span>
+              <a href={`/${solicitud.comprobante_pago}`} data-fancybox="vip-comprobante"
+                className="inline-flex items-center gap-1.5 text-blue-400 hover:text-blue-300 text-xs">
+                <i className="fas fa-eye" /> Ver comprobante
+              </a>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400">
+                <i className="fas fa-exclamation-triangle text-[0.6rem]" /> No adjunto
+              </span>
+              <span className="text-gray-500 text-xs">
+                Sube el comprobante para volver a revisión.
+              </span>
+            </div>
+          )}
         </InfoBlock>
 
         <div className="mt-6 pt-5 border-t border-admin-border/50 flex justify-end gap-3">
@@ -757,27 +910,51 @@ export default function SolicitarVip() {
           {!comprobanteFile ? (
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-admin-border rounded-2xl p-10 text-center cursor-pointer hover:border-amber-500/30 hover:bg-amber-500/5 transition-all group"
+              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all group ${
+                dragging
+                  ? 'border-amber-500/60 bg-amber-500/10'
+                  : 'border-admin-border hover:border-amber-500/30 hover:bg-amber-500/5'
+              }`}
             >
-              <div className="w-14 h-14 rounded-2xl bg-admin-border/30 flex items-center justify-center mx-auto mb-4 group-hover:bg-amber-500/10 group-hover:scale-110 transition-all duration-300">
-                <i className="fas fa-cloud-upload-alt text-2xl text-gray-600 group-hover:text-amber-400 transition-colors" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500/25 to-amber-500/5 flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-all duration-300">
+                <i className="fas fa-cloud-upload-alt text-2xl text-amber-400/80 group-hover:text-amber-400" />
               </div>
-              <div className="text-gray-400 text-sm font-medium">Haz clic para subir comprobante</div>
-              <div className="text-gray-600 text-xs mt-1.5">JPG, PNG, GIF, PDF, WEBP · Max 5MB</div>
+              <div className="text-gray-300 text-sm font-medium">Arrastra y suelta tu comprobante</div>
+              <div className="text-gray-600 text-xs mt-1">o haz clic para seleccionar un archivo</div>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                {['JPG', 'PNG', 'GIF', 'WEBP', 'PDF'].map((t) => (
+                  <span key={t} className="px-2 py-0.5 rounded-md bg-white/5 text-gray-500 text-[10px] font-semibold uppercase tracking-wide">
+                    {t}
+                  </span>
+                ))}
+                <span className="text-gray-600 text-[10px] font-medium ml-1">· Máx. 5 MB</span>
+              </div>
             </div>
           ) : (
-            <div className="bg-admin-border/20 rounded-2xl p-5">
+            <div className="bg-admin-border/20 rounded-2xl p-5 border border-admin-border/40">
               <div className="flex items-center gap-4">
                 {comprobantePreview ? (
-                  <img src={comprobantePreview} alt="Preview" className="w-20 h-20 rounded-xl object-cover" />
+                  <img src={comprobantePreview} alt="Preview" className="w-16 h-16 rounded-xl object-cover border border-admin-border/50" />
                 ) : (
-                  <div className="w-20 h-20 rounded-xl bg-admin-border flex items-center justify-center">
-                    <i className="fas fa-file text-gray-500 text-2xl" />
+                  <div className="w-16 h-16 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center">
+                    <i className="fas fa-file-pdf text-2xl text-red-400" />
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="text-white text-sm font-medium truncate">{comprobanteFile.name}</div>
-                  <div className="text-gray-500 text-xs mt-0.5">{(comprobanteFile.size / 1024).toFixed(1)} KB</div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white text-sm font-medium truncate">{comprobanteFile.name}</span>
+                    {esPdf(comprobanteFile.name) && (
+                      <span className="shrink-0 px-1.5 py-0.5 rounded bg-red-500/15 text-red-400 text-[10px] font-bold">PDF</span>
+                    )}
+                  </div>
+                  <div className="text-gray-500 text-xs mt-0.5">{formatearBytes(comprobanteFile.size)}</div>
+                  <div className="text-green-400/80 text-[11px] mt-0.5">
+                    <i className="fas fa-check-circle mr-1" />
+                    Listo para adjuntar
+                  </div>
                 </div>
                 <button
                   onClick={() => {
@@ -786,6 +963,7 @@ export default function SolicitarVip() {
                     if (fileInputRef.current) fileInputRef.current.value = '';
                   }}
                   className="text-red-400 hover:text-red-300 p-2 rounded-lg hover:bg-red-500/10 transition-all"
+                  title="Quitar archivo"
                 >
                   <i className="fas fa-trash-alt" />
                 </button>
@@ -916,7 +1094,7 @@ export default function SolicitarVip() {
       {renderContent()}
 
       {/* ═══ MODAL RE-UPLOAD COMPROBANTE VIP ═══ */}
-      {showReuploadModal && solicitud && (
+      {showReuploadModal && solicitudObjetivo && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-3 bg-black/70 backdrop-blur-sm">
           <div className="bg-[#1a1a2e] border border-[#2d2d44] rounded-2xl w-full max-w-md shadow-2xl p-6">
             <div className="flex flex-col items-center text-center">

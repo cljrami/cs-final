@@ -146,12 +146,16 @@ try {
                 $planFormateado['no_disponible'] = true;
                 $planFormateado['motivo_no_disponible'] = 'Ya usaste el plan gratuito';
             }
-            // Si tiene plan base vigente, no puede comprar otro
-            elseif ($tienePlanBaseVigente) {
+            // Si tiene plan base pausado, debe reactivarlo primero
+            elseif ($planBaseActivo && $planBaseActivo['estado_calculado'] === 'pausada') {
                 $planFormateado['no_disponible'] = true;
-                $planFormateado['motivo_no_disponible'] = 'Ya tienes un plan ' .
-                    ($planBaseActivo['estado_calculado'] === 'activa' ? 'activo' : 'pausado') .
-                    ' (' . $planBaseActivo['plan_nombre'] . ')';
+                $planFormateado['motivo_no_disponible'] = 'Tienes un plan pausado (' . $planBaseActivo['plan_nombre'] . '). Reactívalo antes de contratar otro.';
+            }
+            // Si tiene plan base activo, el nuevo plan debe caber en los días restantes
+            elseif ($planBaseActivo && $planBaseActivo['estado_calculado'] === 'activa' && (int)$plan['duracion_dias'] > $diasRestantesBase) {
+                $planFormateado['no_disponible'] = true;
+                $planFormateado['motivo_no_disponible'] =
+                    'Solo te quedan ' . $diasRestantesBase . ' días de plan base. Este plan requiere ' . (int)$plan['duracion_dias'] . ' días.';
             }
             // Si tiene solicitud pendiente, bloquear
             elseif ($planBaseActivo && $planBaseActivo['estado_calculado'] === 'pendiente_aprobacion') {
@@ -195,9 +199,9 @@ try {
 } catch (PDOException $e) {
     error_log("Error planes.php PDO: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(array('success' => false, 'error' => 'DB: ' . $e->getMessage()));
+    echo json_encode(array('success' => false, 'error' => 'Error de base de datos'));
 } catch (Throwable $e) {
     error_log("Error planes.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(array('success' => false, 'error' => $e->getMessage()));
+    echo json_encode(array('success' => false, 'error' => 'Error del servidor'));
 }

@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
@@ -8,6 +8,8 @@ require_once __DIR__ . '/../bootstrap.php';
 
 try {
     $tokenData = requireAuth();
+
+    requireAdminRole($tokenData);
     $pdo = getDBConnection();
 
     $method = $_SERVER['REQUEST_METHOD'];
@@ -155,7 +157,7 @@ try {
 
         if ($id <= 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID de nacionalidad no válido']);
+            echo json_encode(['success' => false, 'error' => 'ID de nacionalidad no víƒÂ¡lido']);
             exit;
         }
 
@@ -174,7 +176,7 @@ try {
         if (isset($input['nombre'])) {
             $nombre = trim($input['nombre']);
             if (empty($nombre)) {
-                $fieldErrors['nombre'] = 'El nombre no puede estar vacío';
+                $fieldErrors['nombre'] = 'El nombre no puede estar vacíƒÂ­o';
             } elseif (strlen($nombre) < 2) {
                 $fieldErrors['nombre'] = 'El nombre debe tener al menos 2 caracteres';
             } elseif (strlen($nombre) > 50) {
@@ -241,7 +243,7 @@ try {
 
         if ($id <= 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID de nacionalidad no válido']);
+            echo json_encode(['success' => false, 'error' => 'ID de nacionalidad no víƒÂ¡lido']);
             exit;
         }
 
@@ -280,7 +282,7 @@ try {
     }
 
     http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+    echo json_encode(['success' => false, 'error' => 'MíƒÂ©todo no permitido']);
 } catch (PDOException $e) {
     error_log("Error nacionalidades.php PDO: " . $e->getMessage());
     http_response_code(500);
@@ -288,5 +290,6 @@ try {
 } catch (Throwable $e) {
     error_log("Error nacionalidades.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error interno: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }
+

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { SkeletonTheme } from 'react-loading-skeleton';
-import 'react-loading-skeleton/dist/skeleton.css';
+
 import StatCard from './StatCard';
 import ActivityChart from './ActivityChart';
 import RecentEscorts from './RecentEscorts';
@@ -10,6 +9,8 @@ interface Stats {
   total: number;
   pendientes: number;
   aprobadas: number;
+  pausadas: number;
+  por_vencer: number;
   rechazadas: number;
   verificadas: number;
   vip: number;
@@ -132,7 +133,6 @@ export default function DashboardData() {
   const ingresoMax = Math.max(...ingresos.map(i => i.total), 1);
 
   return (
-    <SkeletonTheme baseColor="#2d2d44" highlightColor="#3d3d5c" duration={1.2}>
       <div className="space-y-8">
         <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-3">
           <i className="fas fa-chart-line text-red-500"></i>
@@ -143,19 +143,12 @@ export default function DashboardData() {
         </p>
 
         {/* Stats grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
           <StatCard icon="fa-users" value={stats?.total ?? 0} label="Total Escorts" color="#3b82f6" loading={loading} />
-          <StatCard icon="fa-check-circle" value={stats?.aprobadas ?? 0} label="Aprobadas" color="#10b981" loading={loading} />
-          <StatCard icon="fa-clock" value={stats?.pendientes ?? 0} label="Pendientes" color="#fbbf24" loading={loading} />
-          <StatCard icon="fa-times-circle" value={stats?.rechazadas ?? 0} label="Rechazadas" color="#ef4444" loading={loading} />
-          <StatCard icon="fa-check-double" value={stats?.verificadas ?? 0} label="Verificadas" color="#06b6d4" loading={loading} />
-          <StatCard icon="fa-crown" value={stats?.vip ?? 0} label="VIP" color="#f59e0b" loading={loading} />
-          <StatCard icon="fa-fire" value={stats?.destacadas ?? 0} label="Destacadas" color="#f97316" loading={loading} />
-          <StatCard icon="fa-star" value={stats?.nuevas_hoy ?? 0} label="Nuevas hoy" color="#a855f7" loading={loading} />
-          <StatCard icon="fa-clock" value={stats?.verificaciones_pendientes ?? 0} label="Verif. Pendientes" color="#fbbf24" loading={loading} />
-          <StatCard icon="fa-file-invoice" value={stats?.planes_por_activar ?? 0} label="Planes x Activar" color="#ec4899" loading={loading} />
-          <StatCard icon="fa-user" value={stats?.total_usuarios ?? 0} label="Usuarios" color="#6366f1" loading={loading} />
-          <StatCard icon="fa-city" value={stats?.total_ciudades ?? 0} label="Ciudades" color="#14b8a6" loading={loading} />
+          <StatCard icon="fa-check-circle" value={stats?.aprobadas ?? 0} label="Activas" color="#10b981" loading={loading} />
+          <StatCard icon="fa-pause-circle" value={stats?.pausadas ?? 0} label="Pausadas" color="#f59e0b" loading={loading} />
+          <StatCard icon="fa-city" value={stats?.total_ciudades ?? 0} label="Ciudades" color="#a855f7" loading={loading} />
+          <StatCard icon="fa-star" value={stats?.nuevas_hoy ?? 0} label="Nuevas Hoy" color="#ef4444" loading={loading} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -323,6 +316,5 @@ export default function DashboardData() {
         </h2>
         <EscortsTable escorts={escorts} loading={loading} />
       </div>
-    </SkeletonTheme>
   );
 }

@@ -1,5 +1,6 @@
 ---
-import "@fortawesome/fontawesome-free/css/all.min.css";
+import "@fortawesome/fontawesome-free/css/fontawesome.min.css";
+import "../styles/fa-fontfaces.css";
 import Sidebar from "../components/admin/Sidebar";
 import NotificationBell from "../components/admin/NotificationBell";
 
@@ -17,11 +18,12 @@ const { title, activePage = "dashboard" } = Astro.props;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title} | Kimi Admin</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
-      rel="stylesheet"
+      rel="preload"
+      href="/fonts/inter-latin-variable.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
   </head>
   <body class="bg-admin-bg text-admin-text antialiased overflow-x-hidden">
@@ -83,6 +85,13 @@ const { title, activePage = "dashboard" } = Astro.props;
       sans-serif;
     background-color: #0f0f1a;
     color: #ffffff;
+  }
+  @font-face {
+    font-family: 'Inter';
+    font-style: normal;
+    font-weight: 300 800;
+    font-display: swap;
+    src: url('/fonts/inter-latin-variable.woff2') format('woff2');
   }
 
   ::-webkit-scrollbar {

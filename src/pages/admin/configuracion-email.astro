@@ -1,0 +1,12 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import Sidebar from "../../components/admin/Sidebar";
+import AuthGuard from "../../components/admin/AuthGuard";
+import EmailConfigData from "../../components/admin/EmailConfigData";
+---
+<AdminLayout title="Configuración de Email" activePage="configuracion-email">
+  <Sidebar slot="sidebar" activePage="configuracion-email" client:load />
+  <AuthGuard client:load>
+    <EmailConfigData client:load />
+  </AuthGuard>
+</AdminLayout>

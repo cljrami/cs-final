@@ -1,5 +1,16 @@
 RewriteEngine On
 
+# Error 404
+ErrorDocument 404 /404.html
+
+# ============================================
+# SEGURIDAD - Cabeceras globales
+# ============================================
+Header always set X-Content-Type-Options "nosniff"
+Header always set X-Frame-Options "SAMEORIGIN"
+Header always set Referrer-Policy "strict-origin-when-cross-origin"
+Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+
 # ============================================
 # CRÍTICO: Pasar Authorization header a PHP
 # ============================================
@@ -12,6 +23,11 @@ RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
 RewriteCond %{REQUEST_METHOD} OPTIONS
 RewriteCond %{REQUEST_URI} ^/api/
 RewriteRule ^ - [R=204,L]
+
+# ============================================
+# ROBOTS.TXT → robots.php (gestionado desde admin)
+# ============================================
+RewriteRule ^robots\.txt$ robots.php [L,QSA]
 
 # ============================================
 # ARCHIVOS/CARPETAS EXISTENTES - No redirigir
@@ -39,6 +55,24 @@ RewriteCond %{REQUEST_URI} ^/(\d+)/?$
 RewriteRule ^(\d+)/?$ escort.php?id=$1 [L,QSA]
 
 # ============================================
-# ASTRO - SPA fallback
+# SITEMAP.XML → sitemap.php
 # ============================================
-RewriteRule ^(.*)$ /index.html [L]
+RewriteRule ^sitemap\.xml$ sitemap.php [L,QSA]
+
+# ============================================
+# CIUDAD /{slug} → ciudad/index.html
+# ============================================
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ciudad/([^/]+)/?$ ciudad/index.html [L,QSA]
+
+# ============================================
+# PÁGINAS ASTRO - Servir HTML estático si existe
+# ============================================
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{DOCUMENT_ROOT}/$1.html -f
+RewriteRule ^(.*)$ /$1.html [L]
+
+# Si nada coincide → 404
+RewriteRule ^(.*)$ - [R=404,L]

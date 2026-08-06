@@ -74,7 +74,7 @@ export default function PlanesEscort() {
         body: JSON.stringify({
           plan_id: selectedPlan,
           metodo_pago: metodoPago,
-          comprobante_url: comprobante,
+          comprobante_pago: comprobante,
           notas: notas,
           es_extra: false
         })
@@ -96,19 +96,6 @@ export default function PlanesEscort() {
       setSolicitando(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="animate-pulse bg-[#13131a] border border-gray-800 rounded-2xl p-6 h-96"></div>
-          <div className="animate-pulse bg-[#13131a] border border-gray-800 rounded-2xl p-6 h-96"></div>
-          <div className="animate-pulse bg-[#13131a] border border-gray-800 rounded-2xl p-6 h-96"></div>
-          <div className="animate-pulse bg-[#13131a] border border-gray-800 rounded-2xl p-6 h-96"></div>
-        </div>
-      </div>
-    );
-  }
 
   const PlanCard = ({ plan, isSelected, onSelect }: {
     plan: Plan;
@@ -366,17 +353,33 @@ export default function PlanesEscort() {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {planesBase.map((plan) => (
-            <PlanCard
-              key={plan.id}
-              plan={plan}
-              isSelected={selectedPlan === plan.id}
-              onSelect={() => {
-                setSelectedPlan(plan.id);
-                setShowWarning(false);
-              }}
-            />
-          ))}
+          {loading ? (
+            [1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-[#13131a] border border-gray-800 rounded-2xl p-6">
+                <div className="w-16 h-5 bg-gray-800 rounded-full mb-4 animate-pulse" />
+                <div className="w-32 h-7 bg-gray-800 rounded mb-1 animate-pulse" />
+                <div className="w-24 h-8 bg-gray-800 rounded mb-4 animate-pulse" />
+                <div className="w-20 h-5 bg-gray-800 rounded mb-4 animate-pulse" />
+                <div className="space-y-3">
+                  <div className="w-36 h-4 bg-gray-800 rounded animate-pulse" />
+                  <div className="w-36 h-4 bg-gray-800 rounded animate-pulse" />
+                  <div className="w-40 h-4 bg-gray-800 rounded animate-pulse" />
+                </div>
+              </div>
+            ))
+          ) : (
+            planesBase.map((plan) => (
+              <PlanCard
+                key={plan.id}
+                plan={plan}
+                isSelected={selectedPlan === plan.id}
+                onSelect={() => {
+                  setSelectedPlan(plan.id);
+                  setShowWarning(false);
+                }}
+              />
+            ))
+          )}
         </div>
       </div>
 

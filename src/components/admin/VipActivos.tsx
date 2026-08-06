@@ -94,8 +94,21 @@ export default function VipActivos() {
       {error && <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg flex items-center gap-2"><i className="fas fa-exclamation-triangle"></i>{error} <button onClick={() => setError('')} className="ml-auto text-red-400/60 hover:text-red-400"><i className="fas fa-times"></i></button></div>}
 
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="animate-spin w-8 h-8 border-4 border-red-500 border-t-transparent rounded-full"></div>
+        <div className="grid gap-4">
+          {[1,2,3].map(i => (
+            <div key={i} className="bg-admin-card border border-admin-border rounded-xl p-4 flex items-center gap-4">
+              <div className="w-12 h-12 min-w-[48px] rounded-xl bg-gray-800 animate-pulse shrink-0"></div>
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-gray-800 rounded animate-pulse w-40"></div>
+                <div className="h-3 bg-gray-800 rounded animate-pulse w-56"></div>
+              </div>
+              <div className="text-right shrink-0 space-y-1">
+                <div className="h-5 bg-gray-800 rounded animate-pulse w-16 ml-auto"></div>
+                <div className="h-3 bg-gray-800 rounded animate-pulse w-20 ml-auto"></div>
+              </div>
+              <div className="w-20 h-7 bg-gray-800 rounded-lg animate-pulse shrink-0"></div>
+            </div>
+          ))}
         </div>
       ) : activos.length === 0 ? (
         <div className="text-center py-16 text-gray-500">

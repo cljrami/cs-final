@@ -79,7 +79,7 @@ try {
         exit;
     }
 
-    $uploadDir = __DIR__ . '/../../../uploads/escorts/historias/';
+    $uploadDir = __DIR__ . '/../../../uploads/escorts/historias/' . $escortId . '/';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
 
     $MAX_IMG = 10 * 1024 * 1024;
@@ -150,8 +150,12 @@ try {
             continue;
         }
 
-        // Validar imagen con getimagesize
+        // Validar por MIME real
         if (!$isVideo) {
+            if (!validarMIME($tmpName, array_merge(...array_values($formatosImg)))) {
+                $errores[] = "$name no es una imagen válida o está corrupta";
+                continue;
+            }
             $imgInfo = @getimagesize($tmpName);
             if ($imgInfo === false) {
                 $errores[] = "$name no es una imagen válida o está corrupta";
@@ -164,6 +168,11 @@ try {
             if ($ext === 'jpeg') {
                 $ext = 'jpg';
             }
+        } else {
+            if (!validarMIME($tmpName, array_merge(...array_values($formatosVid)))) {
+                $errores[] = "$name no es un video válido o está corrupto";
+                continue;
+            }
         }
 
         $fileType = $isVideo ? 'video' : 'imagen';
@@ -171,7 +180,7 @@ try {
         $destPath = $uploadDir . $newName;
 
         if (move_uploaded_file($tmpName, $destPath)) {
-            $url = '/api/serve-upload.php?path=/uploads/escorts/historias/' . $newName;
+            $url = '/api/serve-upload.php?path=/uploads/escorts/historias/' . $escortId . '/' . $newName;
             $expiraEn = date('Y-m-d H:i:s', strtotime('+24 hours'));
 
             $stmt = $pdo->prepare("
@@ -194,9 +203,18 @@ try {
     if (!empty($errores)) {
         $respuesta['errores'] = $errores;
     }
+    if (count($historias) > 0) {
+        require_once __DIR__ . '/../../mail.php';
+        notificarAccionEscort('historias', $escortId, 'Escort publicó nueva historia', [
+            'Historias publicadas' => count($historias),
+        ]);
+    }
     echo json_encode($respuesta);
 } catch (Throwable $e) {
     error_log("Error historias/upload.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Error del servidor al procesar el archivo. Verifica el tamaño y formato.'
+    ]);
 }

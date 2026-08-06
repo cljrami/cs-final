@@ -1,0 +1,13 @@
+---
+import EscortLayout from "../../layouts/EscortLayout.astro";
+import EscortSidebar from "../../components/escort/EscortSidebar";
+import EscortAuthGuard from "../../components/escort/EscortAuthGuard";
+import MisComentarios from "../../components/escort/MisComentarios";
+---
+
+<EscortLayout title="Mis Comentarios - CS Panel" activePage="comentarios">
+  <EscortSidebar slot="sidebar" activePage="comentarios" client:load />
+  <EscortAuthGuard client:load>
+    <MisComentarios client:load />
+  </EscortAuthGuard>
+</EscortLayout>

@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
@@ -12,7 +12,7 @@ function generarSlug($str)
 {
     $str = strtolower(trim($str));
     $str = str_replace(
-        ['á', 'é', 'í', 'ó', 'ú', 'ñ', 'ü', 'Á', 'Ã‰', 'Í', 'Ó', 'Ãš', 'Ã‘', 'Ãœ', 'Ã ', 'Ã¨', 'Ã¬', 'Ã²', 'Ã¹', 'Ã§', 'Ã‡'],
+        ['íƒÂ¡', 'íƒÂ©', 'íƒÂ­', 'íƒÂ³', 'íƒÂº', 'íƒÂ±', 'íƒÂ¼', 'íƒÂ', 'íƒâ€°', 'íƒÂ', 'íƒâ€œ', 'íƒÅ¡', 'íƒâ€˜', 'íƒÅ“', 'íƒÂ ', 'íƒÂ¨', 'íƒÂ¬', 'íƒÂ²', 'íƒÂ¹', 'íƒÂ§', 'íƒâ€¡'],
         ['a', 'e', 'i', 'o', 'u', 'n', 'u', 'a', 'e', 'i', 'o', 'u', 'n', 'u', 'a', 'e', 'i', 'o', 'u', 'c', 'c'],
         $str
     );
@@ -24,6 +24,8 @@ require_once __DIR__ . '/../bootstrap.php';
 
 try {
     $tokenData = requireAuth();
+
+    requireAdminRole($tokenData);
     $pdo = getDBConnection();
 
     $method = $_SERVER['REQUEST_METHOD'];
@@ -139,9 +141,9 @@ try {
         if (empty($nombre)) {
             $fieldErrors['nombre'] = 'El nombre es obligatorio';
         } elseif (strlen($nombre) < 2) {
-            $fieldErrors['nombre'] = 'Mínimo 2 caracteres';
+            $fieldErrors['nombre'] = 'MíƒÂ­nimo 2 caracteres';
         } elseif (strlen($nombre) > 100) {
-            $fieldErrors['nombre'] = 'Máximo 100 caracteres';
+            $fieldErrors['nombre'] = 'MíƒÂ¡ximo 100 caracteres';
         }
 
         if (empty($fieldErrors['nombre'])) {
@@ -162,7 +164,7 @@ try {
 
         $gruposValidos = ['sexual', 'relajacion', 'acompanamiento', 'experiencia', 'adicional', 'lugar', 'tiempo', 'virtual'];
         if (!in_array($grupo, $gruposValidos)) {
-            $fieldErrors['grupo'] = 'Grupo no válido';
+            $fieldErrors['grupo'] = 'Grupo no víƒÂ¡lido';
         }
 
         if (!empty($fieldErrors)) {
@@ -205,7 +207,7 @@ try {
 
         if ($id <= 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID no válido']);
+            echo json_encode(['success' => false, 'error' => 'ID no víƒÂ¡lido']);
             exit;
         }
 
@@ -226,9 +228,9 @@ try {
         if (isset($input['nombre'])) {
             $nombre = trim($input['nombre']);
             if (empty($nombre)) {
-                $fieldErrors['nombre'] = 'El nombre no puede estar vacío';
+                $fieldErrors['nombre'] = 'El nombre no puede estar vacíƒÂ­o';
             } elseif (strlen($nombre) > 100) {
-                $fieldErrors['nombre'] = 'Máximo 100 caracteres';
+                $fieldErrors['nombre'] = 'MíƒÂ¡ximo 100 caracteres';
             } else {
                 $dupStmt = $pdo->prepare("SELECT id FROM servicios WHERE LOWER(nombre) = LOWER(?) AND id != ?");
                 $dupStmt->execute([$nombre, $id]);
@@ -268,7 +270,7 @@ try {
         if (isset($input['grupo'])) {
             $grupo = trim($input['grupo']);
             if (!in_array($grupo, $gruposValidos)) {
-                $fieldErrors['grupo'] = 'Grupo no válido';
+                $fieldErrors['grupo'] = 'Grupo no víƒÂ¡lido';
             } else {
                 $updates[] = 'grupo = ?';
                 $values[] = $grupo;
@@ -331,7 +333,7 @@ try {
 
         if ($id <= 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID no válido']);
+            echo json_encode(['success' => false, 'error' => 'ID no víƒÂ¡lido']);
             exit;
         }
 
@@ -357,13 +359,14 @@ try {
     }
 
     http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'Método no permitido']);
+    echo json_encode(['success' => false, 'error' => 'MíƒÂ©todo no permitido']);
 } catch (PDOException $e) {
     error_log("Error servicios.php PDO: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'DB: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error de base de datos']);
 } catch (Throwable $e) {
     error_log("Error servicios.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }
+

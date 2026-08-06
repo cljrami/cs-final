@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
@@ -12,6 +12,9 @@ require_once __DIR__ . '/../../bootstrap.php';
 
 $tokenData = requireAuth();
 
+
+requireAdminRole($tokenData);
+
 try {
     $data = json_decode(file_get_contents('php://input'), true);
     $suscripcionId = intval($data['suscripcion_id'] ?? 0);
@@ -19,16 +22,16 @@ try {
 
     if (!$suscripcionId || !$motivo) {
         http_response_code(400);
-        echo json_encode(['error' => 'ID de suscripción y motivo requeridos']);
+        echo json_encode(['error' => 'ID de suscripciíƒÂ³n y motivo requeridos']);
         exit;
     }
 
     $db = getDBConnection();
     $db->beginTransaction();
 
-    // Verificar suscripción
+    // Verificar suscripciíƒÂ³n
     $check = $db->prepare("
-        SELECT s.*, e.nombre as escort_nombre, p.nombre as plan_nombre
+        SELECT s.*, e.nombre as escort_nombre, p.nombre as plan_nombre, p.tipo as plan_tipo
         FROM suscripciones s
         JOIN escorts e ON e.id = s.escort_id
         JOIN planes p ON p.id = s.plan_id
@@ -40,18 +43,25 @@ try {
     if (!$suscripcion) {
         $db->rollBack();
         http_response_code(404);
-        echo json_encode(['error' => 'Suscripción no encontrada']);
+        echo json_encode(['error' => 'SuscripciíƒÂn no encontrada']);
+        exit;
+    }
+
+    if ($suscripcion['plan_tipo'] === 'extra') {
+        $db->rollBack();
+        http_response_code(400);
+        echo json_encode(['error' => 'Las solicitudes de planes extra se gestionan desde el panel de Solicitudes Extras']);
         exit;
     }
 
     if ($suscripcion['estado'] === 'rechazada') {
         $db->rollBack();
         http_response_code(400);
-        echo json_encode(['error' => 'Esta suscripción ya fue rechazada']);
+        echo json_encode(['error' => 'Esta suscripciíƒÂ³n ya fue rechazada']);
         exit;
     }
 
-    // Actualizar suscripción
+    // Actualizar suscripciíƒÂ³n
     $update = $db->prepare("
         UPDATE suscripciones 
         SET estado = 'rechazada',
@@ -62,7 +72,7 @@ try {
     ");
     $update->execute([$tokenData['id'], $suscripcionId]);
 
-    // Log auditoría con motivo
+    // Log auditoríƒÂ­a con motivo
     $log = $db->prepare("
         INSERT INTO logs_auditoria 
         (usuario_id, escort_id, accion, tabla_afectada, registro_id, datos_nuevos, ip_address)
@@ -83,7 +93,7 @@ try {
         $_SERVER['REMOTE_ADDR'] ?? null
     ]);
 
-    // Notificación a escort
+    // NotificaciíƒÂ³n a escort
     $notif = $db->prepare("
         INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url)
         VALUES (?, 'sistema', 'Plan rechazado', ?, '/panel/mi-plan')
@@ -97,10 +107,11 @@ try {
 
     echo json_encode([
         'success' => true,
-        'message' => 'Suscripción rechazada correctamente'
+        'message' => 'SuscripciíƒÂ³n rechazada correctamente'
     ]);
 } catch (PDOException $e) {
     if (isset($db)) $db->rollBack();
     http_response_code(500);
-    echo json_encode(['error' => 'Error: ' . $e->getMessage()]);
+    echo json_encode(['error' => 'Error del servidor']);
 }
+

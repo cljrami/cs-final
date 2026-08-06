@@ -55,7 +55,7 @@ try {
     }
 
     $pdo->prepare("UPDATE escort_fotos SET es_portada = 0 WHERE escort_id = ?")->execute([$escortId]);
-    $pdo->prepare("UPDATE escort_fotos SET es_portada = 1 WHERE id = ? AND escort_id = ?")->execute([$fotoId, $escortId]);
+    $pdo->prepare("UPDATE escort_fotos SET es_portada = 1, created_at = NOW() WHERE id = ? AND escort_id = ?")->execute([$fotoId, $escortId]);
 
     // Sincronizar la portada en la tabla escorts para que se refleje en el index/perfil
     $fotoStmt = $pdo->prepare("SELECT url FROM escort_fotos WHERE id = ? AND escort_id = ?");
@@ -64,6 +64,20 @@ try {
     if ($foto && !empty($foto['url'])) {
         $pdo->prepare("UPDATE escorts SET foto_principal = ? WHERE id = ?")->execute([$foto['url'], $escortId]);
     }
+
+    // Notificar a la escort y a los admins
+    $nombreStmt = $pdo->prepare("SELECT nombre FROM escorts WHERE id = ?");
+    $nombreStmt->execute([$escortId]);
+    $nombreEscort = $nombreStmt->fetchColumn();
+    $pdo->prepare("INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url, created_at) VALUES (?, 'fotos_actualizadas', 'Foto de portada cambiada', 'Cambiaste tu foto de portada.', '/micuenta/fotos', NOW())")
+        ->execute([$escortId]);
+    $pdo->prepare("INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, url, escort_id, created_at) VALUES (NULL, 'sistema', 'Foto de portada cambiada', ?, '/admin/escorts', ?, NOW())")
+        ->execute(["{$nombreEscort} cambió su foto de portada.", $escortId]);
+
+    require_once __DIR__ . '/../../mail.php';
+    notificarAccionEscort('fotos', $escortId, $nombreEscort . ' cambió su foto de portada', [
+        'Foto' => ($foto['url'] ?? '') ?: '—',
+    ]);
 
     echo json_encode(['success' => true]);
 } catch (Throwable $e) {

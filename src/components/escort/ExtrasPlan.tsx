@@ -1,9 +1,7 @@
 // src/components/escort/ExtrasPlan.tsx
 
 import React, { useState, useEffect, useRef } from 'react';
-import { SkeletonTheme } from 'react-loading-skeleton';
-import Skeleton from 'react-loading-skeleton';
-import 'react-loading-skeleton/dist/skeleton.css';
+
 import EscortStatCard from '../ui/EscortStatCard';
 
 interface Plan {
@@ -92,12 +90,38 @@ export default function ExtrasPlan() {
 
   const fetchExtras = async () => {
     try {
-      const res = await fetch('/api/escort/planes.php', {
+      const res = await fetch('/api/escort/extras.php', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
       if (data.success) {
-        setPlanesExtra(data.planes.filter((p: Plan) => p.tipo === 'extra'));
+        // Reestructurar datos para compatibilidad con el frontend existente
+        const planesExtraFormateados = (data.extras || []).map((p: any) => ({
+          ...p,
+          tipo: p.tipo || p.extra_tipo,
+          badge: p.tipo || p.badge || 'Extra',
+          duracion_dias: p.duracion_dias,
+          precio: p.precio || p.extra_precio,
+          moneda: p.moneda || p.extra_moneda,
+          color_badge: p.color_badge || p.extra_color_badge,
+          no_disponible: p._puede_solicitar === false,
+          motivo_no_disponible: p._motivo_no_disponible || null,
+          usado: data.extra_vigente && data.extra_vigente.extra_id === p.id,
+        }));
+        
+        setPlanesExtra(planesExtraFormateados);
+        
+        if (data.extra_vigente) {
+          setExtrasActivos([{
+            id: data.extra_vigente.id,
+            plan_id: data.extra_vigente.extra_id,
+            plan_nombre: data.extra_vigente.extra_nombre,
+            estado: data.extra_vigente.estado,
+            fecha_fin: data.extra_vigente.fecha_fin,
+            comprobante_pago: null,
+            pendiente_aprobacion: data.extra_vigente.estado === 'pendiente_aprobacion'
+          }]);
+        }
       }
     } catch (e) {
       setError('Error cargando extras');
@@ -166,6 +190,52 @@ export default function ExtrasPlan() {
     return planBase?.estado === 'activa' && (planBase?.dias_restantes ?? 0) > 0;
   };
 
+  // NUEVO: Extras no expirados (los expirados no bloquean ni se muestran como activos)
+  const extrasVigentes = extrasActivos.filter(e => e.estado !== 'expirado');
+
+  // NUEVO: La escort ya tiene un extra pendiente, pausado o activo -> bloquea pedir otro
+  const tieneExtraVigente = extrasVigentes.some(e =>
+    e.estado === 'activo' || e.estado === 'pendiente' || e.estado === 'pausado'
+  );
+
+  // NUEVO: Puede pedir otro extra solo si no tiene uno vigente
+  const puedePedirOtroExtra = puedeSolicitarExtras() && !tieneExtraVigente;
+
+  // NUEVO: Extra que bloquea (para mostrar fecha de vencimiento)
+  const extraBloqueante = extrasVigentes.find(e => e.estado !== 'expirado') || null;
+
+  // NUEVO: Render mensaje cuando ya tiene un extra vigente
+  const renderBloqueoPorExtraVigente = () => {
+    if (!tieneExtraVigente) return null;
+
+    return (
+      <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-8 text-center">
+        <div className="w-14 h-14 bg-purple-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <i className="fas fa-star text-purple-400 text-xl"></i>
+        </div>
+        <h3 className="text-white font-bold text-lg mb-2">Ya tienes un extra contratado</h3>
+        <p className="text-gray-500 text-sm max-w-md mx-auto">
+          {extraBloqueante && (
+            <>
+              <strong className="text-white">{extraBloqueante.plan_nombre}</strong>
+              {extraBloqueante.fecha_fin && (
+                <>
+                  {' '}está vigente hasta el{' '}
+                  <strong className="text-purple-400">
+                    {new Date(extraBloqueante.fecha_fin).toLocaleDateString('es-CL')}
+                  </strong>
+                  .
+                </>
+              )}
+            </>
+          )}
+          <br /><br />
+          Podrás solicitar otro extra una vez que este venza.
+        </p>
+      </div>
+    );
+  };
+
   // NUEVO: Valida si un extra cabe en los días restantes del plan
   const extraEsValido = (plan: Plan): { valido: boolean; motivo?: string } => {
     if (!planBase) {
@@ -225,7 +295,7 @@ export default function ExtrasPlan() {
         const uploadData = await uploadRes.json();
         setSubiendoComprobante(false);
         if (uploadData.success) {
-          comprobantePath = uploadData.path;
+          comprobantePath = uploadData.comprobante_url;
         } else {
           setError(uploadData.error || 'Error al subir comprobante');
           setSolicitando(false);
@@ -355,7 +425,6 @@ export default function ExtrasPlan() {
   };
 
   return (
-    <SkeletonTheme baseColor="#1a1a2e" highlightColor="#2d2d44" duration={1.2}>
       <div className="space-y-8">
         {/* Header estilo "Mi Plan" */}
         <div>
@@ -371,28 +440,26 @@ export default function ExtrasPlan() {
         </div>
 
         {/* Stats */}
-        {!loading && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <EscortStatCard
-              icon="fa-star"
-              value={extrasActivos.filter(e => e.estado === 'activo').length}
-              label="Extras activos"
-              color="#a855f7"
-            />
-            <EscortStatCard
-              icon="fa-calendar-alt"
-              value={planBase ? `${planBase.dias_restantes} días` : '—'}
-              label="Días restantes en tu plan"
-              color="#22c55e"
-            />
-            <EscortStatCard
-              icon="fa-plus-circle"
-              value={planesExtra.length}
-              label="Extras disponibles"
-              color="#ef4444"
-            />
-          </div>
-        )}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <EscortStatCard
+            icon="fa-star"
+            value={extrasVigentes.filter(e => e.estado === 'activo').length}
+            label="Extras activos"
+            color="#a855f7"
+          />
+          <EscortStatCard
+            icon="fa-calendar-alt"
+            value={planBase ? `${planBase.dias_restantes} días` : '—'}
+            label="Días restantes en tu plan"
+            color="#22c55e"
+          />
+          <EscortStatCard
+            icon="fa-plus-circle"
+            value={planesExtra.length}
+            label="Extras disponibles"
+            color="#ef4444"
+          />
+        </div>
 
         {/* Alerts */}
         {success && !showSuccessModal && (
@@ -409,7 +476,7 @@ export default function ExtrasPlan() {
         )}
 
         {/* EXTRAS ACTIVOS - solo si no está cargando y hay datos */}
-        {!loading && extrasActivos.length > 0 && (
+        {!loading && extrasVigentes.length > 0 && (
           <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-6">
             <div className="flex items-center gap-3 mb-4">
               <i className="fas fa-star text-purple-400 text-xl"></i>
@@ -419,7 +486,7 @@ export default function ExtrasPlan() {
               </div>
             </div>
             <div className="space-y-3">
-              {extrasActivos.map((extra) => (
+              {extrasVigentes.map((extra) => (
                 <div key={extra.id} className="flex items-center justify-between bg-[#1a1a24] rounded-xl p-4">
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 rounded-full bg-green-400"></div>
@@ -461,28 +528,25 @@ export default function ExtrasPlan() {
         {!loading && !puedeSolicitarExtras() && renderBloqueoExtras()}
 
         {/* ═══════════════════════════════════════════
-            LOADING - Skeleton cards
+            BLOQUEO: Ya tiene un extra vigente (pendiente/pausado/activo)
             ═══════════════════════════════════════════ */}
-        {loading && (
-          <div>
-            <div className="flex items-center gap-3 mb-6">
-              <Skeleton width={180} height={24} />
-              <div>
-                <Skeleton width={160} height={20} className="mb-1" />
-                <Skeleton width={280} height={14} />
+        {!loading && puedeSolicitarExtras() && renderBloqueoPorExtraVigente()}
+
+        {/* Info extra activo */}
+        {!loading && extrasVigentes.length > 0 && (
+          <div className="bg-[#1a1a2e] border border-[#2d2d44] rounded-xl p-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+                <i className="fas fa-star text-purple-400"></i>
               </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-[#13131a] border border-gray-800 rounded-2xl p-6">
-                  <Skeleton width={80} height={24} className="mb-4 rounded-full" />
-                  <Skeleton width={140} height={28} className="mb-1" />
-                  <Skeleton width={100} height={32} className="mb-4" />
-                  <Skeleton width={120} height={32} className="mb-4" />
-                  <Skeleton width={200} height={16} className="mb-2" />
-                  <Skeleton width={160} height={16} />
-                </div>
-              ))}
+              <div className="flex-1">
+                <h4 className="text-white font-semibold text-sm">Extra Activo</h4>
+                <p className="text-gray-400 text-xs">
+                  {extrasVigentes[0].plan_nombre} • {new Date(extrasVigentes[0].fecha_fin).toLocaleDateString('es-CL')} ({extrasVigentes[0].dias_restantes} días restantes)
+                </p>
+              </div>
+              <div className={`px-3 py-1 rounded-full text-xs font-medium ${extrasVigentes[0].estado === 'activo' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'}`}>
+                {extrasVigentes[0].estado === 'activo' ? 'Activo' : 'Pendiente'}</div>
             </div>
           </div>
         )}
@@ -490,7 +554,29 @@ export default function ExtrasPlan() {
         {/* ═══════════════════════════════════════════
             PLANES EXTRA - Solo si tiene plan activo
             ═══════════════════════════════════════════ */}
-        {!loading && puedeSolicitarExtras() && (
+        {loading ? (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-6">
+              <i className="fas fa-plus-circle text-purple-400 text-xl"></i>
+              <div>
+                <h2 className="text-white font-bold text-lg">Destacados Disponibles</h2>
+                <p className="text-gray-500 text-xs">Aumenta tu visibilidad en el directorio</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-[#13131a] border border-gray-800 rounded-2xl p-6">
+                  <div className="animate-pulse bg-gray-800 rounded-full h-6 w-20 mb-4" />
+                  <div className="animate-pulse bg-gray-800 rounded h-7 w-36 mb-1" />
+                  <div className="animate-pulse bg-gray-800 rounded h-8 w-24 mb-4" />
+                  <div className="animate-pulse bg-gray-800 rounded h-8 w-32 mb-4" />
+                  <div className="animate-pulse bg-gray-800 rounded h-4 w-48 mb-2" />
+                  <div className="animate-pulse bg-gray-800 rounded h-4 w-40" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : puedePedirOtroExtra && (
           <div>
             <div className="flex items-center gap-3 mb-6">
               <i className="fas fa-plus-circle text-purple-400 text-xl"></i>
@@ -895,6 +981,5 @@ export default function ExtrasPlan() {
           </div>
         )}
       </div>
-    </SkeletonTheme>
   );
 }

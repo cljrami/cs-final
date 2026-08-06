@@ -18,7 +18,7 @@ interface SolicitudVip {
     verificado: boolean;
   };
   plan_vip: string;
-  estado: 'enviado' | 'en_revision' | 'aprobado' | 'rechazado';
+  estado: 'enviado' | 'aprobado' | 'rechazado' | 'pendientes';
   comprobante_pago: string;
   admin_notas: string | null;
   fecha_solicitud: string;
@@ -48,7 +48,7 @@ function getAuthHeaders(): Record<string, string> {
 
 const estadoConfig: Record<string, { bg: string; text: string; icon: string; label: string }> = {
   enviado: { bg: '#3d3d1a', text: '#fbbf24', icon: 'fa-clock', label: 'Pendiente' },
-  en_revision: { bg: '#1a2a3d', text: '#60a5fa', icon: 'fa-search', label: 'En Revisión' },
+
   aprobado: { bg: '#1a3d2e', text: '#10b981', icon: 'fa-check-circle', label: 'Aprobado' },
   rechazado: { bg: '#3d1a1a', text: '#ef4444', icon: 'fa-times-circle', label: 'Rechazado' },
 };
@@ -68,7 +68,7 @@ export default function SolicitudesVip() {
   const [deleting, setDeleting] = useState(false);
 
   const [actionItem, setActionItem] = useState<SolicitudVip | null>(null);
-  const [actionType, setActionType] = useState<'aprobar' | 'rechazar' | null>(null);
+  const [actionType, setActionType] = useState<'aprobar' | 'rechazar' | 'volver_revision' | null>(null);
   const [notas, setNotas] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -113,15 +113,14 @@ export default function SolicitudesVip() {
   }, []);
 
   useEffect(() => {
-    if (!search && filter === 'enviado') return;
+    if (!search && filter === 'pendientes') return;
     const timer = setTimeout(() => fetchItems(), 400);
     return () => clearTimeout(timer);
   }, [search]);
 
   const stats = {
     total: pagination.total,
-    enviado: items.filter(i => i.estado === 'enviado').length,
-    en_revision: items.filter(i => i.estado === 'en_revision').length,
+    pendientes: items.filter(i => i.estado === 'enviado').length,
     aprobado: items.filter(i => i.estado === 'aprobado').length,
     rechazado: items.filter(i => i.estado === 'rechazado').length,
   };
@@ -143,7 +142,13 @@ export default function SolicitudesVip() {
       });
       const data = await res.json();
       if (data.success) {
-        showNotification(actionType === 'aprobar' ? 'Solicitud VIP aprobada. La escort ahora tiene VIP activo.' : 'Solicitud VIP rechazada.');
+        showNotification(
+          actionType === 'aprobar'
+            ? 'Solicitud VIP aprobada. La escort ahora tiene VIP activo.'
+            : actionType === 'volver_revision'
+              ? 'Solicitud VIP devuelta a estado de revisión.'
+              : 'Solicitud VIP rechazada.'
+        );
         setActionItem(null);
         setActionType(null);
         setNotas('');
@@ -186,15 +191,31 @@ export default function SolicitudesVip() {
     }
   };
 
-  const getActions = (item: SolicitudVip): ActionItem[] => [
-    ...(item.estado === 'enviado' || item.estado === 'en_revision' ? [
-      { label: 'Aprobar', icon: 'fa-check', onClick: () => { setActionItem(item); setActionType('aprobar'); setNotas(''); } },
-      { label: 'Rechazar', icon: 'fa-times', danger: true, onClick: () => { setActionItem(item); setActionType('rechazar'); setNotas(''); } },
-    ] : []),
-    {
-      label: 'Eliminar', icon: 'fa-trash-alt', danger: true, onClick: () => setDeleteConfirm(item),
-    },
-  ].filter(Boolean) as ActionItem[];
+  const getActions = (item: SolicitudVip): ActionItem[] => {
+    const actions: ActionItem[] = [];
+    const revisar = (type: 'aprobar' | 'rechazar' | 'volver_revision') => () => {
+      setActionItem(item);
+      setActionType(type);
+      setNotas('');
+    };
+
+    if (item.estado === 'enviado' || item.estado === 'pendientes') {
+      actions.push({ label: 'Aprobar', icon: 'fa-check', onClick: revisar('aprobar') });
+      actions.push({ label: 'Rechazar', icon: 'fa-times', danger: true, onClick: revisar('rechazar') });
+    }
+
+    if (item.estado === 'rechazado') {
+      actions.push({ label: 'Aprobar', icon: 'fa-check', onClick: revisar('aprobar') });
+    }
+
+    if (item.estado === 'aprobado' || item.estado === 'rechazado') {
+      actions.push({ label: 'Volver a revisión', icon: 'fa-undo', onClick: revisar('volver_revision') });
+    }
+
+    actions.push({ label: 'Eliminar', icon: 'fa-trash-alt', danger: true, onClick: () => setDeleteConfirm(item) });
+
+    return actions;
+  };
 
   const columns: Column<SolicitudVip>[] = [
     {
@@ -254,6 +275,16 @@ export default function SolicitudesVip() {
       render: (item) => {
         if (!item.comprobante_pago) return <span className="text-gray-600 text-xs">—</span>;
         const src = item.comprobante_pago;
+        const isPdf = src.match(/\.pdf$/i);
+        if (isPdf) {
+          return (
+            <a href={src} target="_blank" rel="noopener noreferrer"
+              className="flex items-center justify-center w-10 h-10 mx-auto rounded-lg bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 transition-colors"
+              title="Ver comprobante PDF">
+              <i className="fas fa-file-pdf text-red-400 text-lg"></i>
+            </a>
+          );
+        }
         return (
           <a href={src} data-fancybox="vip-solicitud" className="block relative w-10 h-10 mx-auto">
             <img src={src} alt="Comprobante"
@@ -290,8 +321,7 @@ export default function SolicitudesVip() {
 
       <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
         <StatCard label="Total" value={stats.total} icon="fa-list" color="#6b7280" loading={isLoading} />
-        <StatCard label="Pendientes" value={stats.enviado} icon="fa-clock" color="#fbbf24" loading={isLoading} />
-        <StatCard label="En Revisión" value={stats.en_revision} icon="fa-search" color="#60a5fa" loading={isLoading} />
+        <StatCard label="Pendientes" value={stats.pendientes} icon="fa-clock" color="#fbbf24" loading={isLoading} />
         <StatCard label="Aprobados" value={stats.aprobado} icon="fa-check-circle" color="#10b981" loading={isLoading} />
         <StatCard label="Rechazados" value={stats.rechazado} icon="fa-times-circle" color="#ef4444" loading={isLoading} />
       </div>
@@ -304,8 +334,7 @@ export default function SolicitudesVip() {
         onSearch={(val) => { setSearch(val); setPage(1); }}
         placeholder="Buscar por nombre o email..."
         filters={[
-          { key: 'enviado', label: 'Pendientes', icon: 'fa-clock' },
-          { key: 'en_revision', label: 'En Revisión', icon: 'fa-search' },
+          { key: 'pendientes', label: 'Pendientes', icon: 'fa-clock' },
           { key: 'aprobado', label: 'Aprobados', icon: 'fa-check' },
           { key: 'rechazado', label: 'Rechazados', icon: 'fa-times' },
           { key: 'todos', label: 'Todos', icon: 'fa-list' },
@@ -340,22 +369,49 @@ export default function SolicitudesVip() {
         </div>
       )}
 
-      {/* Approve/Reject Modal */}
+      {/* Approve/Reject/Revision Modal */}
       {actionItem && actionType && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70" onClick={() => { setActionItem(null); setActionType(null); }}>
           <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className={`w-10 h-10 rounded-full ${actionType === 'aprobar' ? 'bg-emerald-500/20' : 'bg-red-500/20'} flex items-center justify-center flex-shrink-0`}>
-                  <i className={`fas fa-${actionType === 'aprobar' ? 'check' : 'times'} ${actionType === 'aprobar' ? 'text-emerald-400' : 'text-red-400'} text-lg`}></i>
+                <div className={`w-10 h-10 rounded-full ${
+                  actionType === 'aprobar' ? 'bg-emerald-500/20'
+                  : actionType === 'volver_revision' ? 'bg-amber-500/20'
+                  : 'bg-red-500/20'
+                } flex items-center justify-center flex-shrink-0`}>
+                  <i className={`fas ${
+                    actionType === 'aprobar' ? 'fa-check'
+                    : actionType === 'volver_revision' ? 'fa-undo'
+                    : 'fa-times'
+                  } ${
+                    actionType === 'aprobar' ? 'text-emerald-400'
+                    : actionType === 'volver_revision' ? 'text-amber-400'
+                    : 'text-red-400'
+                  } text-lg`}></i>
                 </div>
                 <div>
-                  <h3 className="text-white font-semibold text-sm">{actionType === 'aprobar' ? '¿Aprobar solicitud VIP?' : '¿Rechazar solicitud VIP?'}</h3>
+                  <h3 className="text-white font-semibold text-sm">
+                    {actionType === 'aprobar'
+                      ? '¿Aprobar solicitud VIP?'
+                      : actionType === 'volver_revision'
+                        ? '¿Volver a estado de revisión?'
+                        : '¿Rechazar solicitud VIP?'}
+                  </h3>
                   <p className="text-gray-400 text-sm leading-relaxed mt-0.5">
                     Escort: <strong className="text-white">{actionItem.escort.nombre}</strong>
                   </p>
                 </div>
               </div>
+
+              {actionType === 'volver_revision' && (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 mb-4 text-xs text-amber-300/90">
+                  <i className="fas fa-info-circle mr-1.5"></i>
+                  {actionItem.estado === 'aprobado'
+                    ? 'Se revocará el VIP de la escort y la solicitud quedará pendiente de revisión nuevamente.'
+                    : 'La solicitud quedará pendiente de revisión nuevamente. La escort podrá re-subir su comprobante.'}
+                </div>
+              )}
 
               {/* Comprobante link */}
               {actionItem.comprobante_pago && (
@@ -386,10 +442,14 @@ export default function SolicitudesVip() {
                 </button>
                 <button onClick={handleAction} disabled={actionLoading || (actionType === 'rechazar' && !notas.trim())}
                   className={`flex-1 px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
-                    actionType === 'aprobar' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
+                    actionType === 'aprobar' ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : actionType === 'volver_revision' ? 'bg-amber-600 hover:bg-amber-700'
+                    : 'bg-red-600 hover:bg-red-700'
                   }`}>
                   {actionLoading && <i className="fas fa-spinner fa-spin mr-1"></i>}
-                  {actionType === 'aprobar' ? 'Aprobar VIP' : 'Rechazar'}
+                  {actionType === 'aprobar' ? 'Aprobar VIP'
+                    : actionType === 'volver_revision' ? 'Volver a revisión'
+                    : 'Rechazar'}
                 </button>
               </div>
             </div>

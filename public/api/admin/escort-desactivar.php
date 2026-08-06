@@ -12,6 +12,9 @@ require_once __DIR__ . '/../bootstrap.php';
 
 $tokenData = requireAuth();
 
+
+requireAdminRole($tokenData);
+
 $input = json_decode(file_get_contents('php://input'), true);
 $id = intval($input['id'] ?? 0);
 

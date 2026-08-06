@@ -12,6 +12,9 @@ require_once __DIR__ . '/../../bootstrap.php';
 
 $tokenData = requireAuth();
 
+
+requireAdminRole($tokenData);
+
 try {
     $db = getDBConnection();
 
@@ -52,5 +55,5 @@ try {
     ]);
 } catch (PDOException $e) {
     http_response_code(500);
-    echo json_encode(['error' => 'Error: ' . $e->getMessage()]);
+    echo json_encode(['error' => 'Error del servidor']);
 }

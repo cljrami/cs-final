@@ -1,116 +1,143 @@
 // src/components/EscortCard.tsx
+import type { Escort, EscortCardProps } from '../types/escort';
+import { isNueva } from '../utils/fecha';
+import { Skeleton } from './ui/Skeleton';
 
-interface Servicio {
-    nombre: string;
-    icono: string;
-  }
+function getImageSrcSet(src: string): string {
+  if (!src) return '';
+  const base = src.split('?')[0];
+  const ext = base.split('.').pop()?.toLowerCase();
+  if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext || '')) return '';
   
-  export interface Escort {
-    id: number;
-    nombre: string;
-    slug: string;
-    edad: number;
-    ciudad: string;
-    foto_principal: string | null;
-    vip: number;
-    verificado: number;
-    destacado: number;
-    estado: string;
-    likes: number;
-    visitas_perfil: number;
-    rating: number;
-    tarifa_1h: number | null;
-    servicios?: Servicio[];
-  }
-  
-  interface EscortCardProps {
-    escort: Escort;
-  }
-  
-  export default function EscortCard({ escort }: EscortCardProps) {
+  const widths = [320, 480, 640];
+  return widths
+    .map(w => `${base}?w=${w}&q=65&fm=webp ${w}w`)
+    .join(', ');
+}
+
+function getBlurDataURL(src: string): string {
+  if (!src) return '';
+  // Very small base64 placeholder - 10px blurred version
+  return `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FAAh5DwHEEwKLAAAAABJRU5ErkJggg==`;
+}
+
+export default function EscortCard({ escort, skeleton = false }: EscortCardProps) {
+  const imgSrc = escort.foto_principal;
+  const srcSet = getImageSrcSet(imgSrc || '');
+  const blurDataURL = getBlurDataURL(imgSrc || '');
+
+  if (skeleton) {
     return (
-      <a
-        href={`/${escort.id}`}
-        className="group block bg-[#1a1a2e] rounded-xl overflow-hidden border border-white/5 hover:border-red-500/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-red-500/5"
-      >
-        <div className="relative aspect-[3/4] bg-gradient-to-b from-[#2a2a3e] to-[#1a1a2e] overflow-hidden">
-          {escort.foto_principal ? (
-            <img
-              src={escort.foto_principal}
-              alt={escort.nombre}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              loading="lazy"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <div className="w-20 h-20 rounded-full bg-[#2a2a3e] flex items-center justify-center">
-                <i className="fas fa-user text-3xl text-gray-600"></i>
-              </div>
-            </div>
-          )}
-  
-          {escort.vip === 1 && (
-            <div className="absolute bottom-3 right-3 bg-yellow-500 text-black text-xs font-bold px-2.5 py-1 rounded-md flex items-center gap-1 shadow-lg">
-              <i className="fas fa-crown text-[0.6rem]"></i>VIP
-            </div>
-          )}
-  
-          {escort.destacado === 1 && escort.vip !== 1 && (
-            <div className="absolute bottom-3 right-3 bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-md flex items-center gap-1 shadow-lg">
-              <i className="fas fa-star text-[0.6rem]"></i>Destacada
-            </div>
-          )}
-  
-          {escort.verificado === 1 && (
-            <div className="absolute top-3 right-3 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center shadow-lg">
-              <i className="fas fa-check text-white text-[0.6rem]"></i>
-            </div>
-          )}
-  
-          {escort.servicios && escort.servicios.length > 0 && (
-            <div className="absolute bottom-3 left-3 flex gap-1">
-              {escort.servicios.map((s, i) => (
-                <span key={i} className="bg-black/60 backdrop-blur-sm text-white text-[0.6rem] px-1.5 py-0.5 rounded">
-                  {s.nombre}
-                </span>
-              ))}
-            </div>
-          )}
+      <a className="group block bg-surface rounded-xl overflow-hidden border border-white/5 animate-pulse pointer-events-none">
+        <div className="relative aspect-[3/4] bg-gradient-to-b from-raised to-surface overflow-hidden">
+          <Skeleton className="w-full h-full !rounded-none" />
         </div>
-  
         <div className="p-3">
-          <div className="flex items-center justify-between mb-1">
-            <h3 className="text-white font-semibold text-sm">{escort.nombre}</h3>
-            {escort.rating > 0 && (
-              <div className="flex items-center gap-1 text-yellow-400 text-xs">
-                <i className="fas fa-star text-[0.6rem]"></i>
-                <span>{Number(escort.rating).toFixed(1)}</span>
-              </div>
-            )}
+          <div className="mb-1.5">
+            <Skeleton width="60%" height={20} />
           </div>
-          
-          <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1.5 text-gray-500">
-              <i className="fas fa-map-marker-alt text-[0.6rem]"></i>
-              <span>{escort.ciudad}</span>
-              <span className="text-gray-700">•</span>
-              <span className="text-red-400">{escort.edad} años</span>
-            </div>
-            {escort.likes > 0 && (
-              <div className="flex items-center gap-1 text-red-400">
-                <i className="fas fa-heart text-[0.6rem]"></i>
-                <span>{escort.likes}</span>
-              </div>
-            )}
-          </div>
-          
-          {escort.tarifa_1h && (
-            <div className="mt-2 text-xs text-gray-600">
-              Desde <span className="text-green-400 font-medium">${Number(escort.tarifa_1h).toLocaleString('es-CL')}</span>/hora
-            </div>
-          )}
+          <Skeleton width="40%" height={14} />
         </div>
       </a>
     );
   }
+
+  return (
+    <a
+      href={`/${escort.id}`}
+      className="group block bg-surface rounded-xl overflow-hidden border border-white/5 hover:border-red-500/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-red-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-page"
+    >
+      <div className="relative aspect-[3/4] bg-gradient-to-b from-raised to-surface overflow-hidden">
+        {imgSrc ? (
+          <picture>
+            <source
+              srcSet={srcSet}
+              sizes="(max-width: 640px) 320px, (max-width: 1024px) 480px, 640px"
+              type="image/webp"
+            />
+            <img
+              src={imgSrc}
+              srcSet={srcSet}
+              alt={escort.nombre}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              loading="lazy"
+              decoding="async"
+              style={{ opacity: 1 }}
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+          </picture>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center" aria-hidden="true">
+            <div className="w-20 h-20 rounded-full bg-raised flex items-center justify-center">
+              <i className="fas fa-user text-3xl text-muted"></i>
+            </div>
+          </div>
+        )}
+
+        {escort.disponible_ahora === 1 && (
+          <span className="absolute top-2 left-2 z-10 flex items-center justify-center w-4 h-4 rounded-full bg-green-500 shadow-lg shadow-green-600/50 animate-pulse" title="Disponible">
+          </span>
+        )}
+
+        {escort.gira_activa === 1 && (
+          <span
+            className="absolute bottom-2 left-2 z-10
+              bg-gradient-to-r from-purple-500 to-fuchsia-600
+              text-white text-[0.6rem] sm:text-xs font-semibold px-2 py-0.5
+              rounded-full flex items-center gap-1
+              shadow-md shadow-purple-500/30
+              border border-white/20"
+            title={escort.gira_ciudad ? `En gira en ${escort.gira_ciudad}` : 'En gira'}
+          >
+            <i className="fas fa-plane-departure text-[0.5rem]"></i>{escort.gira_ciudad || 'En gira'}
+          </span>
+        )}
+
+        {isNueva(escort.fecha_aprobacion) && (
+          <span
+            className="absolute top-2 right-2 z-10
+              bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500
+              text-white text-[0.6rem] sm:text-xs font-semibold px-2 py-0.5
+              rounded-full flex items-center gap-1
+              shadow-md shadow-amber-500/30
+              border border-white/20"
+            title="Nueva"
+          >
+            <i className="fas fa-star text-[0.5rem]"></i>Nueva
+          </span>
+        )}
+
+      </div>
+
+      <div className="p-3">
+        <div className="flex items-start justify-between mb-1.5">
+          <div className="flex items-center gap-1 min-w-0">
+            <h3 className="text-ink font-semibold text-sm leading-tight truncate">{escort.nombre}</h3>
+            {escort.verificado === 1 && (
+              <span className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center shrink-0" title="Verificada">
+                <i className="fas fa-check text-[0.35rem] text-white"></i>
+              </span>
+            )}
+            {escort.vip === 1 && (
+              <span className="w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center shrink-0" title="VIP">
+                <i className="fas fa-crown text-[0.35rem] text-black"></i>
+              </span>
+            )}
+          </div>
+          {(escort.total_valoraciones ?? 0) > 0 && (
+            <div className="flex items-center gap-1 text-yellow-400 text-xs flex-shrink-0" aria-label={`Valoración: ${Number(escort.rating).toFixed(1)} estrellas, ${escort.total_valoraciones} reseñas`}>
+              <i className="fas fa-star text-[0.55rem]" aria-hidden="true"></i>
+              <span>{Number(escort.rating).toFixed(1)}</span>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted">
+          <i className="fas fa-map-marker-alt text-[0.55rem] flex-shrink-0" aria-hidden="true"></i>
+          <span className="truncate">{escort.ciudad}</span>
+          <span className="text-gray-700" aria-hidden="true">•</span>
+          <span className="text-red-400">{escort.edad} años</span>
+        </div>
+      </div>
+    </a>
+  );
+}

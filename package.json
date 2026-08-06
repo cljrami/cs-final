@@ -7,7 +7,7 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build",
+    "build": "astro build && tailwindcss -i src/styles/escort-profile.css -o public_html/_astro/escort-profile.css --minify",
     "preview": "astro preview",
     "deploy": "node scripts/deploy.js",
     "build:deploy": "npm run build && npm run deploy",
@@ -18,15 +18,24 @@
     "@fancyapps/ui": "^6.1.14",
     "@fortawesome/fontawesome-free": "^7.2.0",
     "@tailwindcss/vite": "^4.3.0",
+    "@tanstack/react-query": "^5.101.4",
+    "@tanstack/react-query-devtools": "^5.101.4",
     "@types/dompurify": "^3.0.5",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
+    "@types/sortablejs": "^1.15.9",
     "astro": "^6.4.2",
     "basic-ftp": "^6.0.1",
     "dompurify": "^3.4.12",
+    "qrcode": "^1.5.4",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-loading-skeleton": "^3.5.0",
+    "sortablejs": "^1.15.7",
+    "swiper": "^14.0.7",
     "tailwindcss": "^4.3.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "@types/qrcode": "^1.5.6"
   }
 }

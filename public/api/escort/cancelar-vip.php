@@ -64,7 +64,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT id, estado, comprobante_pago 
         FROM escort_vip_solicitudes 
-        WHERE id = ? AND escort_id = ? AND estado IN ('enviado', 'en_revision')
+        WHERE id = ? AND escort_id = ? AND estado = 'enviado'
     ");
     $stmt->execute([$solicitudId, $escortId]);
     $solicitud = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -88,9 +88,9 @@ try {
 } catch (PDOException $e) {
     error_log("Error cancelar-vip.php PDO: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error de base de datos: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error de base de datos']);
 } catch (Throwable $e) {
     error_log("Error cancelar-vip.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error interno: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'error' => 'Error del servidor']);
 }

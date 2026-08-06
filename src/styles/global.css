@@ -12,4 +12,48 @@
   --color-admin-text: #ffffff;
   --color-admin-muted: #9ca3af;
   --color-admin-accent: #ef4444;
+
+  /* Tokens semánticos (web pública) — tema noche por defecto */
+  --color-page: #0f0f1a;
+  --color-surface: #1a1a2e;
+  --color-surface2: #1a1a24;
+  --color-raised: #2a2a3e;
+  --color-edge: #2d2d44;
+  --color-ink: #ffffff;
+  --color-muted: #9ca3af;
+  --color-overlay: rgba(15, 15, 26, 0.95);
+  --color-overlay-soft: rgba(15, 15, 26, 0.6);
+}
+
+/* Paleta clara (modo día) */
+[data-theme="light"] {
+  --color-page: #f7f8fc;
+  --color-surface: #ffffff;
+  --color-surface2: #eef0f6;
+  --color-raised: #e3e6ef;
+  --color-edge: #dfe3ec;
+  --color-ink: #1a1d29;
+  --color-muted: #50596b;
+  --color-overlay: rgba(255, 255, 255, 0.95);
+  --color-overlay-soft: rgba(255, 255, 255, 0.6);
+}
+
+:root {
+  color-scheme: dark;
+}
+[data-theme="light"] {
+  color-scheme: light;
+}
+
+body,
+body * {
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 300 800;
+  font-display: swap;
+  src: url('/fonts/inter-latin-variable.woff2') format('woff2');
 }

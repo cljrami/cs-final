@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../lib/plan_pausas.php';
 
 header('Content-Type: application/json');
 header('Cache-Control: no-cache, no-store, must-revalidate');
@@ -50,11 +51,11 @@ try {
             s.plan_id,
             s.fecha_inicio,
             s.fecha_fin,
+            s.fecha_pausa,
             s.fecha_aprobacion,
             s.estado,
             s.precio_pagado,
             s.moneda,
-            s.auto_renovar,
             s.comprobante_pago,
             s.creado_en,
             (SELECT id FROM pagos WHERE escort_id = s.escort_id AND concepto = 'plan' ORDER BY creado_en DESC LIMIT 1) AS pago_id,
@@ -81,11 +82,7 @@ try {
             END AS estado_calculated,
             CASE 
                 WHEN s.fecha_aprobacion IS NULL THEN NULL
-                WHEN s.estado = 'pausada' THEN (
-                    SELECT COALESCE(SUM(hp.dias_acumulados_pausa), 0) 
-                    FROM historial_pausas hp 
-                    WHERE hp.suscripcion_id = s.id AND hp.accion = 'pausa'
-                )
+                WHEN s.estado = 'pausada' THEN IFNULL(GREATEST(0, DATEDIFF(COALESCE(s.fecha_fin, CURDATE()), COALESCE(s.fecha_pausa, CURDATE()))), p.duracion_dias)
                 WHEN s.estado = 'activa' THEN IFNULL(GREATEST(0, DATEDIFF(s.fecha_fin, CURDATE())), p.duracion_dias)
                 ELSE 0
             END AS dias_restantes_calculados,
@@ -148,6 +145,16 @@ try {
     $puedeReactivar = false;
     $motivoNoPausar = '';
 
+    // Plazo para usar pausas (desde la primera pausa, calendario real)
+    $plazoPausas = plan_plazo_pausas($pdo, (int)$suscripcion['suscripcion_id'], $diasTotales);
+
+    // Vencimiento proyectado si está pausada (base + duracion + días de la pausa en curso)
+    $fechaFinProyectada = null;
+    if ($estadoCalculado === 'pausada' && !empty($suscripcion['fecha_fin']) && !empty($suscripcion['fecha_pausa'])) {
+        $diasEnPausa = (int)floor((strtotime(date('Y-m-d')) - strtotime(date('Y-m-d', strtotime($suscripcion['fecha_pausa'])))) / 86400);
+        $fechaFinProyectada = date('Y-m-d', strtotime(date('Y-m-d', strtotime($suscripcion['fecha_fin'])) . " +{$diasEnPausa} days"));
+    }
+
     if ($estadoCalculado === 'pausada') {
         $porcentajeUsado = $diasTotales > 0 ? round((($diasTotales - $diasRestantes) / $diasTotales) * 100, 1) : 0;
         $puedeReactivar = true;
@@ -157,6 +164,10 @@ try {
         if ((int)$suscripcion['contador_pausas'] >= (int)$suscripcion['max_pausas_permitidas']) {
             $puedePausar = false;
             $motivoNoPausar = 'Límite de ' . $suscripcion['max_pausas_permitidas'] . ' pausas alcanzado';
+        }
+        if ($puedePausar && $plazoPausas['vencido']) {
+            $puedePausar = false;
+            $motivoNoPausar = 'Tu plazo para usar pausas venció el ' . date('d/m/Y', strtotime($plazoPausas['limite']));
         }
     } elseif ($estadoCalculado === 'expirada') {
         $porcentajeUsado = 100;
@@ -193,6 +204,8 @@ try {
 
     $fechaInicioFmt = $suscripcion['fecha_inicio'] ? date('d/m/Y', strtotime($suscripcion['fecha_inicio'])) : null;
     $fechaFinFmt = $suscripcion['fecha_fin'] ? date('d/m/Y', strtotime($suscripcion['fecha_fin'])) : null;
+    $fechaPausaFmt = !empty($suscripcion['fecha_pausa']) ? date('d/m/Y', strtotime($suscripcion['fecha_pausa'])) : null;
+    $finProyectadaFmt = $fechaFinProyectada ? date('d/m/Y', strtotime($fechaFinProyectada)) : null;
 
     $escortCheck = $pdo->prepare("SELECT email FROM escorts WHERE id = ?");
     $escortCheck->execute(array($escortId));
@@ -237,11 +250,15 @@ try {
         'fechas' => array(
             'inicio' => $fechaInicioFmt,
             'fin' => $fechaFinFmt,
+            'pausa' => $fechaPausaFmt,
+            'fin_proyectada' => $finProyectadaFmt,
         ),
         'pausas' => array(
             'usadas' => (int)$suscripcion['contador_pausas'],
             'maximas' => (int)$suscripcion['max_pausas_permitidas'],
             'restantes' => max(0, (int)$suscripcion['max_pausas_permitidas'] - (int)$suscripcion['contador_pausas']),
+            'limite' => $plazoPausas['limite'] ? date('d/m/Y', strtotime($plazoPausas['limite'])) : null,
+            'plazo_dias_restantes' => $plazoPausas['dias_restantes'],
         ),
         'acciones' => array(
             'puede_pausar' => $puedePausar,

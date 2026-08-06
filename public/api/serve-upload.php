@@ -1,8 +1,16 @@
 <?php
 $requestPath = parse_url($_GET['path'] ?? '', PHP_URL_PATH);
-if (!$requestPath || strpos($requestPath, '/uploads/') !== 0 || strpos($requestPath, '..') !== false) {
+$decodedPath = urldecode((string)$requestPath);
+
+// Validar ruta: debe estar bajo /uploads/ y no contener secuencias de salida (..)
+// Se comprueba tanto la ruta cruda como la decodificada (%2e%2e => ..)
+if ($requestPath === false || $decodedPath === ''
+    || stripos($decodedPath, '/uploads/') !== 0
+    || strpos($decodedPath, '..') !== false
+    || strpos($requestPath, '..') !== false) {
     http_response_code(400);
     header('Content-Type: application/json');
+    header('X-Content-Type-Options: nosniff');
     echo json_encode(['error' => 'Ruta inválida']);
     exit;
 }
@@ -25,7 +33,20 @@ if (file_exists($newFile) && is_file($newFile)) {
 if (!$foundFile) {
     http_response_code(404);
     header('Content-Type: application/json');
+    header('X-Content-Type-Options: nosniff');
     echo json_encode(['error' => 'Archivo no encontrado']);
+    exit;
+}
+
+// Canonicalizar y verificar que el archivo resuelto esté realmente bajo /uploads/
+$realFile = realpath($foundFile);
+$realNorm = str_replace('\\', '/', (string)$realFile);
+$inUploads = $realFile !== false && stripos($realNorm, '/uploads/') !== false;
+if (!$inUploads) {
+    http_response_code(403);
+    header('Content-Type: application/json');
+    header('X-Content-Type-Options: nosniff');
+    echo json_encode(['error' => 'Acceso denegado']);
     exit;
 }
 
@@ -39,6 +60,7 @@ $mimeMap = [
 $mime = $mimeMap[$ext] ?? 'application/octet-stream';
 
 header('Content-Type: ' . $mime);
+header('X-Content-Type-Options: nosniff');
 header('Content-Length: ' . filesize($foundFile));
 header('Cache-Control: public, max-age=86400');
 readfile($foundFile);

@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
@@ -9,8 +9,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 require_once __DIR__ . '/../../bootstrap.php';
+require_once __DIR__ . '/../../lib/plan_pausas.php';
 
 $tokenData = requireAuth();
+
+
+requireAdminRole($tokenData);
 
 try {
     $data = json_decode(file_get_contents('php://input'), true);
@@ -19,7 +23,7 @@ try {
 
     if (!$suscripcionId || !$motivo) {
         http_response_code(400);
-        echo json_encode(['error' => 'ID de suscripción y motivo requeridos']);
+        echo json_encode(['error' => 'ID de suscripciíƒÂ³n y motivo requeridos']);
         exit;
     }
 
@@ -27,8 +31,8 @@ try {
     $db->beginTransaction();
 
     $check = $db->prepare("
-        SELECT s.*, e.nombre as escort_nombre, p.nombre as plan_nombre,
-               p.max_pausas_permitidas, p.duracion_dias,
+SELECT s.*, e.nombre as escort_nombre, p.nombre as plan_nombre,
+               p.max_pausas_permitidas, p.duracion_dias, p.tipo as plan_tipo,
                (SELECT COUNT(*) FROM historial_pausas hp WHERE hp.suscripcion_id = s.id AND hp.accion = 'pausa') as contador_pausas
         FROM suscripciones s
         JOIN escorts e ON e.id = s.escort_id
@@ -41,7 +45,14 @@ try {
     if (!$suscripcion) {
         $db->rollBack();
         http_response_code(404);
-        echo json_encode(['error' => 'Suscripción no encontrada']);
+        echo json_encode(['error' => 'SuscripciíƒÂn no encontrada']);
+        exit;
+    }
+
+    if ($suscripcion['plan_tipo'] === 'extra') {
+        $db->rollBack();
+        http_response_code(400);
+        echo json_encode(['error' => 'Las solicitudes de planes extra se gestionan desde el panel de Solicitudes Extras']);
         exit;
     }
 
@@ -52,21 +63,7 @@ try {
         exit;
     }
 
-    // Verificar ventana desde primera pausa
-    $fechaPrimerPausa = $suscripcion['fecha_primer_pausa'];
-    $ventanaDias = max(1, (int)$suscripcion['duracion_dias']);
-    if ($fechaPrimerPausa) {
-        $inicio = new DateTime($fechaPrimerPausa);
-        $diff = (int)$inicio->diff(new DateTime())->days;
-        if ($diff > $ventanaDias) {
-            $db->prepare("UPDATE suscripciones SET estado = 'expirada', actualizado_en = NOW() WHERE id = ?")->execute([$suscripcionId]);
-            $db->commit();
-            http_response_code(400);
-            echo json_encode(['error' => "Pasaron más de {$ventanaDias} días desde la primera pausa. La suscripción ha expirado."]);
-            exit;
-        }
-    }
-
+    // Verificar pausas usadas
     $contadorPausas = (int)$suscripcion['contador_pausas'];
     $maxPausas = (int)$suscripcion['max_pausas_permitidas'];
 
@@ -77,18 +74,27 @@ try {
         exit;
     }
 
-    // Si es la primera pausa, guardar fecha de referencia
-    if ($contadorPausas === 0) {
-        $db->prepare("UPDATE suscripciones SET fecha_primer_pausa = NOW() WHERE id = ?")->execute([$suscripcionId]);
+    // Plazo para usar pausas (desde la primera pausa, calendario real)
+    $plazo = plan_plazo_pausas($db, $suscripcionId, (int)$suscripcion['duracion_dias']);
+    if ($plazo['vencido']) {
+        $db->rollBack();
+        http_response_code(400);
+        echo json_encode(['error' => 'Plazo para usar pausas vencido el ' . date('d/m/Y', strtotime($plazo['limite']))]);
+        exit;
     }
 
+    // Pausar (reloj congelado: fecha_fin no cambia, se fija fecha_pausa)
     $update = $db->prepare("
         UPDATE suscripciones 
         SET estado = 'pausada',
+            fecha_pausa = CURDATE(),
             actualizado_en = NOW()
         WHERE id = ?
     ");
     $update->execute([$suscripcionId]);
+
+    // Ocultar escort en listados píƒÂºblicos
+    $db->prepare("UPDATE escorts SET activa = 0 WHERE id = ?")->execute([$suscripcion['escort_id']]);
 
     $historial = $db->prepare("
         INSERT INTO historial_pausas 
@@ -128,14 +134,18 @@ try {
         "Tu plan '{$suscripcion['plan_nombre']}' ha sido pausado. Motivo: {$motivo}"
     ]);
 
+    $db->prepare("INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, url, escort_id) VALUES (NULL, 'sistema', 'Plan pausado por admin', ?, '/admin/escorts', ?)")
+        ->execute(["El administrador pausíƒÂ³ el plan '{$suscripcion['plan_nombre']}' de {$suscripcion['escort_nombre']} (ID {$suscripcion['escort_id']}). Motivo: {$motivo}", $suscripcion['escort_id']]);
+
     $db->commit();
 
     echo json_encode([
         'success' => true,
-        'message' => 'Suscripción pausada correctamente'
+        'message' => 'SuscripciíƒÂ³n pausada correctamente'
     ]);
 } catch (PDOException $e) {
     if (isset($db)) $db->rollBack();
     http_response_code(500);
-    echo json_encode(['error' => 'Error: ' . $e->getMessage()]);
+    echo json_encode(['error' => 'Error del servidor']);
 }
+

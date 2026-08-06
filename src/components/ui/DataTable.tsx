@@ -104,7 +104,7 @@ export default function DataTable<T>({
                 <tr key={i} className="border-b border-admin-border">
                   {selectable && <td className="p-4 text-center"><div className="w-4 h-4 bg-admin-border rounded mx-auto" /></td>}
                   {columns.map((c) => (
-                    <td key={c.key} className="p-4">
+                    <td key={c.key} className="p-4 whitespace-nowrap">
                       <DataCell value="" loading={true} className="w-full h-4" />
                     </td>
                   ))}
@@ -191,7 +191,7 @@ export default function DataTable<T>({
                   {columns.map((c) => (
                     <td
                       key={c.key}
-                      className={`p-4 ${c.align === 'right' ? 'text-right' : 'text-left'}`}
+                      className={`p-4 whitespace-nowrap ${c.align === 'right' ? 'text-right' : 'text-left'}`}
                     >
                       {c.render(row, false)}
                     </td>

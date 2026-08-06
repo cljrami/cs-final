@@ -3,14 +3,14 @@ import { useState } from 'react';
 import { API_BASE } from '../../lib/escortAuth';
 
 export default function LoginForm() {
-  const [form, setForm] = useState({ usuario: '', password: '' });
+  const [form, setForm] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const validate = () => {
     const errs: Record<string, string> = {};
-    if (!form.usuario.trim()) errs.usuario = 'Ingresa tu usuario';
+    if (!form.email.trim()) errs.email = 'Ingresa tu email';
     if (!form.password) errs.password = 'Ingresa tu contraseña';
     if (form.password && form.password.length < 6) errs.password = 'Mínimo 6 caracteres';
     setErrors(errs);
@@ -26,7 +26,7 @@ export default function LoginForm() {
       const res = await fetch(`${API_BASE}/login.php`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ usuario: form.email, password: form.password }),
       });
       const data = await res.json();
       
@@ -61,19 +61,19 @@ export default function LoginForm() {
 
       <div>
         <label className="block text-sm text-gray-400 mb-2">
-          <i className="fas fa-user mr-2"></i>Usuario
+          <i className="fas fa-envelope mr-2"></i>Email
         </label>
         <div className="flex items-center bg-[#0f0f1a] rounded-xl px-4 focus-within:bg-[#2a2a3e] transition-colors">
-          <i className="fas fa-user text-gray-500"></i>
+          <i className="fas fa-envelope text-gray-500"></i>
           <input
-            type="text"
-            value={form.usuario}
-            onChange={(e) => setForm({ ...form, usuario: e.target.value })}
+            type="email"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
             className="flex-1 bg-transparent border-none text-white px-4 py-3 outline-none"
-            placeholder="Tu usuario"
+            placeholder="tu@email.com"
           />
         </div>
-        {errors.usuario && <p className="text-red-400 text-xs mt-1">{errors.usuario}</p>}
+        {errors.email && <p className="text-red-400 text-xs mt-1">{errors.email}</p>}
       </div>
 
       <div>

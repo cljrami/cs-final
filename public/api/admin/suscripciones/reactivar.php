@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
@@ -9,8 +9,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 require_once __DIR__ . '/../../bootstrap.php';
+require_once __DIR__ . '/../../lib/plan_pausas.php';
 
 $tokenData = requireAuth();
+
+
+requireAdminRole($tokenData);
 
 try {
     $data = json_decode(file_get_contents('php://input'), true);
@@ -19,17 +23,17 @@ try {
 
     if (!$suscripcionId) {
         http_response_code(400);
-        echo json_encode(['error' => 'ID de suscripción requerido']);
+        echo json_encode(['error' => 'ID de suscripciíƒÂ³n requerido']);
         exit;
     }
 
     $db = getDBConnection();
     $db->beginTransaction();
 
-    // Verificar suscripción pausada
+    // Verificar suscripciíƒÂ³n pausada
     $check = $db->prepare("
         SELECT s.*, e.nombre as escort_nombre, p.nombre as plan_nombre,
-               p.duracion_dias
+               p.duracion_dias, p.tipo as plan_tipo
         FROM suscripciones s
         JOIN escorts e ON e.id = s.escort_id
         JOIN planes p ON p.id = s.plan_id
@@ -41,54 +45,34 @@ try {
     if (!$suscripcion) {
         $db->rollBack();
         http_response_code(404);
-        echo json_encode(['error' => 'Suscripción no encontrada o no está pausada']);
+        echo json_encode(['error' => 'SuscripciíƒÂn no encontrada o no estíƒÂ pausada']);
         exit;
     }
 
-    // Verificar ventana desde primera pausa
-    $fechaPrimerPausa = $suscripcion['fecha_primer_pausa'];
-    $ventanaDias = max(1, (int)$suscripcion['duracion_dias']);
-    if ($fechaPrimerPausa) {
-        $inicio = new DateTime($fechaPrimerPausa);
-        $diff = (int)$inicio->diff(new DateTime())->days;
-        if ($diff > $ventanaDias) {
-            $db->prepare("UPDATE suscripciones SET estado = 'expirada', actualizado_en = NOW() WHERE id = ?")->execute([$suscripcionId]);
-            $db->commit();
-            http_response_code(400);
-            echo json_encode(['error' => "Pasaron más de {$ventanaDias} días desde la primera pausa. La suscripción ha expirado."]);
-            exit;
-        }
+    if ($suscripcion['plan_tipo'] === 'extra') {
+        $db->rollBack();
+        http_response_code(400);
+        echo json_encode(['error' => 'Las solicitudes de planes extra se gestionan desde el panel de Solicitudes Extras']);
+        exit;
     }
 
-    // Obtener última pausa para calcular días transcurridos
-    $ultimaPausa = $db->prepare("
-        SELECT fecha_accion, dias_acumulados_pausa 
-        FROM historial_pausas 
-        WHERE suscripcion_id = ? AND accion = 'pausa'
-        ORDER BY fecha_accion DESC LIMIT 1
-    ");
-    $ultimaPausa->execute([$suscripcionId]);
-    $pausa = $ultimaPausa->fetch(PDO::FETCH_ASSOC);
-
-    // Calcular nueva fecha_fin (extender por días que estuvo pausada)
-    $diasPausados = 0;
-    if ($pausa) {
-        $fechaPausa = new DateTime($pausa['fecha_accion']);
-        $hoy = new DateTime();
-        $diasPausados = $fechaPausa->diff($hoy)->days;
-    }
-
-    $nuevaFechaFin = date('Y-m-d', strtotime($suscripcion['fecha_fin'] . " +{$diasPausados} days"));
+    // Modelo unificado: sumar la duración real de la pausa y recalcular fecha_fin desde la base
+    $diasEstaPausa = plan_dias_esta_pausa($suscripcion['fecha_pausa']);
+    $diasPausadosTotal = (int)($suscripcion['dias_pausados'] ?? 0) + $diasEstaPausa;
 
     // Actualizar suscripción
     $update = $db->prepare("
         UPDATE suscripciones 
         SET estado = 'activa',
-            fecha_fin = ?,
+            fecha_pausa = NULL,
+            dias_pausados = ?,
             actualizado_en = NOW()
         WHERE id = ?
     ");
-    $update->execute([$nuevaFechaFin, $suscripcionId]);
+    $update->execute([$diasPausadosTotal, $suscripcionId]);
+    $nuevaFechaFin = plan_recalcular_fecha_fin($db, $suscripcionId);
+
+    $db->prepare("UPDATE escorts SET activa = 1 WHERE id = ?")->execute([$suscripcion['escort_id']]);
 
     // Registrar en historial_pausas
     $historial = $db->prepare("
@@ -99,12 +83,32 @@ try {
     $historial->execute([
         $suscripcionId,
         $suscripcion['escort_id'],
-        $diasPausados,
+        $diasEstaPausa,
         $notas,
         $tokenData['id']
     ]);
 
     // Log auditoría
+    $log = $db->prepare("
+        INSERT INTO logs_auditoria 
+        (usuario_id, escort_id, accion, tabla_afectada, registro_id, datos_nuevos, ip_address)
+        VALUES (?, ?, 'reactivar_suscripcion', 'suscripciones', ?, ?, ?)
+    ");
+    $log->execute([
+        $tokenData['id'],
+        $suscripcion['escort_id'],
+        $suscripcionId,
+        json_encode([
+            'suscripcion_id' => $suscripcionId,
+            'escort_id' => $suscripcion['escort_id'],
+            'dias_esta_pausa' => $diasEstaPausa,
+            'nueva_fecha_fin' => $nuevaFechaFin,
+            'notas' => $notas
+        ]),
+        $_SERVER['REMOTE_ADDR'] ?? null
+    ]);
+
+    // Log auditoríƒÂ­a
     $log = $db->prepare("
         INSERT INTO logs_auditoria 
         (usuario_id, escort_id, accion, tabla_afectada, registro_id, datos_nuevos, ip_address)
@@ -124,7 +128,7 @@ try {
         $_SERVER['REMOTE_ADDR'] ?? null
     ]);
 
-    // Notificación
+    // NotificaciíƒÂ³n
     $notif = $db->prepare("
         INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url)
         VALUES (?, 'sistema', 'Plan reactivado', ?, '/panel/mi-plan')
@@ -134,16 +138,20 @@ try {
         "Tu plan '{$suscripcion['plan_nombre']}' ha sido reactivado. Nueva fecha de vencimiento: {$nuevaFechaFin}"
     ]);
 
+    $db->prepare("INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, url, escort_id) VALUES (NULL, 'sistema', 'Plan reactivado por admin', ?, '/admin/escorts', ?)")
+        ->execute(["El administrador reactivíƒÂ³ el plan '{$suscripcion['plan_nombre']}' de {$suscripcion['escort_nombre']} (ID {$suscripcion['escort_id']}).", $suscripcion['escort_id']]);
+
     $db->commit();
 
     echo json_encode([
         'success' => true,
-        'message' => 'Suscripción reactivada correctamente',
+        'message' => 'SuscripciíƒÂ³n reactivada correctamente',
         'nueva_fecha_fin' => $nuevaFechaFin,
-        'dias_pausados' => $diasPausados
+        'dias_esta_pausa' => $diasEstaPausa
     ]);
 } catch (PDOException $e) {
     if (isset($db)) $db->rollBack();
     http_response_code(500);
-    echo json_encode(['error' => 'Error: ' . $e->getMessage()]);
+    echo json_encode(['error' => 'Error del servidor']);
 }
+

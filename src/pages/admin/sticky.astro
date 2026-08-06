@@ -1,0 +1,13 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import Sidebar from "../../components/admin/Sidebar";
+import AuthGuard from "../../components/admin/AuthGuard";
+import StickyAdmin from "../../components/admin/StickyAdmin";
+---
+
+<AdminLayout title="Sticky y Pinned" activePage="sticky">
+  <Sidebar slot="sidebar" activePage="sticky" client:load />
+  <AuthGuard client:load>
+    <StickyAdmin client:load />
+  </AuthGuard>
+</AdminLayout>

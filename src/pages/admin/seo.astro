@@ -1,0 +1,14 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import Sidebar from "../../components/admin/Sidebar";
+import AuthGuard from "../../components/admin/AuthGuard";
+import SeoData from "../../components/admin/SeoData";
+---
+
+<AdminLayout title="SEO" activePage="seo">
+  <Sidebar slot="sidebar" activePage="seo" client:load />
+
+  <AuthGuard client:load>
+    <SeoData client:load />
+  </AuthGuard>
+</AdminLayout>

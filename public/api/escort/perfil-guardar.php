@@ -35,7 +35,14 @@ try {
     $escortId = $tokenData['id'];
 
     // Verificar que la escort existe
-    $checkStmt = $pdo->prepare("SELECT id, activa, plan_id, suscripcion_id FROM escorts WHERE id = ? AND eliminada = 0");
+    $checkStmt = $pdo->prepare("
+        SELECT e.id, e.activa, s.id AS suscripcion_id, s.plan_id
+        FROM escorts e
+        LEFT JOIN suscripciones s ON s.escort_id = e.id
+            AND s.estado IN ('activa', 'pausada', 'pendiente_aprobacion')
+        WHERE e.id = ? AND e.eliminada = 0
+        ORDER BY s.id DESC LIMIT 1
+    ");
     $checkStmt->execute([$escortId]);
     $escortActual = $checkStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -84,6 +91,12 @@ try {
         exit;
     }
 
+    // Validar gira
+    $enGira = isset($input['enGira']) ? (int)$input['enGira'] : 0;
+    $giraCiudadId = $enGira && isset($input['giraCiudadId']) && $input['giraCiudadId'] !== '' ? (int)$input['giraCiudadId'] : null;
+    $giraFechaInicio = $enGira && isset($input['giraFechaInicio']) && $input['giraFechaInicio'] !== '' ? $input['giraFechaInicio'] : null;
+    $giraFechaFin = $enGira && isset($input['giraFechaFin']) && $input['giraFechaFin'] !== '' ? $input['giraFechaFin'] : null;
+
     // Obtener nombre de ciudad
     $ciudadStmt = $pdo->prepare("SELECT nombre FROM ciudades WHERE id = ? AND activa = 1");
     $ciudadStmt->execute([$ciudadId]);
@@ -96,7 +109,13 @@ try {
         exit;
     }
 
-    // Actualizar datos básicos (SIN zona)
+    // Validar categoría
+    $categoriaId = isset($input['categoriaId']) && $input['categoriaId'] !== '' ? (int)$input['categoriaId'] : null;
+
+    // Privacidad (campos a ocultar)
+    $privacidad = isset($input['privacidad']) && is_array($input['privacidad']) ? $input['privacidad'] : [];
+
+    // Actualizar datos básicos + gira
     $updateStmt = $pdo->prepare("
         UPDATE escorts SET
             nombre = ?,
@@ -105,6 +124,7 @@ try {
             peso = ?,
             medidas = ?,
             ciudad = ?,
+            categoria_id = ?,
             nacionalidad = ?,
             etnia = ?,
             color_ojos = ?,
@@ -115,6 +135,11 @@ try {
             telefono = ?,
             descripcion_corta = ?,
             descripcion_larga = ?,
+            privacidad = ?,
+            en_gira = ?,
+            gira_ciudad_id = ?,
+            gira_fecha_inicio = ?,
+            gira_fecha_fin = ?,
             updated_at = NOW()
         WHERE id = ?
     ");
@@ -126,6 +151,7 @@ try {
         isset($input['peso']) && $input['peso'] !== '' ? (int)$input['peso'] : null,
         isset($input['medidas']) ? trim($input['medidas']) : null,
         $ciudadNombre,
+        $categoriaId,
         isset($input['nacionalidad']) ? trim($input['nacionalidad']) : null,
         isset($input['etnia']) ? trim($input['etnia']) : null,
         isset($input['color_ojos']) ? trim($input['color_ojos']) : null,
@@ -136,6 +162,11 @@ try {
         isset($input['telefono']) ? trim($input['telefono']) : null,
         isset($input['descripcionCorta']) ? trim($input['descripcionCorta']) : null,
         isset($input['descripcionLarga']) ? trim($input['descripcionLarga']) : null,
+        !empty($privacidad) ? json_encode($privacidad) : null,
+        $enGira,
+        $giraCiudadId,
+        $giraFechaInicio,
+        $giraFechaFin,
         $escortId
     ]);
 
@@ -161,6 +192,20 @@ try {
 
             if ($servicioId > 0) {
                 $insertServicio->execute([$escortId, $servicioId, $incluido]);
+            }
+        }
+    }
+
+    // Eliminar idiomas actuales y re-insertar los seleccionados
+    $idiomas = isset($input['idiomas']) && is_array($input['idiomas']) ? $input['idiomas'] : [];
+    $pdo->prepare("DELETE FROM escort_idiomas WHERE escort_id = ?")->execute([$escortId]);
+
+    if (!empty($idiomas)) {
+        $insertIdioma = $pdo->prepare("INSERT INTO escort_idiomas (escort_id, idioma_id) VALUES (?, ?)");
+        foreach ($idiomas as $idiomaItem) {
+            $idiomaId = is_array($idiomaItem) ? (int) ($idiomaItem['id'] ?? 0) : (int) $idiomaItem;
+            if ($idiomaId > 0) {
+                $insertIdioma->execute([$escortId, $idiomaId]);
             }
         }
     }
@@ -199,6 +244,16 @@ try {
             }
         }
     }
+
+    // Notificar a administradores que la escort actualizó su perfil
+    $pdo->prepare("INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, url, escort_id) VALUES (NULL, 'sistema', 'Perfil actualizado', ?, '/admin/escorts', ?)")
+        ->execute(["{$nombre} actualizó su perfil.", $escortId]);
+
+    require_once __DIR__ . '/../mail.php';
+    notificarAccionEscort('perfil', $escortId, $nombre . ' actualizó su perfil', [
+        'Ciudad' => $ciudadNombre,
+        'Edad' => $edad > 0 ? $edad : '—',
+    ]);
 
     echo json_encode([
         'success' => true,
