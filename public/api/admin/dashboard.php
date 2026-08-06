@@ -31,8 +31,8 @@ try {
         'verificadas' => (int)$pdo->query("SELECT COUNT(*) FROM escorts WHERE verificado = 1 AND eliminada = 0")->fetchColumn(),
         'vip' => (int)$pdo->query("SELECT COUNT(*) FROM escorts WHERE vip = 1 AND eliminada = 0")->fetchColumn(),
         'destacadas' => (int)$pdo->query("SELECT COUNT(*) FROM escorts WHERE destacado = 1 AND eliminada = 0")->fetchColumn(),
-        'planes_por_activar' => (int)$pdo->query("SELECT COUNT(*) FROM escort_vip_solicitudes WHERE estado = 'enviado'")->fetchColumn(),
-        'verificaciones_pendientes' => (int)$pdo->query("SELECT COUNT(*) FROM escorts WHERE verificado = 0 AND activa = 1 AND eliminada = 0")->fetchColumn(),
+'planes_por_activar' => (int)$pdo->query("SELECT COUNT(*) FROM escort_vip_solicitudes WHERE estado = 'enviado'")->fetchColumn(),
+        'verificaciones_pendientes' => (int)$pdo->query("SELECT COUNT(*) FROM verificaciones WHERE estado = 'pendiente'")->fetchColumn(),
         'nuevas_hoy' => (int)$pdo->query("SELECT COUNT(*) FROM escorts WHERE DATE(created_at) = CURDATE() AND eliminada = 0")->fetchColumn(),
         'pausadas' => (int)$pdo->query("
             SELECT COUNT(*) FROM escorts e WHERE (
