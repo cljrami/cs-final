@@ -26,6 +26,20 @@ $defaults = [
     'sitemap_urls_extra'        => '',
 ];
 
+// Slug consistente con las páginas de ciudad: se genera SIEMPRE del nombre
+// (normalizando acentos), NO de la columna slug de la BD, porque esos slugs
+// pueden estar dañados (ej. "chill-n" en vez de "chillan") y generar URLs rotas.
+function entradaSlug($slug, $nombre): string {
+    $mapa = [
+        'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u',
+        'ñ' => 'n', 'ü' => 'u', 'Á' => 'a', 'É' => 'e', 'Í' => 'i',
+        'Ó' => 'o', 'Ú' => 'u', 'Ñ' => 'n', 'Ü' => 'u',
+    ];
+    $nombre = strtr((string)$nombre, $mapa);
+    $s = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', $nombre));
+    return trim($s, '-');
+}
+
 try {
     $pdo = getDBConnection();
 
@@ -84,7 +98,8 @@ try {
     if ($incluirCiudades) {
         $stmtCiudades = $pdo->query("SELECT * FROM ciudades WHERE activa = 1 ORDER BY nombre ASC");
         foreach ($stmtCiudades->fetchAll() as $c) {
-            $slug = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', $c['nombre']));
+            $slug = entradaSlug($c['slug'] ?? '', $c['nombre'] ?? '');
+            if ($slug === '') continue;
             $lastmod = isset($c['updated_at']) && $c['updated_at'] ? date('Y-m-d', strtotime($c['updated_at'])) : date('Y-m-d');
             $xml .= "  <url>\n";
             $xml .= "    <loc>{$base}/ciudad/{$slug}</loc>\n";
