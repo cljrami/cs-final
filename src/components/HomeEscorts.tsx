@@ -53,7 +53,8 @@ export default function HomeEscorts() {
     setError('');
 
     try {
-      const res = await fetch(`/api/escorts/listado.php?page=${pageNum}&limit=40`);
+      const q = new URLSearchParams(window.location.search).get('q') || '';
+      const res = await fetch(`/api/escorts/listado.php?page=${pageNum}&limit=40${q ? `&q=${encodeURIComponent(q)}` : ''}`);
       const data: ListadoResponse = await res.json();
       
       if (!data.success) throw new Error('Error al cargar');

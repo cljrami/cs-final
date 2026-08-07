@@ -509,6 +509,41 @@ function showNotAvailable($escort)
         <?php endif; ?>
     }
     </script>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": 1,
+                "name": "Inicio",
+                "item": "<?= $baseURL ?>/"
+            }
+            <?php if (!empty($ciudadEfectiva)): ?>
+            ,{
+                "@type": "ListItem",
+                "position": 2,
+                "name": "<?= e($ciudadEfectiva) ?>",
+                "item": "<?= $baseURL ?>/escorts-<?= e(entradaSlug($ciudadEfectiva)) ?>"
+            }
+            ,{
+                "@type": "ListItem",
+                "position": 3,
+                "name": "<?= e($escort['nombre']) ?>",
+                "item": "<?= $baseURL ?>/<?= $id ?>"
+            }
+            <?php else: ?>
+            ,{
+                "@type": "ListItem",
+                "position": 2,
+                "name": "<?= e($escort['nombre']) ?>",
+                "item": "<?= $baseURL ?>/<?= $id ?>"
+            }
+            <?php endif; ?>
+        ]
+    }
+    </script>
     <?php if (!empty($cfg['schema_nombre'])): ?>
     <script type="application/ld+json">
     {
