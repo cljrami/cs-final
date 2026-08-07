@@ -273,9 +273,12 @@ try {
         } elseif (isset($mapEstados[$estado])) {
             $estado = $mapEstados[$estado];
             $estadosValidos = ['activa', 'expirada', 'cancelada', 'pausada', 'rechazada', 'pendiente_aprobacion'];
-            if (in_array($estado, $estadosValidos)) {
+             if (in_array($estado, $estadosValidos)) {
                 if ($estado === 'pendiente_aprobacion') {
                     $where .= " AND s.fecha_aprobacion IS NULL";
+                } elseif ($estado === 'expirada') {
+                    // Incluye estado 'expirada' y activas cuyo vencimiento ya pasó
+                    $where .= " AND (s.estado = 'expirada' OR (s.estado = 'activa' AND s.fecha_fin < CURDATE()))";
                 } else {
                     $where .= " AND s.estado = ?";
                     $params[] = $estado;
