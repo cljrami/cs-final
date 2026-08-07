@@ -32,6 +32,14 @@ try {
             'Disponible ahora' => $nuevo ? 'Sí' : 'No',
         ]);
 
+        $pdo->prepare("INSERT INTO logs_auditoria (escort_id, accion, tabla_afectada, datos_nuevos, ip_address, user_agent, created_at) VALUES (?, 'disponibilidad', 'escorts', ?, ?, ?, NOW())")
+            ->execute([
+                $escortId,
+                json_encode(['disponible' => $nuevo]),
+                $_SERVER['REMOTE_ADDR'] ?? null,
+                $_SERVER['HTTP_USER_AGENT'] ?? null
+            ]);
+
         echo json_encode(['success' => true, 'disponible_ahora' => $nuevo]);
         exit;
     }

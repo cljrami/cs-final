@@ -91,7 +91,7 @@ try {
             la.accion,
             la.tabla_afectada as entidad,
             la.registro_id as entidad_id,
-            la.datos_nuevos as detalle,
+            COALESCE(la.datos_nuevos, la.datos_anteriores) as detalle,
             la.created_at as creado_en
         FROM logs_auditoria la
         LEFT JOIN admins a ON a.id = la.usuario_id
@@ -106,14 +106,90 @@ try {
     $stmt->execute($params);
     $data = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Format detalle from JSON if possible
-    foreach ($data as &$row) {
-        if ($row['detalle'] !== null) {
-            $decoded = json_decode($row['detalle'], true);
-            if ($decoded !== null) {
-                $row['detalle'] = json_encode($decoded, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-            }
+    // Humaniza el detalle según la acción y el JSON almacenado
+    $humanizar = function ($accion, $tabla, $detalleJson) {
+        $d = json_decode($detalleJson, true);
+        if (!is_array($d)) { $d = []; }
+
+        $estadoLabel = function ($e) {
+            $map = [
+                'pausada' => 'Pausada', 'pausado' => 'Pausado', 'activa' => 'Activa', 'activo' => 'Activo',
+                'pendiente_aprobacion' => 'Pendiente de aprobación', 'pendiente' => 'Pendiente',
+                'rechazada' => 'Rechazada', 'rechazado' => 'Rechazado',
+                'cancelada' => 'Cancelada', 'cancelado' => 'Cancelado',
+                'expirada' => 'Expirada', 'expirado' => 'Expirado',
+                'completado' => 'Completado', 'aprobada' => 'Aprobada', 'aprobado' => 'Aprobado',
+                'eliminada' => 'Eliminada', 'eliminado' => 'Eliminado',
+            ];
+            return $map[$e] ?? ucfirst(str_replace('_', ' ', (string)$e));
+        };
+
+        $motivo = !empty($d['motivo']) ? ": " . $d['motivo'] : '';
+        $plan = !empty($d['plan_nombre']) ? $d['plan_nombre'] : '';
+        if (empty($plan) && !empty($d['nombre'])) { $plan = $d['nombre']; }
+        if (empty($plan) && !empty($d['plan'])) { $plan = $d['plan']; }
+
+        $map = [
+            'cambio_estado' => (function () use ($d, $estadoLabel) {
+                $e = $d['estado_nuevo'] ?? '';
+                if ($e === 'pausada' || $e === 'pausado') return 'Pausó su aviso';
+                return 'Cambió su estado a ' . (($e !== '' ) ? $estadoLabel($e) : 'Activa');
+            }),
+            'pausar_suscripcion' => "Pausó la suscripción" . ($plan ? " de {$plan}" : ""),
+            'reactivar_suscripcion' => "Reactivó la suscripción" . ($plan ? " de {$plan}" : "") . (!empty($d['nueva_fecha_fin']) ? ", vence el " . date('d/m/Y', strtotime($d['nueva_fecha_fin'])) : ''),
+            'aprobar_suscripcion' => "Aprobó la suscripción" . ($plan ? " de {$plan}" : ""),
+            'rechazar_suscripcion' => "Rechazó la solicitud/el plan" . $motivo,
+            'cancelar_suscripcion' => "Canceló la suscripción" . ($plan ? " de {$plan}" : ""),
+            'eliminar_suscripcion' => "Eliminó la suscripción" . ($plan ? " de {$plan}" : ""),
+            'pago_creado' => "Registró un pago" . (!empty($d['monto']) ? " de {$d['monto']}" : ""),
+            'pago_aprobado' => "Aprobó el pago",
+            'pago_eliminado' => "Eliminó un registro de pago",
+            'crear_extra' => "Creó el plan extra " . ($d['nombre'] ?? ($d['plan_nombre'] ?? '')),
+            'actualizar_extra' => "Editó el plan extra " . ($d['nombre'] ?? ($d['plan_nombre'] ?? '')),
+            'eliminar_extra' => "Eliminó el plan extra " . ($d['nombre'] ?? ($d['plan_nombre'] ?? '')),
+            'crear_orientacion' => "Creó una orientación",
+            'actualizar_orientacion' => "Editó una orientación",
+            'eliminar_orientacion' => "Eliminó una orientación",
+            'eliminar_escort' => "Eliminó a la escort " . ($d['nombre'] ?? ''),
+            'restaurar_escort' => "Restauró a la escort " . ($d['nombre'] ?? ''),
+            'galeria_actualizada' => "Actualizó su galería de fotos (" . ($d['archivos'] ?? 0) . " foto(s) subida(s))",
+            'fotos_portada' => "Cambió su foto de portada",
+            'fotos_eliminar' => "Eliminó una foto de su galería",
+            'historia_publicada' => "Publicó una nueva historia (" . ($d['historias'] ?? 0) . " historia(s))",
+            'historia_eliminar' => "Eliminó una historia",
+            'perfil_actualizado' => "Actualizó su perfil",
+            'disponibilidad' => ((isset($d['disponible']) && (int)$d['disponible'] === 1) ? "Se marcó como disponible ahora" : ((isset($d['disponible']) && (int)$d['disponible'] === 0) ? "Se marcó como no disponible" : "Cambió su disponibilidad")),
+            'solicitar_plan' => "Solicitó el plan " . ($d['plan_nombre'] ?? ''),
+            'solicitar_extra' => "Solicitó el extra " . ($d['plan_nombre'] ?? ''),
+            'solicitar_vip' => "Solicitó estado VIP",
+            'verificacion_solicitud' => "Envió su documentación de verificación",
+            'nueva_escort' => "Se registró como nueva escort",
+        ];
+
+        if (isset($map[$accion])) {
+            $out = $map[$accion];
+            return is_string($out) ? $out : $out();
         }
+
+        // Fallback genérico según acción base
+        $v = [
+            'crear' => 'creó', 'editar' => 'editó', 'actualizar' => 'actualizó',
+            'aprobar' => 'aprobó', 'rechazar' => 'rechazó', 'eliminar' => 'eliminó',
+            'cancelar' => 'canceló', 'pausar' => 'pausó', 'reactivar' => 'reactivó',
+        ];
+        $acc = 'realizó una acción';
+        if (preg_match('/^(crear|editar|actualizar|aprobar|rechazar|eliminar|cancelar|pausar|reactivar)/', (string)$accion, $m)) {
+            $acc = ($v[$m[1]] ?? 'registró');
+        } elseif (isset($v[$accion])) {
+            $acc = $v[$accion];
+        }
+        $entidad = ucwords(str_replace('_', ' ', (string)$tabla));
+        return ucfirst($acc) . ($plan ? " {$plan}" : '') . " en {$entidad}";
+    };
+
+    // Format detalle + resolver nombre/foto del actor
+    foreach ($data as &$row) {
+        $row['detalle'] = $humanizar($row['accion'], $row['entidad'], $row['detalle']);
         $nombre = null;
         $foto = null;
         if (!empty($row['admin_nombre'])) {

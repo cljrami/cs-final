@@ -214,6 +214,15 @@ try {
         error_log("solicitar-vip notify error: " . $e2->getMessage());
     }
 
+    $pdo->prepare("INSERT INTO logs_auditoria (escort_id, accion, tabla_afectada, registro_id, datos_nuevos, ip_address, user_agent, created_at) VALUES (?, 'solicitar_vip', 'vip_solicitudes', ?, ?, ?, ?, NOW())")
+        ->execute([
+            $escortId,
+            $solicitudId,
+            json_encode(['plan_vip' => $planVip, 'precio' => $precioVip, 'moneda' => 'CLP']),
+            $_SERVER['REMOTE_ADDR'] ?? null,
+            $_SERVER['HTTP_USER_AGENT'] ?? null
+        ]);
+
     echo json_encode([
         'success' => true,
         'message' => 'Solicitud VIP enviada correctamente. Será revisada por un administrador.',

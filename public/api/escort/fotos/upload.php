@@ -208,6 +208,16 @@ try {
             VALUES (NULL, 'sistema', 'Galería actualizada', ?, '/admin/escorts', ?, NOW())
         ")->execute(["{$nombreEscort} actualizó su galería de fotos.", $escortId]);
 
+        $pdo->prepare("
+            INSERT INTO logs_auditoria (escort_id, accion, tabla_afectada, datos_nuevos, ip_address, user_agent, created_at)
+            VALUES (?, 'galeria_actualizada', 'escort_fotos', ?, ?, ?, NOW())
+        ")->execute([
+            $escortId,
+            json_encode(['archivos' => count($fotos)]),
+            $_SERVER['REMOTE_ADDR'] ?? null,
+            $_SERVER['HTTP_USER_AGENT'] ?? null
+        ]);
+
         require_once __DIR__ . '/../../mail.php';
         notificarAccionEscort('fotos', $escortId, $nombreEscort . ' actualizó su galería', [
             'Archivos subidos' => count($fotos),

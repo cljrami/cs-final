@@ -72,6 +72,14 @@ try {
     require_once __DIR__ . '/../../mail.php';
     notificarAccionEscort('historias', $escortId, 'Escort eliminó una historia');
 
+    $pdo->prepare("INSERT INTO logs_auditoria (escort_id, accion, tabla_afectada, datos_nuevos, ip_address, user_agent, created_at) VALUES (?, 'historia_eliminar', 'historias', ?, ?, ?, NOW())")
+        ->execute([
+            $escortId,
+            json_encode(['historia_id' => $historiaId]),
+            $_SERVER['REMOTE_ADDR'] ?? null,
+            $_SERVER['HTTP_USER_AGENT'] ?? null
+        ]);
+
     echo json_encode(['success' => true, 'message' => 'Historia eliminada']);
 } catch (Throwable $e) {
     error_log("Error historias/eliminar.php: " . $e->getMessage());

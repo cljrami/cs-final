@@ -249,6 +249,14 @@ try {
     $pdo->prepare("INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, url, escort_id) VALUES (NULL, 'sistema', 'Perfil actualizado', ?, '/admin/escorts', ?)")
         ->execute(["{$nombre} actualizó su perfil.", $escortId]);
 
+    $pdo->prepare("INSERT INTO logs_auditoria (escort_id, accion, tabla_afectada, datos_nuevos, ip_address, user_agent, created_at) VALUES (?, 'perfil_actualizado', 'escorts', ?, ?, ?, NOW())")
+        ->execute([
+            $escortId,
+            json_encode(['ciudad' => $ciudadNombre, 'edad' => $edad]),
+            $_SERVER['REMOTE_ADDR'] ?? null,
+            $_SERVER['HTTP_USER_AGENT'] ?? null
+        ]);
+
     require_once __DIR__ . '/../mail.php';
     notificarAccionEscort('perfil', $escortId, $nombre . ' actualizó su perfil', [
         'Ciudad' => $ciudadNombre,

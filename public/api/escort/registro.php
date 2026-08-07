@@ -87,6 +87,15 @@ try {
     $notif = $pdo->prepare("INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, url, escort_id) VALUES (NULL, 'sistema', 'Nueva escort registrada', ?, '/admin/escorts', ?)");
     $notif->execute([$notifMsg, $newId]);
 
+    $pdo->prepare("INSERT INTO logs_auditoria (escort_id, accion, tabla_afectada, registro_id, datos_nuevos, ip_address, user_agent, created_at) VALUES (?, 'nueva_escort', 'escorts', ?, ?, ?, ?, NOW())")
+        ->execute([
+            $newId,
+            $newId,
+            json_encode(['nombre' => $usuario]),
+            $_SERVER['REMOTE_ADDR'] ?? null,
+            $_SERVER['HTTP_USER_AGENT'] ?? null
+        ]);
+
     require_once __DIR__ . '/../mail.php';
     try {
         $body = '<p>Se ha registrado una nueva escort en la plataforma:</p>';

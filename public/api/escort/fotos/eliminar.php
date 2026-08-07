@@ -98,6 +98,14 @@ try {
         'Era portada' => $foto['es_portada'] ? 'Sí' : 'No',
     ]);
 
+    $pdo->prepare("INSERT INTO logs_auditoria (escort_id, accion, tabla_afectada, datos_nuevos, ip_address, user_agent, created_at) VALUES (?, 'fotos_eliminar', 'escort_fotos', ?, ?, ?, NOW())")
+        ->execute([
+            $escortId,
+            json_encode(['foto_id' => $fotoId, 'era_portada' => (int)$foto['es_portada']]),
+            $_SERVER['REMOTE_ADDR'] ?? null,
+            $_SERVER['HTTP_USER_AGENT'] ?? null
+        ]);
+
     echo json_encode(['success' => true, 'message' => 'Foto eliminada']);
 } catch (Throwable $e) {
     error_log("Error fotos/eliminar.php: " . $e->getMessage());
