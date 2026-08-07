@@ -254,6 +254,18 @@ try {
             ")->execute([$escortId]);
 
             sendVerificacionAprobada($escortId);
+
+            $pdo->prepare("INSERT INTO logs_auditoria (usuario_id, escort_id, accion, tabla_afectada, registro_id, datos_nuevos, datos_anteriores, ip_address, user_agent, created_at) VALUES (?, ?, 'aprobar_verificacion', 'verificaciones', ?, ?, ?, ?, ?, NOW())")
+                ->execute([
+                    $tokenData['id'] ?? null,
+                    $escortId,
+                    $id,
+                    json_encode(['estado' => 'aprobada', 'verificado_escort' => 1]),
+                    json_encode(['estado_previo' => $verif['estado'] ?? '']),
+                    $_SERVER['REMOTE_ADDR'] ?? null,
+                    $_SERVER['HTTP_USER_AGENT'] ?? null,
+                ]);
+
             echo json_encode(['success' => true, 'message' => 'Verificación aprobada correctamente']);
         } else { // rechazada
             $pdo->prepare("UPDATE verificaciones SET estado = 'rechazada', revisado_en = NOW(), notas_revision = ? WHERE id = ?")
@@ -266,6 +278,18 @@ try {
             ")->execute([$escortId, $notasRevision ?? 'Tu solicitud de verificación fue rechazada.']);
 
             sendVerificacionRechazada($escortId, $notasRevision ?? 'No se especificó motivo');
+
+            $pdo->prepare("INSERT INTO logs_auditoria (usuario_id, escort_id, accion, tabla_afectada, registro_id, datos_nuevos, datos_anteriores, ip_address, user_agent, created_at) VALUES (?, ?, 'rechazar_verificacion', 'verificaciones', ?, ?, ?, ?, ?, NOW())")
+                ->execute([
+                    $tokenData['id'] ?? null,
+                    $escortId,
+                    $id,
+                    json_encode(['estado' => 'rechazada', 'notas_revision' => $notasRevision]),
+                    json_encode(['estado_previo' => $verif['estado'] ?? '']),
+                    $_SERVER['REMOTE_ADDR'] ?? null,
+                    $_SERVER['HTTP_USER_AGENT'] ?? null,
+                ]);
+
             echo json_encode(['success' => true, 'message' => 'Verificación rechazada']);
         }
         exit;
@@ -308,8 +332,10 @@ try {
             exit;
         }
 
-        // === CASO 2: Normal (id > 0) ===
-        if ($id > 0) {
+         // === CASO 2: Normal (id > 0) – ELIMINAR verificación (físico) ===
+         // Restringido a admin/superadmin. El rol moderador solo puede REMOVER (caso 1).
+         if ($id > 0) {
+            requireAdminRole($tokenData, ['admin', 'superadmin']);
             $checkStmt = $pdo->prepare("SELECT escort_id FROM verificaciones WHERE id = ?");
             $checkStmt->execute([$id]);
             $verif = $checkStmt->fetch(PDO::FETCH_ASSOC);
@@ -338,6 +364,16 @@ try {
                 INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url, created_at) 
                 VALUES (?, 'sistema', 'Verificación Eliminada', 'Tu verificación ha sido eliminada.', '/micuenta/verificacion', NOW())
             ")->execute([$escortId]);
+
+            $pdo->prepare("INSERT INTO logs_auditoria (usuario_id, escort_id, accion, tabla_afectada, registro_id, datos_anteriores, ip_address, user_agent, created_at) VALUES (?, ?, 'eliminar_verificacion', 'verificaciones', ?, ?, ?, ?, NOW())")
+                ->execute([
+                    $tokenData['id'] ?? null,
+                    $escortId,
+                    $id,
+                    json_encode(['foto_perfil_real' => null, 'foto_documento' => null]),
+                    $_SERVER['REMOTE_ADDR'] ?? null,
+                    $_SERVER['HTTP_USER_AGENT'] ?? null,
+                ]);
 
             echo json_encode(['success' => true, 'message' => 'Verificación eliminada']);
             exit;

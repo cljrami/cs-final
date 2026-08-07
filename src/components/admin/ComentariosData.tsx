@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { esAdminOSuperior } from '../../lib/adminRole';
 import DataTable from '../ui/DataTable';
 import type { Column, ActionItem } from '../ui/DataTable';
 import StatCard from '../ui/StatCard';
@@ -142,7 +143,9 @@ export default function ComentariosData() {
     } else {
       actions.push({ label: 'Rechazar', icon: 'fa-times', onClick: () => aprobarRechazar(item.id, 'rechazar') });
     }
-    actions.push({ label: 'Eliminar', icon: 'fa-trash-alt', danger: true, onClick: () => setConfirmDeleteId(item.id) });
+    if (esAdminOSuperior()) {
+      actions.push({ label: 'Eliminar', icon: 'fa-trash-alt', danger: true, onClick: () => setConfirmDeleteId(item.id) });
+    }
     return actions;
   };
 

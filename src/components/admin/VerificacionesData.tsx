@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { esAdminOSuperior } from '../../lib/adminRole';
 import StatCard from '../ui/StatCard';
 import DataTable from '../ui/DataTable';
 import type { Column, ActionItem } from '../ui/DataTable';
@@ -196,9 +197,9 @@ export default function VerificacionesData() {
       { label: 'Aprobar', icon: 'fa-check', onClick: () => { setActionVerif(item); setActionType('aprobar'); setNotas(''); } },
       { label: 'Rechazar', icon: 'fa-times', danger: true, onClick: () => { setActionVerif(item); setActionType('rechazar'); setNotas(''); } },
     ] : []),
-    {
-      label: 'Eliminar', icon: 'fa-trash-alt', danger: true, onClick: () => setDeleteConfirm(item),
-    },
+    ...(esAdminOSuperior() ? [
+      { label: 'Eliminar', icon: 'fa-trash-alt', danger: true, onClick: () => setDeleteConfirm(item) },
+    ] : []),
   ].filter(Boolean) as ActionItem[];
 
   const columns: Column<Verificacion>[] = [

@@ -158,11 +158,18 @@ try {
             'historia_publicada' => "Publicó una nueva historia (" . ($d['historias'] ?? 0) . " historia(s))",
             'historia_eliminar' => "Eliminó una historia",
             'perfil_actualizado' => "Actualizó su perfil",
+            "aprobar_comentario" => "Aprobó un comentario",
+            "rechazar_comentario" => "Rechazó un comentario" . (!empty($d['motivo_rechazo']) ? " (motivo registrado)" : ""),
+            "eliminar_comentario" => "Eliminó un comentario",
             'disponibilidad' => ((isset($d['disponible']) && (int)$d['disponible'] === 1) ? "Se marcó como disponible ahora" : ((isset($d['disponible']) && (int)$d['disponible'] === 0) ? "Se marcó como no disponible" : "Cambió su disponibilidad")),
+            'revisar_reporte' => "Revisó un reporte" . (!empty($d['estado']) ? " ({$d['estado']})" : ""),
             'solicitar_plan' => "Solicitó el plan " . ($d['plan_nombre'] ?? ''),
             'solicitar_extra' => "Solicitó el extra " . ($d['plan_nombre'] ?? ''),
             'solicitar_vip' => "Solicitó estado VIP",
             'verificacion_solicitud' => "Envió su documentación de verificación",
+            'aprobar_verificacion' => "Aprobó la verificación" . ($plan ? " de {$plan}" : ""),
+            'rechazar_verificacion' => "Rechazó la verificación" . $motivo,
+            'eliminar_verificacion' => "Eliminó la verificación" . ($d['escort_id'] ?? ''),
             'nueva_escort' => "Se registró como nueva escort",
         ];
 

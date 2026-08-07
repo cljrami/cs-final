@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { esAdminOSuperior } from '../../lib/adminRole';
 import StatCard from '../ui/StatCard';
 import DataTable from '../ui/DataTable';
 import type { Column, ActionItem } from '../ui/DataTable';
@@ -194,7 +195,8 @@ export default function PagosData() {
       });
       return acts;
     }
-    if (item.origen === 'pago' && item.estado_pago === 'pendiente') {
+    const isAdminOsuperior = esAdminOSuperior();
+    if (isAdminOsuperior && item.origen === 'pago' && item.estado_pago === 'pendiente') {
       acts.push({
         label: 'Aprobar', icon: 'fa-check',
         onClick: () => { setActionItem(item); setActionType('aprobar'); setNotas(''); },
@@ -204,10 +206,12 @@ export default function PagosData() {
         onClick: () => { setActionItem(item); setActionType('rechazar'); setNotas(''); },
       });
     }
-    acts.push({
-      label: 'Eliminar', icon: 'fa-trash', danger: true,
-      onClick: () => { setDeleteConfirm(item); },
-    });
+    if (isAdminOsuperior) {
+      acts.push({
+        label: 'Eliminar', icon: 'fa-trash', danger: true,
+        onClick: () => { setDeleteConfirm(item); },
+      });
+    }
     return acts;
   };
 

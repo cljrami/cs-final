@@ -214,9 +214,10 @@ try {
     }
 
     // ============================================================
-    // PUT - Aprobar o Rechazar pago
+    // PUT - Aprobar o Rechazar pago  (solo admin / superadmin)
     // ============================================================
     if ($method === 'PUT') {
+        requireAdminRole($tokenData, ['admin', 'superadmin']);
         $input = json_decode(file_get_contents('php://input'), true);
         $id = isset($input['id']) ? intval($input['id']) : 0;
         $estado = isset($input['estado']) && in_array($input['estado'], ['completado', 'rechazado'])
@@ -460,9 +461,10 @@ try {
     }
 
     // ============================================================
-    // DELETE - Eliminar pago (o suscripciíƒÂ³n extra si id < 0)
+    // DELETE - Eliminar pago (o suscripci�n extra si id < 0)  (admin/superadmin)
     // ============================================================
     if ($method === 'DELETE') {
+        requireAdminRole($tokenData, ['admin', 'superadmin']);
         $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
         if ($id === 0) {
             http_response_code(400);

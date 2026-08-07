@@ -1,5 +1,6 @@
 // src/components/admin/EscortsData.tsx
 import { useState, useEffect, useRef } from 'react';
+import { getAdminRol, esAdminOSuperior } from '../../lib/adminRole';
 import StatCard from '../ui/StatCard';
 import DataTable from '../ui/DataTable';
 import type { Column, ActionItem } from '../ui/DataTable';
@@ -226,6 +227,7 @@ export default function EscortsData() {
         { label: 'Restaurar', icon: 'fa-undo', onClick: () => setRestoreConfirm(item) },
       ];
     }
+    const isAdminOsuperior = esAdminOSuperior();
     return [
       ...(item.suscripcion_estado !== 'pausada' && (item.activa === 0 || item.activa === -1) ? [
         { label: 'Aprobar', icon: 'fa-check', onClick: () => setApproveConfirm(item) },
@@ -233,30 +235,34 @@ export default function EscortsData() {
       ...(item.suscripcion_estado !== 'pausada' && (item.activa === 0 || item.activa === 1) ? [
         { label: 'Rechazar', icon: 'fa-times', danger: true, onClick: () => setRejectConfirm(item) },
       ] : []),
-      {
-        label: 'Editar', icon: 'fa-edit', onClick: async () => {
-          const adminToken = localStorage.getItem('admin_token');
-          if (!adminToken) { setError('Sesión de administrador no encontrada'); return; }
-          try {
-            const res = await fetch(`/api/admin/escort-login-as.php?id=${item.id}`, {
-              headers: { Authorization: 'Bearer ' + adminToken },
-            });
-            const data = await res.json();
-            if (data.success) {
-              localStorage.setItem('escort_token', data.token);
-              localStorage.setItem('escort_data', JSON.stringify(data.escort || { id: item.id }));
-              window.open('/micuenta/perfil', '_blank');
-            } else {
-              setError(data.error || 'No se pudo abrir el editor');
+      ...(isAdminOsuperior ? [
+        {
+          label: 'Editar', icon: 'fa-edit', onClick: async () => {
+            const adminToken = localStorage.getItem('admin_token');
+            if (!adminToken) { setError('Sesión de administrador no encontrada'); return; }
+            try {
+              const res = await fetch(`/api/admin/escort-login-as.php?id=${item.id}`, {
+                headers: { Authorization: 'Bearer ' + adminToken },
+              });
+              const data = await res.json();
+              if (data.success) {
+                localStorage.setItem('escort_token', data.token);
+                localStorage.setItem('escort_data', JSON.stringify(data.escort || { id: item.id }));
+                window.open('/micuenta/perfil', '_blank');
+              } else {
+                setError(data.error || 'No se pudo abrir el editor');
+              }
+            } catch (err) {
+              setError('Error de conexión');
             }
-          } catch (err) {
-            setError('Error de conexión');
-          }
+          },
         },
-      },
-      {
-        label: 'Eliminar', icon: 'fa-trash-alt', danger: true, onClick: () => setDeleteConfirm(item),
-      },
+      ] : []),
+      ...(isAdminOsuperior ? [
+        {
+          label: 'Eliminar', icon: 'fa-trash-alt', danger: true, onClick: () => setDeleteConfirm(item),
+        },
+      ] : []),
       {
         label: 'Ver perfil', icon: 'fa-eye', onClick: () => { window.open(`/${item.slug || item.id}`, '_blank'); },
       },

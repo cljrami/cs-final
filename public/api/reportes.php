@@ -59,7 +59,8 @@ try {
 
         // Admin: cambiar estado del reporte
         if (strpos($_SERVER['REQUEST_URI'], '/review') !== false) {
-            requireAdminAuth();
+            $adminToken = requireAdminAuth();
+            $adminId = (int)($adminToken['id'] ?? 0);
             $id = isset($input['id']) ? intval($input['id']) : 0;
             $estado = isset($input['estado']) ? $input['estado'] : 'reviewed';
 
@@ -72,6 +73,22 @@ try {
             try {
                 $stmt = $pdo->prepare("UPDATE reportes SET estado = ? WHERE id = ?");
                 $stmt->execute([$estado, $id]);
+
+                // Auditoría
+                $rep = $pdo->prepare("SELECT escort_id FROM reportes WHERE id = ?");
+                $rep->execute([$id]);
+                $escortId = $rep->fetchColumn() ?: null;
+                $pdo->prepare("INSERT INTO logs_auditoria (usuario_id, escort_id, accion, tabla_afectada, registro_id, datos_anteriores, datos_nuevos, ip_address, user_agent, created_at) VALUES (?, ?, 'revisar_reporte', 'reportes', ?, ?, ?, ?, ?, NOW())")
+                    ->execute([
+                        $adminId,
+                        $escortId,
+                        $id,
+                        json_encode(['estado_previo' => 'pending']),
+                        json_encode(['estado' => $estado]),
+                        $_SERVER['REMOTE_ADDR'] ?? null,
+                        $_SERVER['HTTP_USER_AGENT'] ?? null,
+                    ]);
+
                 echo json_encode(['success' => true], JSON_UNESCAPED_UNICODE);
                 exit;
             } catch (PDOException $e) {

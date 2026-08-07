@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getAdminRol, esAdminOSuperior } from '../../lib/adminRole';
 
 interface SidebarProps {
   activePage?: string;
@@ -42,18 +43,46 @@ const configItems = [
   { id: 'notificaciones-email', label: 'Notificaciones Email', icon: 'fa-bell', href: '/admin/notificaciones-email', countKey: null },
 ];
 
-export default function Sidebar({ activePage = 'dashboard', loading }: SidebarProps) {
+  export default function Sidebar({ activePage = 'dashboard', loading }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [itemCounts, setItemCounts] = useState<Record<string, number>>({});
   const [adminUser, setAdminUser] = useState<{ nombre: string; rol: string } | null>(null);
+  const [rol, setRol] = useState<'admin' | 'superadmin' | 'moderador' | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem('admin_user');
     if (stored) {
-      try { setAdminUser(JSON.parse(stored)); } catch {}
+      try {
+        const parsed = JSON.parse(stored);
+        setAdminUser(parsed);
+        setRol(parsed.rol);
+      } catch {}
     }
   }, []);
+
+  const isAdminOsuperior = esAdminOSuperior(rol);
+  const esModerador = rol === 'moderador';
+
+  // Menús visibles según rol
+  const visibleMenuItems = menuItems.filter(item => {
+    if (item.id === 'dashboard') return true;
+    if (item.id === 'escorts') return true;
+    if (item.id === 'verificaciones') return true;
+    if (item.id === 'comentarios') return true;
+    if (item.id === 'reportes') return true;
+    if (item.id === 'auditoria') return true;
+    if (item.id === 'notificaciones') return true;
+    // Moderador: solo lectura
+    if (item.id === 'suscripciones' || item.id === 'pagos') return true;
+    return isAdminOsuperior;
+  });
+
+  const visibleConfigItems = configItems.filter(item => {
+    if (item.id === 'auditoria') return true;
+    return isAdminOsuperior;
+  });
+
 
   // Guardar timestamp al visitar cada seccion
   useEffect(() => {
@@ -212,12 +241,12 @@ export default function Sidebar({ activePage = 'dashboard', loading }: SidebarPr
           <div className="text-[0.7rem] text-gray-500 uppercase tracking-widest px-3 mb-2">
             Principal
           </div>
-          {menuItems.map(item => renderItem(item))}
+          {visibleMenuItems.map(item => renderItem(item))}
 
           <div className="text-[0.7rem] text-gray-500 uppercase tracking-widest px-3 mt-4 md:mt-6 mb-2">
             Configuración
           </div>
-          {configItems.map(item => renderItem(item, true))}
+          {visibleConfigItems.map(item => renderItem(item, true))}
         </div>
 
         {/* Footer - fijo abajo */}

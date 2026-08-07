@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { esAdminOSuperior } from '../../lib/adminRole';
 import { Skeleton } from '../ui/Skeleton';
 import '@fancyapps/ui/dist/fancybox/fancybox.css';
 import SearchFilters from './SearchFilters';
@@ -464,6 +465,8 @@ export default function SuscripcionesData() {
     );
   }
 
+  const isAdminOsuperior = esAdminOSuperior();
+
   return (
       <div>
         <h1 className="text-2xl md:text-3xl font-bold mb-2">Gestión de Suscripciones</h1>
@@ -523,10 +526,10 @@ export default function SuscripcionesData() {
                       <td className="px-4 py-3"><Skeleton width={80} height={20} /></td>
                       <td className="px-4 py-3"><Skeleton width={100} height={20} /></td>
                       <td className="px-4 py-3 text-right"><Skeleton width={80} height={32} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                       </tr>
+                     ))}
+                   </tbody>
+                 </table>
             </div>
           ) : suscripciones.length === 0 ? (
             <div className="p-12 text-center">
@@ -548,9 +551,9 @@ export default function SuscripcionesData() {
                       <th className="px-4 py-3 text-right">Acciones</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {suscripciones.map((s) => (
-                      <tr key={s.suscripcion_id} className="border-b border-[#2a2a3e] last:border-0 hover:bg-[#252538] transition-colors">
+                   <tbody>
+                     {suscripciones.map((s) => (
+                        <tr key={s.suscripcion_id} className="border-b border-[#2a2a3e] last:border-0 hover:bg-[#252538] transition-colors">
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-[#2a2a3e] flex items-center justify-center text-gray-400 overflow-hidden flex-shrink-0">
@@ -621,54 +624,58 @@ export default function SuscripcionesData() {
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
-                            <button onClick={() => fetchDetalle(s.suscripcion_id)}
-                              className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#2a2a3e] text-gray-400 hover:text-blue-400 hover:bg-blue-500/10 transition-colors" title="Ver detalle">
-                              <i className="fas fa-eye text-sm"></i>
-                            </button>
-                            <button onClick={() => setEditModal(s)}
-                              className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#2a2a3e] text-gray-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors" title="Editar">
-                              <i className="fas fa-edit text-sm"></i>
-                            </button>
+                             <button onClick={() => fetchDetalle(s.suscripcion_id)}
+                               className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#2a2a3e] text-gray-400 hover:text-blue-400 hover:bg-blue-500/10 transition-colors" title="Ver detalle">
+                               <i className="fas fa-eye text-sm"></i>
+                             </button>
+                             {isAdminOsuperior && (
+                               <button onClick={() => setEditModal(s)}
+                                 className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#2a2a3e] text-gray-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors" title="Editar">
+                                 <i className="fas fa-edit text-sm"></i>
+                               </button>
+                             )}
 
-                            {s.estado_calculado === 'pendiente_aprobacion' && (
-                              <>
-                                <button onClick={() => setAprobarModal(s)}
-                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] rounded-md font-medium transition-colors flex items-center gap-1">
-                                  <i className="fas fa-check text-[10px]" />
-                                  Aprobar
-                                </button>
-                                <button onClick={() => { setRechazarModal(s); setMotivoRechazo(''); }} disabled={actionLoading === s.suscripcion_id}
-                                  className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[11px] rounded-md font-medium transition-colors disabled:opacity-50 flex items-center gap-1">
-                                  <i className="fas fa-times text-[10px]" />Rechazar
-                                </button>
-                              </>
-                            )}
+                             {isAdminOsuperior && s.estado_calculado === 'pendiente_aprobacion' && (
+                               <>
+                                 <button onClick={() => setAprobarModal(s)}
+                                   className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] rounded-md font-medium transition-colors flex items-center gap-1">
+                                   <i className="fas fa-check text-[10px]" />
+                                   Aprobar
+                                 </button>
+                                 <button onClick={() => { setRechazarModal(s); setMotivoRechazo(''); }} disabled={actionLoading === s.suscripcion_id}
+                                   className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[11px] rounded-md font-medium transition-colors disabled:opacity-50 flex items-center gap-1">
+                                   <i className="fas fa-times text-[10px]" />Rechazar
+                                 </button>
+                               </>
+                             )}
 
-                            {s.estado_calculado === 'activa' && (
-                              <>
-                                <button onClick={() => confirmAction('¿Cancelar esta suscripción?', () => handleCancelar(s.suscripcion_id))} disabled={actionLoading === s.suscripcion_id}
-                                  className="px-2.5 py-1 bg-gray-600 hover:bg-gray-700 text-white text-[11px] rounded-md font-medium transition-colors disabled:opacity-50 flex items-center gap-1">
-                                  <i className="fas fa-ban text-[10px]" />Cancelar
-                                </button>
-                              </>
-                            )}
+                             {isAdminOsuperior && s.estado_calculado === 'activa' && (
+                               <>
+                                 <button onClick={() => confirmAction('¿Cancelar esta suscripción?', () => handleCancelar(s.suscripcion_id))} disabled={actionLoading === s.suscripcion_id}
+                                   className="px-2.5 py-1 bg-gray-600 hover:bg-gray-700 text-white text-[11px] rounded-md font-medium transition-colors disabled:opacity-50 flex items-center gap-1">
+                                   <i className="fas fa-ban text-[10px]" />Cancelar
+                                 </button>
+                               </>
+                             )}
 
-                            {s.estado_calculado === 'pausada' && (
-                              <button onClick={() => confirmAction('¿Reactivar esta suscripción?', () => handleReactivar(s.suscripcion_id))} disabled={actionLoading === s.suscripcion_id}
-                                className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white text-[11px] rounded-md font-medium transition-colors disabled:opacity-50 flex items-center gap-1">
-                                <i className="fas fa-play text-[10px]" />Reactivar
-                              </button>
-                            )}
+                             {isAdminOsuperior && s.estado_calculado === 'pausada' && (
+                               <button onClick={() => confirmAction('¿Reactivar esta suscripción?', () => handleReactivar(s.suscripcion_id))} disabled={actionLoading === s.suscripcion_id}
+                                 className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white text-[11px] rounded-md font-medium transition-colors disabled:opacity-50 flex items-center gap-1">
+                                 <i className="fas fa-play text-[10px]" />Reactivar
+                               </button>
+                             )}
 
-                            <button onClick={() => confirmAction('¿Eliminar esta suscripción? Esta acción no se puede deshacer.', () => handleEliminar(s.suscripcion_id))} disabled={actionLoading === s.suscripcion_id}
-                              className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#2a2a3e] text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Eliminar">
-                              <i className="fas fa-trash-alt text-sm"></i>
-                            </button>
+                             {isAdminOsuperior && (
+                               <button onClick={() => confirmAction('¿Eliminar esta suscripción? Esta acción no se puede deshacer.', () => handleEliminar(s.suscripcion_id))} disabled={actionLoading === s.suscripcion_id}
+                                 className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#2a2a3e] text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Eliminar">
+                               <i className="fas fa-trash-alt text-sm"></i>
+                             </button>
+                             )}
                           </div>
                         </td>
-                      </tr>
-                    ))}
-                  </tbody>
+                       </tr>
+                     ))}
+                   </tbody>
                 </table>
               </div>
 
