@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // GET: obtener datos del admin autenticado
 // PUT: actualizar nombre/email del admin autenticado
 

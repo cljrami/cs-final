@@ -54,6 +54,7 @@ interface Stats {
   expiradas: number;
   rechazadas: number;
   canceladas: number;
+  vencen_hoy: number;
 }
 
 interface HistorialPausa {
@@ -118,6 +119,7 @@ const statConfig = [
   { key: 'total' as keyof Stats, icon: 'fa-layer-group', label: 'Total', color: '#3b82f6', bgColor: '#1e3a5f' },
   { key: 'pendientes' as keyof Stats, icon: 'fa-clock', label: 'Pendientes', color: '#f59e0b', bgColor: '#3d3d1a' },
   { key: 'activas' as keyof Stats, icon: 'fa-check-circle', label: 'Activas', color: '#10b981', bgColor: '#1a3d2e' },
+  { key: 'vencen_hoy' as keyof Stats, icon: 'fa-hourglass-half', label: 'Vencen hoy', color: '#f97316', bgColor: '#3d2f1a' },
   { key: 'expiradas' as keyof Stats, icon: 'fa-times-circle', label: 'Expiradas', color: '#ef4444', bgColor: '#3d1a1a' },
 ];
 
@@ -246,6 +248,7 @@ export default function SuscripcionesData() {
           expiradas: c.expiradas ?? 0,
           rechazadas: c.rechazadas ?? 0,
           canceladas: c.canceladas ?? 0,
+          vencen_hoy: c.vencen_hoy ?? 0,
         });
         setHasMore(data.pagination?.hasMore ?? data.pagination?.page < data.pagination?.total_pages);
       } else {
@@ -428,8 +431,8 @@ export default function SuscripcionesData() {
       activa: 'bg-emerald-900/40 text-emerald-400 border-emerald-800/50',
       pausada: 'bg-orange-900/40 text-orange-400 border-orange-800/50',
       expirada: 'bg-red-900/40 text-red-400 border-red-800/50',
-      cancelada: 'bg-gray-900/40 text-gray-400 border-gray-700/50',
-      rechazada: 'bg-rose-900/40 text-rose-400 border-rose-800/50',
+      cancelada: 'bg-amber-900/40 text-amber-400 border-amber-800/50',
+      rechazada: 'bg-rose-900/60 text-rose-300 border-rose-600/60 font-semibold',
       sin_plan: 'bg-gray-900/40 text-gray-500 border-gray-700/50',
     };
     const textos: Record<string, string> = {
@@ -481,6 +484,7 @@ export default function SuscripcionesData() {
             { key: 'pendientes', label: 'Pendientes' },
             { key: 'activas', label: 'Activas' },
             { key: 'pausadas', label: 'Pausadas' },
+            { key: 'vencen_hoy', label: 'Vencen hoy' },
             { key: 'expiradas', label: 'Expiradas' },
             { key: 'rechazadas', label: 'Rechazadas' },
             { key: 'canceladas', label: 'Canceladas' },
@@ -492,13 +496,14 @@ export default function SuscripcionesData() {
         <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl overflow-hidden">
           {loading ? (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full" style={{ minWidth: 1100 }}>
                 <thead>
                   <tr className="border-b border-[#2a2a3e] text-left text-xs text-gray-400 uppercase">
                     <th className="px-4 py-3">Escort</th>
                     <th className="px-4 py-3">Plan</th>
                     <th className="px-4 py-3">Estado</th>
                     <th className="px-4 py-3">Pago</th>
+                    <th className="px-4 py-3">Vence</th>
                     <th className="px-4 py-3 text-right">Acciones</th>
                   </tr>
                 </thead>
@@ -531,7 +536,7 @@ export default function SuscripcionesData() {
           ) : (
             <>
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full" style={{ minWidth: 1100 }}>
                   <thead>
                     <tr className="border-b border-[#2a2a3e] text-left text-xs text-gray-400 uppercase">
                       <th className="px-4 py-3">Escort</th>
@@ -539,13 +544,14 @@ export default function SuscripcionesData() {
                       <th className="px-4 py-3">Estado</th>
 
                       <th className="px-4 py-3">Pago</th>
+                      <th className="px-4 py-3">Vence</th>
                       <th className="px-4 py-3 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
                     {suscripciones.map((s) => (
-                      <tr key={s.suscripcion_id} className={`border-b border-[#2a2a3e] last:border-0 hover:bg-[#252538] transition-colors ${s.estado_calculado === 'cancelada' || s.estado_calculado === 'rechazada' ? 'opacity-50' : ''}`}>
-                        <td className="px-4 py-3">
+                      <tr key={s.suscripcion_id} className="border-b border-[#2a2a3e] last:border-0 hover:bg-[#252538] transition-colors">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-[#2a2a3e] flex items-center justify-center text-gray-400 overflow-hidden flex-shrink-0">
                               {s.foto_principal ? (
@@ -563,7 +569,7 @@ export default function SuscripcionesData() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <div className="w-7 h-7 rounded-md flex items-center justify-center text-white font-bold text-[10px] flex-shrink-0" style={{ backgroundColor: s.color_badge }}>
                               {s.plan_badge ? s.plan_badge.charAt(0) : 'P'}
@@ -575,7 +581,7 @@ export default function SuscripcionesData() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex flex-col gap-1">
                             <div className="flex items-center gap-1.5">
                               <i className={`fas ${getEstadoIcon(s.estado_calculado)} text-[10px] ${s.estado_calculado === 'activa' ? 'text-emerald-400' : s.estado_calculado === 'pendiente_aprobacion' ? 'text-yellow-400' : s.estado_calculado === 'pausada' ? 'text-orange-400' : s.estado_calculado === 'rechazada' ? 'text-rose-400' : 'text-red-400'}`} />
@@ -588,7 +594,7 @@ export default function SuscripcionesData() {
                           </div>
                         </td>
 
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <div className="text-sm text-white font-medium">{formatMoney(s.precio_pagado)}</div>
                           <div className="text-xs text-gray-500">{s.moneda}</div>
                           {s.comprobante_pago && (
@@ -598,7 +604,22 @@ export default function SuscripcionesData() {
                             </a>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {(() => {
+                            const ven = s.fecha_fin ? new Date(s.fecha_fin + 'T12:00:00') : null;
+                            const hoy = new Date();
+                            hoy.setHours(12, 0, 0, 0);
+                            const diff = ven ? Math.round((ven.getTime() - hoy.getTime()) / 86400000) : null;
+                            const hoyClass = diff === 0 ? 'text-red-400 font-bold' : diff !== null && diff <= 7 ? 'text-amber-400 font-semibold' : 'text-white';
+                            return (
+                              <>
+                                <div className={`text-sm ${hoyClass}`}>{formatDate(s.fecha_fin)}</div>
+                                <div className="text-[11px] text-gray-500">Vence</div>
+                              </>
+                            );
+                          })()}
+                        </td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
                             <button onClick={() => fetchDetalle(s.suscripcion_id)}
                               className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#2a2a3e] text-gray-400 hover:text-blue-400 hover:bg-blue-500/10 transition-colors" title="Ver detalle">

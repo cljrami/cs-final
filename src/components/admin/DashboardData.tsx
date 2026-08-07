@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import StatCard from './StatCard';
 import ActivityChart from './ActivityChart';
 import RecentEscorts from './RecentEscorts';
-import EscortsTable from './EscortsTable';
+import UltimosPagos from './UltimosPagos';
 
 interface Stats {
   total: number;
@@ -11,6 +11,7 @@ interface Stats {
   aprobadas: number;
   pausadas: number;
   por_vencer: number;
+  vence_hoy: number;
   rechazadas: number;
   verificadas: number;
   vip: number;
@@ -71,6 +72,24 @@ interface Escort {
   activa: number;
   created_at: string;
   foto_principal?: string | null;
+  plan_base?: string | null;
+  plan_badge?: string | null;
+  plan_inicio?: string | null;
+  plan_fin?: string | null;
+  extras?: string | null;
+  estado_plan?: string | null;
+}
+
+interface Pago {
+  escort_id: number;
+  escort_nombre: string;
+  foto_principal?: string | null;
+  plan_nombre: string;
+  plan_tipo: string;
+  precio_pagado: string | number;
+  moneda: string;
+  fecha_aprobacion: string;
+  fecha_fin: string;
 }
 
 export default function DashboardData() {
@@ -81,7 +100,7 @@ export default function DashboardData() {
   const [topEscorts, setTopEscorts] = useState<TopEscort[]>([]);
   const [porVencer, setPorVencer] = useState<PorVencer[]>([]);
   const [recentEscorts, setRecentEscorts] = useState<Escort[]>([]);
-  const [escorts, setEscorts] = useState<Escort[]>([]);
+  const [ultimosPagos, setUltimosPagos] = useState<Pago[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -108,7 +127,7 @@ export default function DashboardData() {
         setTopEscorts(data.topEscorts || []);
         setPorVencer(data.porVencer || []);
         setRecentEscorts(data.recentEscorts || []);
-        setEscorts(data.escorts || []);
+        setUltimosPagos(data.ultimosPagos || []);
       } else {
         setError(data.error || 'Error al cargar datos');
       }
@@ -177,21 +196,13 @@ export default function DashboardData() {
         })()}
 
         {/* Stats grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-          <StatCard icon="fa-users" value={stats?.total ?? 0} label="Total Escorts" color="#3b82f6" loading={loading} />
-          <StatCard icon="fa-check-circle" value={stats?.aprobadas ?? 0} label="Activas" color="#10b981" loading={loading} />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <StatCard icon="fa-users" value={stats?.total ?? 0} label="Total Escorts" color="#3b82f6" loading={loading} href="/admin/escorts" />
+          <StatCard icon="fa-check-circle" value={stats?.aprobadas ?? 0} label="Activas" color="#10b981" loading={loading} href="/admin/escorts" />
           <StatCard icon="fa-pause-circle" value={stats?.pausadas ?? 0} label="Pausadas" color="#f59e0b" loading={loading} />
-          <StatCard icon="fa-city" value={stats?.total_ciudades ?? 0} label="Ciudades" color="#a855f7" loading={loading} />
-          <StatCard icon="fa-star" value={stats?.nuevas_hoy ?? 0} label="Nuevas Hoy" color="#ef4444" loading={loading} />
-        </div>
-
-        {/* Stats acción */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-          <StatCard icon="fa-user-clock" value={stats?.pendientes ?? 0} label="Por aprobar" color="#f97316" loading={loading} href="/admin/escorts" />
-          <StatCard icon="fa-star" value={stats?.vip ?? 0} label="VIP Activos" color="#eab308" loading={loading} href="/admin/vip-activos" />
+          <StatCard icon="fa-user-clock" value={stats?.pendientes ?? 0} label="Pendientes" color="#f97316" loading={loading} href="/admin/escorts" />
+          <StatCard icon="fa-clock" value={stats?.vence_hoy ?? 0} label="Vencen hoy" color="#8b5cf6" loading={loading} href="/admin/suscripciones" />
           <StatCard icon="fa-shield-alt" value={stats?.verificadas ?? 0} label="Verificadas" color="#06b6d4" loading={loading} href="/admin/verificaciones" />
-          <StatCard icon="fa-flag" value={stats?.destacadas ?? 0} label="Destacadas" color="#ec4899" loading={loading} />
-          <StatCard icon="fa-clock" value={stats?.por_vencer ?? 0} label="Por vencer (7d)" color="#8b5cf6" loading={loading} href="/admin/suscripciones" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -353,11 +364,7 @@ export default function DashboardData() {
 
         <RecentEscorts escorts={recentEscorts} loading={loading} />
 
-        <h2 className="text-xl font-bold flex items-center gap-2">
-          <i className="fas fa-users text-red-500"></i>
-          Gestión de Escorts
-        </h2>
-        <EscortsTable escorts={escorts} loading={loading} />
+        <UltimosPagos pagos={ultimosPagos} loading={loading} />
       </div>
   );
 }

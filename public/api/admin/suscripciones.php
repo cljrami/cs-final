@@ -260,13 +260,26 @@ try {
 
     // Filtro por estado
     if ($estado !== 'todos') {
-        $estadosValidos = ['activa', 'expirada', 'cancelada', 'pausada', 'rechazada', 'pendiente_aprobacion'];
-        if (in_array($estado, $estadosValidos)) {
-            if ($estado === 'pendiente_aprobacion') {
-                $where .= " AND s.fecha_aprobacion IS NULL";
-            } else {
-                $where .= " AND s.estado = ?";
-                $params[] = $estado;
+        $mapEstados = [
+            'pendientes' => 'pendiente_aprobacion',
+            'activas' => 'activa',
+            'pausadas' => 'pausada',
+            'expiradas' => 'expirada',
+            'rechazadas' => 'rechazada',
+            'canceladas' => 'cancelada',
+        ];
+        if ($estado === 'vencen_hoy') {
+            $where .= " AND s.estado = 'activa' AND s.fecha_fin = CURDATE()";
+        } elseif (isset($mapEstados[$estado])) {
+            $estado = $mapEstados[$estado];
+            $estadosValidos = ['activa', 'expirada', 'cancelada', 'pausada', 'rechazada', 'pendiente_aprobacion'];
+            if (in_array($estado, $estadosValidos)) {
+                if ($estado === 'pendiente_aprobacion') {
+                    $where .= " AND s.fecha_aprobacion IS NULL";
+                } else {
+                    $where .= " AND s.estado = ?";
+                    $params[] = $estado;
+                }
             }
         }
     }
@@ -431,7 +444,8 @@ try {
             SUM(CASE WHEN s.estado = 'pausada' THEN 1 ELSE 0 END) as pausadas,
             SUM(CASE WHEN s.estado = 'expirada' OR (s.estado = 'activa' AND s.fecha_fin < CURDATE()) THEN 1 ELSE 0 END) as expiradas,
             SUM(CASE WHEN s.estado = 'rechazada' THEN 1 ELSE 0 END) as rechazadas,
-            SUM(CASE WHEN s.estado = 'cancelada' THEN 1 ELSE 0 END) as canceladas
+            SUM(CASE WHEN s.estado = 'cancelada' THEN 1 ELSE 0 END) as canceladas,
+            SUM(CASE WHEN s.estado = 'activa' AND s.fecha_fin = CURDATE() THEN 1 ELSE 0 END) as vencen_hoy
         FROM suscripciones s
         JOIN escorts e ON e.id = s.escort_id
         JOIN planes p ON p.id = s.plan_id
@@ -455,7 +469,8 @@ try {
             'pausadas' => (int)$counts['pausadas'],
             'expiradas' => (int)$counts['expiradas'],
             'rechazadas' => (int)$counts['rechazadas'],
-            'canceladas' => (int)$counts['canceladas']
+            'canceladas' => (int)$counts['canceladas'],
+            'vencen_hoy' => (int)$counts['vencen_hoy']
         ]
     ]);
 } catch (PDOException $e) {

@@ -183,7 +183,7 @@ try {
             $stmtFijos->execute(array_merge([$ciudadId], $paramsBase, [$limit, $offset]));
             $fijos = $stmtFijos->fetchAll(PDO::FETCH_ASSOC);
 
-            // Random para llenar slots vacíos (solo no-sticky)
+            // Random para llenar slots vacíos (excluir solo los que YA tienen posición sticky asignada)
             $slotsLibres = max(0, $limit - count($fijos));
             $stmtRand = $pdo->prepare("
                 SELECT $selectFields,
@@ -194,7 +194,7 @@ try {
                 LEFT JOIN escort_fotos pf ON pf.escort_id = e.id AND pf.es_portada = 1
                 LEFT JOIN sticky_posiciones sp ON sp.escort_id = e.id AND sp.ciudad_id = ?
                 WHERE $baseWhere
-                  AND NOT $stickySQL
+                  AND NOT (sp.orden > 0 AND $stickySQL)
                 ORDER BY RAND()
                 LIMIT ?
             ");
@@ -233,7 +233,7 @@ try {
                 LEFT JOIN escort_fotos pf ON pf.escort_id = e.id AND pf.es_portada = 1
                 LEFT JOIN sticky_posiciones sp ON sp.escort_id = e.id AND sp.ciudad_id = ?
                 WHERE $baseWhere
-                  AND NOT $stickySQL
+                  AND NOT (sp.orden > 0 AND $stickySQL)
             ");
             $stmtRand->execute(array_merge([$ciudadId], $paramsBase));
             $todosRandom = $stmtRand->fetchAll(PDO::FETCH_ASSOC);

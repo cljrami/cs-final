@@ -35,10 +35,14 @@ try {
         $where = "WHERE e.eliminada = 0 AND p.tipo = 'extra'";
 
         if ($estado !== 'todos') {
-            $estadosValidos = ['activa', 'expirada', 'cancelada', 'rechazada', 'pendiente_aprobacion'];
-            if (in_array($estado, $estadosValidos)) {
+            $estadosValidos = ['activa', 'expirada', 'cancelada', 'rechazada', 'pendiente_aprobacion', 'pausada'];
+            if ($estado === 'vencen_hoy') {
+                $where .= " AND s.estado = 'activa' AND s.fecha_fin = CURDATE()";
+            } elseif (in_array($estado, $estadosValidos)) {
                 if ($estado === 'pendiente_aprobacion') {
                     $where .= " AND s.fecha_aprobacion IS NULL AND (s.estado IS NULL OR s.estado = '' OR s.estado = 'pendiente_aprobacion')";
+                } elseif ($estado === 'rechazada') {
+                    $where .= " AND s.estado IN ('rechazada', 'cancelada')";
                 } else {
                     $where .= " AND s.estado = ?";
                     $params[] = $estado;
@@ -193,8 +197,10 @@ try {
                 SUM(CASE WHEN s.estado = 'activa' AND s.fecha_fin >= CURDATE() THEN 1 ELSE 0 END) as activas,
                 SUM(CASE WHEN s.estado = 'pausada' THEN 1 ELSE 0 END) as pausadas,
                 SUM(CASE WHEN s.estado = 'expirada' OR (s.estado = 'activa' AND s.fecha_fin < CURDATE()) THEN 1 ELSE 0 END) as expiradas,
-                SUM(CASE WHEN s.estado = 'rechazada' THEN 1 ELSE 0 END) as rechazadas,
-                SUM(CASE WHEN s.estado = 'cancelada' THEN 1 ELSE 0 END) as canceladas
+                SUM(CASE WHEN s.estado = 'rechazada' OR s.estado = 'cancelada' THEN 1 ELSE 0 END) as rechazadas,
+                SUM(CASE WHEN s.estado = 'activa' AND s.fecha_fin = CURDATE() THEN 1 ELSE 0 END) as vencen_hoy,
+                SUM(CASE WHEN s.estado = 'activa' AND s.fecha_fin > CURDATE() AND s.fecha_fin <= DATE_ADD(CURDATE(), INTERVAL 7 DAY) THEN 1 ELSE 0 END) as por_vencer,
+                SUM(CASE WHEN s.estado = 'activa' AND s.precio_pagado > 0 THEN s.precio_pagado ELSE 0 END) as recaudo
             FROM suscripciones s
             JOIN escorts e ON e.id = s.escort_id
             JOIN planes p ON p.id = s.plan_id
@@ -218,7 +224,9 @@ try {
                 'pausadas' => (int)$counts['pausadas'],
                 'expiradas' => (int)$counts['expiradas'],
                 'rechazadas' => (int)$counts['rechazadas'],
-                'canceladas' => (int)$counts['canceladas']
+                'vencen_hoy' => (int)$counts['vencen_hoy'],
+                'por_vencer' => (int)$counts['por_vencer'],
+                'recaudo' => (float)$counts['recaudo']
             ]
         ]);
         exit;

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../bootstrap.php'; // early bootstrap para verifyToken
 // public/api/escort/solicitar-plan.php
 // Solicitar plan base o extra (destacado). Valida todas las reglas de negocio.

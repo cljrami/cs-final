@@ -274,6 +274,19 @@ function e($str)
     return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8');
 }
 
+// Slug amigable de ciudad (consistente con sitemap.php y /escorts-{slug})
+function entradaSlug($nombre)
+{
+    $mapa = [
+        'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u',
+        'ñ' => 'n', 'ü' => 'u', 'Á' => 'a', 'É' => 'e', 'Í' => 'i',
+        'Ó' => 'o', 'Ú' => 'u', 'Ñ' => 'n', 'Ü' => 'u',
+    ];
+    $nombre = strtr((string) $nombre, $mapa);
+    $s = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', $nombre));
+    return trim($s, '-');
+}
+
 // === PÍGINA: Escort no encontrada ===
 function showNotFound($mensaje = 'Escort no encontrada')
 {
@@ -871,7 +884,7 @@ function showNotAvailable($escort)
                 return;
             }
             list.innerHTML = filtered.map(function(c) {
-                return '<a href="/ciudad?nombre=' + encodeURIComponent(c.nombre) + '" class="flex items-center justify-between px-5 py-3 hover:bg-white/5 transition-colors group">' +
+                return '<a href="/escorts-' + slugify(c.nombre) + '" class="flex items-center justify-between px-5 py-3 hover:bg-white/5 transition-colors group">' +
                     '<div class="flex items-center gap-3">' +
                     '<div class="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center group-hover:bg-red-500/20 transition-colors"><i class="fas fa-city text-red-400 text-xs"></i></div>' +
                     '<span class="text-ink text-sm font-medium capitalize">' + escapar(c.nombre) + '</span>' +
@@ -885,6 +898,15 @@ function showNotAvailable($escort)
         }
 
         search?.addEventListener('input', function() { renderCiudades(ciudadesCache); });
+
+        function slugify(nombre) {
+            return nombre
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '');
+        }
 
         function escapar(s) {
             var d = document.createElement('div');
@@ -903,7 +925,7 @@ function showNotAvailable($escort)
             <nav class="flex items-center gap-2 text-sm mb-8 text-muted">
                 <a href="/" class="hover:text-red-400 transition-colors"><?= htmlspecialchars($nav['inicio'], ENT_QUOTES, 'UTF-8') ?></a>
                 <span>/</span>
-                <a href="/ciudad?nombre=<?= urlencode($ciudadEfectiva) ?>" class="hover:text-red-400 transition-colors capitalize"><?= e($ciudadEfectiva) ?></a>
+                <a href="/escorts-<?= entradaSlug($ciudadEfectiva) ?>" class="hover:text-red-400 transition-colors capitalize"><?= e($ciudadEfectiva) ?></a>
                 <span>/</span>
                 <span class="text-muted"><?= e($escort['nombre']) ?></span>
             </nav>

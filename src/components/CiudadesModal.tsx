@@ -49,8 +49,9 @@ export default function CiudadesModal({ isOpen, onClose }: Props) {
   );
 
   const handleSelect = (ciudad: Ciudad) => {
-    const slug = ciudad.slug || ciudad.nombre.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-    window.location.href = `/ciudad/${encodeURIComponent(slug)}`;
+    const slug = ciudad.slug
+      || ciudad.nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    window.location.href = `/escorts-${slug}`;
   };
 
   if (!isOpen) return null;

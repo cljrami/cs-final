@@ -31,7 +31,17 @@ interface ExtraSuscripcion {
   };
 }
 
-interface Counts { todos: number; pendientes: number; activas: number; expiradas: number; rechazadas: number; canceladas: number; }
+interface Counts {
+  todos: number;
+  pendientes: number;
+  activas: number;
+  pausadas: number;
+  expiradas: number;
+  rechazadas: number;
+  vencen_hoy: number;
+  por_vencer: number;
+  recaudo: number;
+}
 
 const API_URL = '/api/admin/solicitudes-extras.php';
 
@@ -50,13 +60,18 @@ const estadoConfig: Record<string, { bg: string; text: string; icon: string; lab
   pendiente_aprobacion: { bg: '#3d3d1a', text: '#fbbf24', icon: 'fa-clock', label: 'Pendiente' },
   activa: { bg: '#1a3d2e', text: '#10b981', icon: 'fa-check-circle', label: 'Activa' },
   expirada: { bg: '#2a1a1a', text: '#ef4444', icon: 'fa-hourglass-end', label: 'Expirada' },
+  pausada: { bg: '#1a2d3d', text: '#3b82f6', icon: 'fa-pause-circle', label: 'Pausado' },
   cancelada: { bg: '#2a1a1a', text: '#ef4444', icon: 'fa-ban', label: 'Cancelada' },
   rechazada: { bg: '#2a1a1a', text: '#ef4444', icon: 'fa-times-circle', label: 'Rechazada' },
 };
 
+function formatMoney(amount: number): string {
+  return '$' + Math.round(amount).toLocaleString('es-CL');
+}
+
 export default function SolicitudesExtrasData() {
   const [items, setItems] = useState<ExtraSuscripcion[]>([]);
-  const [counts, setCounts] = useState<Counts>({ todos: 0, pendientes: 0, activas: 0, expiradas: 0, rechazadas: 0, canceladas: 0 });
+  const [counts, setCounts] = useState<Counts>({ todos: 0, pendientes: 0, activas: 0, pausadas: 0, expiradas: 0, rechazadas: 0, vencen_hoy: 0, por_vencer: 0, recaudo: 0 });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -95,7 +110,7 @@ export default function SolicitudesExtrasData() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Error');
       setItems(data.suscripciones || []);
-      setCounts(data.counts || { todos: 0, pendientes: 0, activas: 0, expiradas: 0, rechazadas: 0, canceladas: 0 });
+      setCounts(data.counts || { todos: 0, pendientes: 0, activas: 0, pausadas: 0, expiradas: 0, rechazadas: 0, vencen_hoy: 0, por_vencer: 0, recaudo: 0 });
       setTotalPages(data.pagination?.total_pages || 1);
     } catch (err: any) {
       setError(err.message);
@@ -257,8 +272,9 @@ export default function SolicitudesExtrasData() {
     { key: 'todos', label: 'Todos', icon: 'fa-list' },
     { key: 'pendiente_aprobacion', label: 'Pendientes', icon: 'fa-clock' },
     { key: 'activa', label: 'Activas', icon: 'fa-check-circle' },
+    { key: 'pausada', label: 'Pausadas', icon: 'fa-pause-circle' },
+    { key: 'vencen_hoy', label: 'Vencen hoy', icon: 'fa-hourglass-half' },
     { key: 'expirada', label: 'Expiradas', icon: 'fa-hourglass-end' },
-    { key: 'cancelada', label: 'Canceladas', icon: 'fa-ban' },
     { key: 'rechazada', label: 'Rechazadas', icon: 'fa-times-circle' },
   ];
 
@@ -332,11 +348,16 @@ export default function SolicitudesExtrasData() {
         <p className="text-gray-400 mt-1">Gestiona las solicitudes de extras contratados por las escorts</p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-3 gap-4">
         <StatCard label="Total" value={counts.todos} icon="fa-list" color="#6b7280" loading={isLoading} />
         <StatCard label="Pendientes" value={counts.pendientes} icon="fa-clock" color="#fbbf24" loading={isLoading} />
         <StatCard label="Activas" value={counts.activas} icon="fa-check-circle" color="#10b981" loading={isLoading} />
-        <StatCard label="Expiradas" value={counts.expiradas} icon="fa-hourglass-end" color="#ef4444" loading={isLoading} />
+        <StatCard label="Pausadas" value={counts.pausadas} icon="fa-pause-circle" color="#3b82f6" loading={isLoading} />
+        <StatCard label="Vencen hoy" value={counts.vencen_hoy} icon="fa-hourglass-half" color="#f97316" loading={isLoading} />
+        <StatCard label="Por vencer (7d)" value={counts.por_vencer} icon="fa-hourglass-start" color="#f59e0b" loading={isLoading} />
+        <StatCard label="Rechazadas" value={counts.rechazadas} icon="fa-times-circle" color="#ef4444" loading={isLoading} />
+        <StatCard label="Expiradas" value={counts.expiradas} icon="fa-hourglass-end" color="#7f1d1d" loading={isLoading} />
+        <StatCard label="Recaudado" value={formatMoney(counts.recaudo)} icon="fa-money-bill-wave" color="#10b981" loading={isLoading} />
       </div>
 
       {successMsg && (

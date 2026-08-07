@@ -11,6 +11,10 @@ interface Stats {
   activas: number;
   pendientes: number;
   rechazadas: number;
+  pausadas: number;
+  verificadas: number;
+  vip: number;
+  vencen_hoy: number;
   papelera: number;
 }
 
@@ -79,7 +83,7 @@ const planEstadoConfig: Record<string, { bg: string; text: string; icon: string;
 
 export default function EscortsData() {
   const [items, setItems] = useState<Escort[]>([]);
-  const [stats, setStats] = useState<Stats>({ total: 0, activas: 0, pendientes: 0, rechazadas: 0, papelera: 0 });
+  const [stats, setStats] = useState<Stats>({ total: 0, activas: 0, pendientes: 0, rechazadas: 0, pausadas: 0, verificadas: 0, vip: 0, vencen_hoy: 0, papelera: 0 });
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 50, total: 0, pages: 1, hasMore: false });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -108,7 +112,7 @@ export default function EscortsData() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Error al cargar');
       setItems(data.escorts || []);
-      setStats(data.stats || { total: 0, activas: 0, pendientes: 0, rechazadas: 0, papelera: 0 });
+      setStats(data.stats || { total: 0, activas: 0, pendientes: 0, rechazadas: 0, pausadas: 0, verificadas: 0, vip: 0, vencen_hoy: 0, papelera: 0 });
       if (data.pagination) {
         setPagination(data.pagination);
       }
@@ -223,10 +227,10 @@ export default function EscortsData() {
       ];
     }
     return [
-      ...(item.activa === 0 || item.activa === -1 ? [
+      ...(item.suscripcion_estado !== 'pausada' && (item.activa === 0 || item.activa === -1) ? [
         { label: 'Aprobar', icon: 'fa-check', onClick: () => setApproveConfirm(item) },
       ] : []),
-      ...(item.activa === 0 || item.activa === 1 ? [
+      ...(item.suscripcion_estado !== 'pausada' && (item.activa === 0 || item.activa === 1) ? [
         { label: 'Rechazar', icon: 'fa-times', danger: true, onClick: () => setRejectConfirm(item) },
       ] : []),
       {
@@ -404,6 +408,10 @@ export default function EscortsData() {
     { label: 'Total Escorts', value: stats.total, icon: 'fa-users', color: '#eab308' },
     { label: 'Activas', value: stats.activas, icon: 'fa-check-circle', color: '#22c55e' },
     { label: 'Pendientes', value: stats.pendientes, icon: 'fa-clock', color: '#fbbf24' },
+    { label: 'Pausadas', value: stats.pausadas, icon: 'fa-pause-circle', color: '#3b82f6' },
+    { label: 'Vencen hoy', value: stats.vencen_hoy, icon: 'fa-hourglass-half', color: '#f97316' },
+    { label: 'Verificadas', value: stats.verificadas, icon: 'fa-check-double', color: '#8b5cf6' },
+    { label: 'VIP', value: stats.vip, icon: 'fa-crown', color: '#eab308' },
     { label: 'Rechazadas', value: stats.rechazadas, icon: 'fa-times-circle', color: '#ef4444' },
   ];
 
@@ -418,7 +426,7 @@ export default function EscortsData() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
         {statCards.map(s => (
           <StatCard key={s.label} label={s.label} value={s.value} icon={s.icon} color={s.color} loading={isLoading} />
         ))}
@@ -446,6 +454,8 @@ export default function EscortsData() {
           { key: 'todos', label: 'Todas' },
           { key: 'activas', label: 'Activas' },
           { key: 'pendientes', label: 'Pendientes' },
+          { key: 'pausadas', label: 'Pausadas' },
+          { key: 'vencen_hoy', label: 'Vencen hoy' },
           { key: 'rechazadas', label: 'Rechazadas' },
           { key: 'papelera', label: 'Papelera' },
         ]}

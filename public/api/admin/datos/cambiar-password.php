@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // POST: cambiar contraseíƒÂ±a del admin autenticado
 
 header('Content-Type: application/json');

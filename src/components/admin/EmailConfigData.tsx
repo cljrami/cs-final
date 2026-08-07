@@ -29,6 +29,10 @@ export default function EmailConfigData() {
   const [showPreview, setShowPreview] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
 
+  const [testTo, setTestTo] = useState('');
+  const [testSending, setTestSending] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
   const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : '';
 
   const mailHeader = (title: string) => `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>body{margin:0;padding:0;background-color:#0a0a0f;font-family:Arial,Helvetica,sans-serif}p{color:#9ca3af;font-size:15px;line-height:1.6;margin:0 0 12px 0}strong{color:#ffffff}a{color:#ef4444;text-decoration:none;font-weight:600}table.info{width:100%;background:#0f0f1a;border-radius:12px;padding:16px;margin:16px 0;border-collapse:collapse}table.info td{color:#9ca3af;padding:4px 0}table.info td:last-child{color:#ffffff;font-weight:600}ul,ol{color:#d1d5db;padding-left:20px;margin:12px 0}li{margin:4px 0}.btn{display:inline-block;background:linear-gradient(135deg,#ef4444,#dc2626);color:#ffffff;padding:14px 32px;border-radius:12px;text-decoration:none;font-weight:700;font-size:16px}.fallback{color:#6b7280;font-size:12px;word-break:break-all;margin:8px 0 0 0}.warning{color:#9ca3af;font-size:13px;margin:8px 0 0 0}.text-center{text-align:center}.text-green{color:#22c55e}.text-red{color:#ef4444}.text-amber{color:#fbbf24}</style></head><body style="margin:0;padding:0;background-color:#0a0a0f;font-family:Arial,Helvetica,sans-serif"><table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:40px 16px"><table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%"><tr><td style="background:#16161f;border-radius:16px;padding:40px;border:1px solid #2a2a3e"><table width="100%" cellpadding="0" cellspacing="0"><tr><td style="text-align:center;padding-bottom:24px"><h1 style="color:#ffffff;font-size:24px;margin:0;font-weight:700">${title}</h1></td></tr><tr><td style="color:#9ca3af;font-size:15px;line-height:1.6">`;
@@ -113,6 +117,25 @@ export default function EmailConfigData() {
     }, 0);
   };
 
+  const handleSendTest = async () => {
+    if (!testTo.trim()) { setTestResult({ ok: false, msg: 'Indica un correo de destino' }); return; }
+    setTestSending(true);
+    setTestResult(null);
+    try {
+      const res = await fetch('/api/admin/email-config.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action: 'prueba', to: testTo.trim() }),
+      });
+      const data = await res.json();
+      setTestResult({ ok: data.success, msg: data.success ? (data.message || 'Correo enviado') : (data.error || 'No se pudo enviar') });
+    } catch {
+      setTestResult({ ok: false, msg: 'Error de conexión' });
+    } finally {
+      setTestSending(false);
+    }
+  };
+
   const handleSaveTemplate = async () => {
     if (!editModal) return;
     if (!editAsunto.trim()) { setErrorMsg('El asunto es requerido'); return; }
@@ -181,11 +204,36 @@ export default function EmailConfigData() {
                 className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500" />
             </div>
           </div>
-          <button onClick={handleSaveConfig} disabled={saving}
-            className="mt-4 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
-            {saving && <i className="fas fa-spinner fa-spin"></i>}
-            <i className="fas fa-save"></i> Guardar
-          </button>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button onClick={handleSaveConfig} disabled={saving}
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
+              {saving && <i className="fas fa-spinner fa-spin"></i>}
+              <i className="fas fa-save"></i> Guardar
+            </button>
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-[#2a2a3e]">
+            <h4 className="text-white font-semibold text-sm mb-1 flex items-center gap-2">
+              <i className="fas fa-paper-plane text-green-400"></i> Enviar correo de prueba
+            </h4>
+            <p className="text-xs text-gray-500 mb-3">Verifica que el envío de emails funciona enviando un correo de prueba a cualquier dirección.</p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input type="email" value={testTo} placeholder="destino@ejemplo.cl"
+                onChange={(e) => { setTestTo(e.target.value); setTestResult(null); }}
+                className="flex-1 bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-green-500" />
+              <button onClick={handleSendTest} disabled={testSending}
+                className="px-5 py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors">
+                {testSending && <i className="fas fa-spinner fa-spin"></i>}
+                <i className="fas fa-paper-plane"></i> Enviar prueba
+              </button>
+            </div>
+            {testResult && (
+              <div className={`mt-3 px-3 py-2 rounded-lg text-sm flex items-center gap-2 ${testResult.ok ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
+                <i className={`fas ${testResult.ok ? 'fa-check-circle' : 'fa-exclamation-circle'}`}></i>
+                {testResult.msg}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Templates */}

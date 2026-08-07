@@ -30,6 +30,12 @@ RewriteRule ^ - [R=204,L]
 RewriteRule ^robots\.txt$ robots.php [L,QSA]
 
 # ============================================
+# CIUDAD - Redirigir 301 /ciudad/{slug} → /escorts-{slug}
+# (se coloca antes del bloque -f/-d para capturar siempre la URL vieja)
+# ============================================
+RewriteRule ^ciudad/([^/]+)/?$ /escorts-$1 [R=301,L]
+
+# ============================================
 # ARCHIVOS/CARPETAS EXISTENTES - No redirigir
 # ============================================
 RewriteCond %{REQUEST_FILENAME} -f [OR]
@@ -60,11 +66,12 @@ RewriteRule ^(\d+)/?$ escort.php?id=$1 [L,QSA]
 RewriteRule ^sitemap\.xml$ sitemap.php [L,QSA]
 
 # ============================================
-# CIUDAD /{slug} → ciudad/index.html
+# CIUDAD /escorts-{slug} → ciudad/{slug}/index.html (pagina SEO estatica)
 # ============================================
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ciudad/([^/]+)/?$ ciudad/index.html [L,QSA]
+RewriteCond %{DOCUMENT_ROOT}/ciudad/$1/index.html -f
+RewriteRule ^escorts-([a-z0-9-]+)/?$ /ciudad/$1/index.html [L,QSA]
 
 # ============================================
 # PÁGINAS ASTRO - Servir HTML estático si existe

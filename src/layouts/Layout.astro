@@ -13,9 +13,10 @@ interface Props {
   showNavFooter?: boolean;
   page?: string;
   vars?: Record<string, string>;
+  canonical?: string;
 }
 
-const { title, description = "Directorio Premium de Escorts en Chile", showNavFooter = true, page = "", vars = {} } =
+const { title, description = "Directorio Premium de Escorts en Chile", showNavFooter = true, page = "", vars = {}, canonical = "" } =
   Astro.props;
 
 let siteConfig: Record<string, any> = {
@@ -64,8 +65,9 @@ const seoDescription = resolvedDesc || description || siteConfig.seo_description
 const seoKeywords = siteConfig.seo_keywords;
 const seoUrl = siteConfig.seo_url;
 const seoBase = (siteConfig.seo_url as string) || "https://kimi.zona8.cl/";
-const seoCanonical = Astro.url?.pathname
-  ? new URL(Astro.url.pathname, seoBase).href
+const canonicalPath = canonical || Astro.url?.pathname || '';
+const seoCanonical = canonicalPath
+  ? new URL(canonicalPath, seoBase).href
   : siteConfig.seo_canonical || seoUrl || seoBase;
 const seoRobots = siteConfig.seo_robots;
 const seoAuthor = siteConfig.seo_author;

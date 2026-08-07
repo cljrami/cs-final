@@ -1,6 +1,7 @@
 ---
 // src/pages/ciudad/[slug].astro
-// Página SEO por ciudad: /ciudad/{slug} → ciudad/{slug}/index.html
+// Página SEO por ciudad: /escorts-{slug} → ciudad/{slug}/index.html
+// La URL pública /escorts-{slug} se resuelve vía .htaccess a esta página estática.
 import Layout from "../../layouts/Layout.astro";
 import CiudadEscorts from "../../components/CiudadEscorts";
 
@@ -10,17 +11,17 @@ interface Ciudad {
 }
 
 export async function getStaticPaths() {
-  const SOURCES = [
-    "http://localhost/api/ciudades/listado.php",
-    "https://kimi.zona8.cl/api/ciudades/listado.php",
-  ];
-  const slugify = (nombre: string) =>
-    nombre
+  function slugify(nombre: string): string {
+    return nombre
       .toLowerCase()
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "");
+  }
+  const SOURCES = [
+    "https://kimi.zona8.cl/api/ciudades/listado.php",
+  ];
   let ciudades: Ciudad[] = [];
   for (const src of SOURCES) {
     try {
@@ -28,7 +29,10 @@ export async function getStaticPaths() {
         fetch(src),
         new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 8000)),
       ]);
-      const data = await res.json();
+      const raw = await res.text();
+      // Eliminar UTF-8 BOM si está presente
+      const cleaned = raw.startsWith('\uFEFF') ? raw.slice(1) : raw;
+      const data = JSON.parse(cleaned);
       if (data.success && Array.isArray(data.data) && data.data.length > 0) {
         ciudades = data.data
           .filter((c: any) => c && c.nombre)
@@ -40,14 +44,14 @@ export async function getStaticPaths() {
       }
     } catch (e) {}
   }
-  return ciudades.map((c) => ({ params: { slug: c.slug }, props: { ciudad: c.nombre } }));
+  return ciudades.map((c) => ({ params: { slug: c.slug }, props: { ciudadNombre: c.nombre, slug: c.slug } }));
 }
 
-const { ciudad } = Astro.props as { ciudad: string };
+const { ciudadNombre, slug } = Astro.props as { ciudadNombre: string; slug: string };
 ---
 
-<Layout title="Escorts por Ciudad" page="ciudad" vars={{ ciudad }}>
+<Layout title="Escorts por Ciudad" page="ciudad" vars={{ ciudad: ciudadNombre }} canonical={`/escorts-${slug}`}>
   <main class="min-h-screen bg-page">
-    <CiudadEscorts client:only="react" ciudadInicial={ciudad} />
+    <CiudadEscorts client:only="react" ciudadInicial={ciudadNombre} />
   </main>
 </Layout>

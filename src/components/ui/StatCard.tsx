@@ -29,7 +29,7 @@ export default function StatCard({ icon, value, label, color, loading }: StatCar
         <div className="text-xl md:text-2xl font-bold leading-none">
           {loading ? <div className="animate-pulse bg-gray-800 rounded-lg" style={{ width: 50, height: 28 }} /> : value}
         </div>
-        <div className="text-xs md:text-sm text-admin-muted mt-1 truncate">{label}</div>
+        <div className="text-xs md:text-sm text-admin-muted mt-1 leading-snug">{label}</div>
       </div>
     </div>
   );

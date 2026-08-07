@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * sitemap.php - Genera el sitemap.xml configurable desde el panel admin.
  */
@@ -102,7 +102,7 @@ try {
             if ($slug === '') continue;
             $lastmod = isset($c['updated_at']) && $c['updated_at'] ? date('Y-m-d', strtotime($c['updated_at'])) : date('Y-m-d');
             $xml .= "  <url>\n";
-            $xml .= "    <loc>{$base}/ciudad/{$slug}</loc>\n";
+            $xml .= "    <loc>{$base}/escorts-{$slug}</loc>\n";
             $xml .= "    <lastmod>{$lastmod}</lastmod>\n";
             $xml .= "    <changefreq>{$cfg['sitemap_freq_ciudad']}</changefreq>\n";
             $xml .= "    <priority>{$cfg['sitemap_priority_ciudad']}</priority>\n";

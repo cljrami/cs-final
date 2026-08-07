@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
@@ -29,18 +29,28 @@ try {
     $search = trim($_GET['search'] ?? '');
     $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
     $limit = isset($_GET['limit']) ? max(1, min(100, intval($_GET['limit']))) : 50;
-    $offset = ($page - 1) * $limit;
+$offset = ($page - 1) * $limit;
+
+    // Subconsulta: estado del último plan base (extra_tipo IS NULL)
+    $ultimoBaseEstado = "(SELECT b2.estado FROM suscripciones b2 JOIN planes q2 ON q2.id = b2.plan_id WHERE b2.escort_id = e.id AND q2.extra_tipo IS NULL ORDER BY b2.creado_en DESC LIMIT 1)";
+    $ultimoBaseFin = "(SELECT b3.fecha_fin FROM suscripciones b3 JOIN planes q3 ON q3.id = b3.plan_id WHERE b3.escort_id = e.id AND q3.extra_tipo IS NULL ORDER BY b3.creado_en DESC LIMIT 1)";
+    $esPausada = "COALESCE($ultimoBaseEstado, '') = 'pausada'";
+    $noPausada = "COALESCE($ultimoBaseEstado, '') <> 'pausada'";
+    $esVenceHoy = "COALESCE($ultimoBaseEstado, '') = 'activa' AND COALESCE($ultimoBaseFin, '') = CURDATE()";
 
     // Stats por suscripcion_estado + eliminadas
     $statsSql = "
         SELECT 
             SUM(CASE WHEN e.eliminada = 1 THEN 1 ELSE 0 END) as papelera,
             SUM(CASE WHEN e.eliminada = 0 THEN 1 ELSE 0 END) as total,
-            SUM(CASE WHEN e.eliminada = 0 AND e.activa = 0 THEN 1 ELSE 0 END) as pendientes,
-            SUM(CASE WHEN e.eliminada = 0 AND e.activa = 1 THEN 1 ELSE 0 END) as activas,
-            SUM(CASE WHEN e.eliminada = 0 AND e.activa = -1 THEN 1 ELSE 0 END) as rechazadas
+            SUM(CASE WHEN e.eliminada = 0 AND e.activa = 0 AND $noPausada THEN 1 ELSE 0 END) as pendientes,
+            SUM(CASE WHEN e.eliminada = 0 AND e.activa = 1 AND $noPausada THEN 1 ELSE 0 END) as activas,
+            SUM(CASE WHEN e.eliminada = 0 AND e.activa = -1 THEN 1 ELSE 0 END) as rechazadas,
+            SUM(CASE WHEN e.eliminada = 0 AND e.activa <> -1 AND COALESCE($ultimoBaseEstado, '') = 'pausada' THEN 1 ELSE 0 END) as pausadas,
+            SUM(CASE WHEN e.eliminada = 0 AND e.verificado = 1 THEN 1 ELSE 0 END) as verificadas,
+            SUM(CASE WHEN e.eliminada = 0 AND e.vip = 1 THEN 1 ELSE 0 END) as vip,
+            SUM(CASE WHEN e.eliminada = 0 AND $esVenceHoy THEN 1 ELSE 0 END) as vencen_hoy
         FROM escorts e
-        LEFT JOIN suscripciones s ON s.id = (SELECT s2.id FROM suscripciones s2 WHERE s2.escort_id = e.id ORDER BY s2.creado_en DESC LIMIT 1)
     ";
     $statsRow = $pdo->query($statsSql)->fetch(PDO::FETCH_ASSOC);
 
@@ -49,6 +59,10 @@ try {
         'pendientes' => (int)$statsRow['pendientes'],
         'activas' => (int)$statsRow['activas'],
         'rechazadas' => (int)$statsRow['rechazadas'],
+        'pausadas' => (int)$statsRow['pausadas'],
+        'verificadas' => (int)$statsRow['verificadas'],
+        'vip' => (int)$statsRow['vip'],
+        'vencen_hoy' => (int)$statsRow['vencen_hoy'],
         'papelera' => (int)$statsRow['papelera'],
     ];
 
@@ -60,12 +74,18 @@ try {
         $where[] = 'e.eliminada = 1';
     } else {
         $where[] = 'e.eliminada = 0';
-        switch ($estado) {
+switch ($estado) {
             case 'pendientes':
-                $where[] = 'e.activa = 0';
+                $where[] = 'e.activa = 0 AND ' . $noPausada;
                 break;
             case 'activas':
-                $where[] = 'e.activa = 1';
+                $where[] = 'e.activa = 1 AND ' . $noPausada;
+                break;
+            case 'pausadas':
+                $where[] = 'e.activa <> -1 AND ' . $esPausada;
+                break;
+            case 'vencen_hoy':
+                $where[] = 'e.activa = 1 AND ' . $esVenceHoy;
                 break;
             case 'rechazadas':
                 $where[] = 'e.activa = -1';

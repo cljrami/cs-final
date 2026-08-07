@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // public/api/escort/perfil-publico.php
 // 
 // Perfil público individual de una escort.
