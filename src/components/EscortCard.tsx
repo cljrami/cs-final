@@ -15,14 +15,22 @@ function getImageSrcSet(src: string): string {
     .join(', ');
 }
 
+function getResizedSrc(src: string): string {
+  if (!src) return '';
+  const base = src.split('?')[0];
+  const ext = base.split('.').pop()?.toLowerCase();
+  if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext || '')) return src;
+  return `${base}?w=640&q=65&fm=webp`;
+}
+
 function getBlurDataURL(src: string): string {
   if (!src) return '';
   // Very small base64 placeholder - 10px blurred version
   return `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAFUlEQVR42mNk+M9Qz0AEYBxVSF+FAAh5DwHEEwKLAAAAABJRU5ErkJggg==`;
 }
 
-export default function EscortCard({ escort, skeleton = false }: EscortCardProps) {
-  const imgSrc = escort.foto_principal;
+export default function EscortCard({ escort, skeleton = false, priority = false }: EscortCardProps) {
+  const imgSrc = getResizedSrc(escort.foto_principal);
   const srcSet = getImageSrcSet(imgSrc || '');
   const blurDataURL = getBlurDataURL(imgSrc || '');
 
@@ -59,8 +67,11 @@ export default function EscortCard({ escort, skeleton = false }: EscortCardProps
               src={imgSrc}
               srcSet={srcSet}
               alt={escort.nombre}
+              width={320}
+              height={427}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              loading="lazy"
+              loading={priority ? 'eager' : 'lazy'}
+              fetchPriority={priority ? 'high' : 'auto'}
               decoding="async"
               style={{ opacity: 1 }}
               onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}

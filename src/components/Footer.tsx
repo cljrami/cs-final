@@ -51,14 +51,14 @@ export default function Footer() {
               contacto@{siteName.toLowerCase()}.cl
             </a>
             <div className="mt-4 flex gap-3">
-              <a href="#" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-muted hover:text-ink hover:bg-white/10 transition-all">
-                <i className="fab fa-twitter text-sm"></i>
+              <a href="#" aria-label="Twitter" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-muted hover:text-ink hover:bg-white/10 transition-all">
+                <i className="fab fa-twitter text-sm" aria-hidden="true"></i>
               </a>
-              <a href="#" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-muted hover:text-ink hover:bg-white/10 transition-all">
-                <i className="fab fa-instagram text-sm"></i>
+              <a href="#" aria-label="Instagram" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-muted hover:text-ink hover:bg-white/10 transition-all">
+                <i className="fab fa-instagram text-sm" aria-hidden="true"></i>
               </a>
-              <a href="#" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-muted hover:text-ink hover:bg-white/10 transition-all">
-                <i className="fab fa-telegram text-sm"></i>
+              <a href="#" aria-label="Telegram" className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-muted hover:text-ink hover:bg-white/10 transition-all">
+                <i className="fab fa-telegram text-sm" aria-hidden="true"></i>
               </a>
             </div>
           </div>
@@ -66,7 +66,7 @@ export default function Footer() {
 
         <div className="mt-12 pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-muted text-xs">© {new Date().getFullYear()} {siteName.toLowerCase()}.cl - Todos los derechos reservados.</p>
-          <p className="text-gray-700 text-xs">Solo para mayores de 18 años.</p>
+          <p className="text-muted text-xs">Solo para mayores de 18 años.</p>
         </div>
       </div>
     </footer>

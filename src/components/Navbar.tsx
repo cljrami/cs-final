@@ -212,9 +212,12 @@ export default function Navbar() {
           {/* Mobile menu button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label={mobileMenuOpen ? 'Cerrar menú' : 'Abrir menú'}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-menu"
             className="md:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-white/5"
           >
-            <i className={`fas ${mobileMenuOpen ? 'fa-times' : 'fa-bars'}`}></i>
+            <i className={`fas ${mobileMenuOpen ? 'fa-times' : 'fa-bars'}`} aria-hidden="true"></i>
           </button>
           <button
             onClick={toggleTheme}
@@ -228,7 +231,7 @@ export default function Navbar() {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-page border-t border-white/5 px-4 py-4 space-y-2">
+        <div id="mobile-menu" className="md:hidden bg-page border-t border-white/5 px-4 py-4 space-y-2">
           <a href="/" className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium bg-red-500/10 text-red-400">
             <i className="fas fa-home w-5"></i>{T.inicio}
           </a>

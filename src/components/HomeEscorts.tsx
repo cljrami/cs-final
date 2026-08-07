@@ -102,8 +102,8 @@ export default function HomeEscorts() {
 
       <div id="escorts-grid" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         {escorts.length > 0 ? (
-          escorts.map((escort) => (
-            <EscortCard key={escort.id} escort={escort} skeleton={loading} />
+          escorts.map((escort, i) => (
+            <EscortCard key={escort.id} escort={escort} skeleton={loading} priority={i === 0} />
           ))
         ) : loading ? (
           Array.from({ length: 8 }).map((_, i) => (

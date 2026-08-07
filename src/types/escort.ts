@@ -39,6 +39,7 @@ export interface Escort {
 export interface EscortCardProps {
   escort: Escort;
   skeleton?: boolean;
+  priority?: boolean;
 }
 
 export interface Filters {
