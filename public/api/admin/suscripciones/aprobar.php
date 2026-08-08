@@ -23,7 +23,7 @@ try {
 
     if (!$suscripcionId) {
         http_response_code(400);
-        echo json_encode(['error' => 'ID de suscripciíƒÂ³n requerido']);
+        echo json_encode(['error' => 'ID de suscripción requerido']);
         exit;
     }
 
@@ -46,7 +46,7 @@ try {
     if (!$suscripcion) {
         $db->rollBack();
         http_response_code(404);
-        echo json_encode(['error' => 'SuscripciíƒÂn no encontrada']);
+        echo json_encode(['error' => 'Suscripción no encontrada']);
         exit;
     }
 
@@ -60,7 +60,7 @@ try {
     if ($suscripcion['fecha_aprobacion'] !== null) {
         $db->rollBack();
         http_response_code(400);
-        echo json_encode(['error' => 'Esta suscripciíƒÂ³n ya fue aprobada']);
+        echo json_encode(['error' => 'Esta suscripción ya fue aprobada']);
         exit;
     }
 
@@ -69,12 +69,18 @@ try {
         $usado = $db->prepare("
             SELECT id FROM planes_usados 
             WHERE plan_id = ? AND email = ?
+            UNION
+            SELECT s.id FROM suscripciones s
+            JOIN planes p ON p.id = s.plan_id
+            JOIN escorts e ON e.id = s.escort_id
+            WHERE e.email = ? AND p.id = ? AND p.uso_unico = 1 AND s.fecha_aprobacion IS NOT NULL
+            LIMIT 1
         ");
-        $usado->execute([$suscripcion['plan_id'], $suscripcion['escort_email']]);
+        $usado->execute([$suscripcion['plan_id'], $suscripcion['escort_email'], $suscripcion['escort_email'], $suscripcion['plan_id']]);
         if ($usado->fetch()) {
             $db->rollBack();
             http_response_code(400);
-            echo json_encode(['error' => 'Esta escort ya usíƒÂ³ el plan gratuito']);
+            echo json_encode(['error' => 'Esta escort ya usó el plan gratuito']);
             exit;
         }
     }
@@ -223,14 +229,14 @@ try {
     ");
     $notif->execute([
         $suscripcion['escort_id'],
-        "Tu plan '{$suscripcion['plan_nombre']}' ha sido aprobado. VíƒÂ¡lido hasta {$fechaFin}."
+        "Tu plan '{$suscripcion['plan_nombre']}' ha sido aprobado. Válido hasta {$fechaFin}."
     ]);
 
     $db->commit();
 
     echo json_encode([
         'success' => true,
-        'message' => 'SuscripciíƒÂ³n aprobada correctamente',
+        'message' => 'Suscripción aprobada correctamente',
         'fecha_fin' => $fechaFin
     ]);
 } catch (PDOException $e) {

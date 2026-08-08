@@ -45,6 +45,9 @@ try {
                 e.telefono,
                 COALESCE(NULLIF(e.foto_principal, ''), pf.url) as foto_principal,
                 e.ciudad,
+                e.ciudad as ciudad_base,
+                e.en_gira,
+                gc.nombre as gira_ciudad,
                 e.sticky,
                 e.sticky_expira,
                 e.activa,
@@ -55,11 +58,17 @@ try {
                 sp.ciudad_id as sticky_ciudad_id
             FROM escorts e
             LEFT JOIN escort_fotos pf ON pf.escort_id = e.id AND pf.es_portada = 1
+            LEFT JOIN ciudades gc ON gc.id = e.gira_ciudad_id
             LEFT JOIN suscripciones s ON s.escort_id = e.id AND s.estado = 'activa' AND s.fecha_fin >= CURDATE()
             LEFT JOIN planes p ON p.id = s.plan_id
             LEFT JOIN sticky_posiciones sp ON sp.escort_id = e.id AND sp.ciudad_id = ?
             WHERE e.eliminada = 0
-                " . ($ciudadId > 0 ? "AND e.ciudad = (SELECT nombre FROM ciudades WHERE id = ? LIMIT 1)" : "") . "
+                " . ($ciudadId > 0
+                    ? "AND (e.ciudad = (SELECT nombre FROM ciudades WHERE id = ? LIMIT 1)
+                          OR (e.en_gira = 1 AND (e.gira_fecha_inicio IS NULL OR e.gira_fecha_inicio <= CURDATE())
+                              AND (e.gira_fecha_fin IS NULL OR e.gira_fecha_fin >= CURDATE())
+                              AND e.gira_ciudad_id = ?))"
+                    : "") . "
                 " . ($search !== '' ? "AND (e.id LIKE ? OR e.nombre LIKE ? OR e.email LIKE ? OR e.telefono LIKE ? OR e.ciudad LIKE ?)" : "") . "
             GROUP BY e.id
             ORDER BY e.sticky DESC, sticky_orden ASC, e.nombre ASC
@@ -70,6 +79,8 @@ try {
 
         // Parámetro 2 (solo si hay ciudadId > 0): el WHERE e.ciudad = (SELECT... WHERE id = ?)
         if ($ciudadId > 0) {
+            $params[] = $ciudadId;
+            // Parámetro 3: e.gira_ciudad_id = ?
             $params[] = $ciudadId;
         }
 

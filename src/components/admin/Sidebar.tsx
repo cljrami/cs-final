@@ -8,7 +8,8 @@ interface SidebarProps {
 
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: 'fa-chart-line', href: '/admin', countKey: null },
-  { id: 'escorts', label: 'Escorts', icon: 'fa-users', href: '/admin/escorts', countKey: 'escorts' },
+   { id: 'escorts', label: 'Escorts', icon: 'fa-users', href: '/admin/escorts', countKey: 'escorts' },
+  { id: 'escorts-gira', label: 'Escorts en Gira', icon: 'fa-route', href: '/admin/escorts-gira', countKey: 'escortsEnGira' },
   { id: 'usuarios', label: 'Usuarios', icon: 'fa-user', href: '/admin/usuarios', countKey: null },
   { id: 'suscripciones', label: 'Suscripciones', icon: 'fa-calendar-check', href: '/admin/suscripciones', countKey: 'suscripcionesPendientes' },
   { id: 'verificaciones', label: 'Verificaciones', icon: 'fa-id-card', href: '/admin/verificaciones', countKey: 'verificaciones' },
@@ -68,6 +69,7 @@ const configItems = [
   const visibleMenuItems = menuItems.filter(item => {
     if (item.id === 'dashboard') return true;
     if (item.id === 'escorts') return true;
+    if (item.id === 'escorts-gira') return true;
     if (item.id === 'verificaciones') return true;
     if (item.id === 'comentarios') return true;
     if (item.id === 'reportes') return true;

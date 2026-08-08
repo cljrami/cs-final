@@ -3,7 +3,6 @@ import EscortLayout from "../../layouts/EscortLayout.astro";
 import EscortSidebar from "../../components/escort/EscortSidebar";
 import EscortAuthGuard from "../../components/escort/EscortAuthGuard";
 import MiPlanComponent from "../../components/escort/MiPlan";
-import AprobacionRequerida from "../../components/escort/AprobacionRequerida";
 ---
 
 <EscortLayout title="Mi Plan - CS Panel" activePage="mi-plan">
@@ -11,9 +10,7 @@ import AprobacionRequerida from "../../components/escort/AprobacionRequerida";
 
   <EscortAuthGuard client:load>
     <div class="w-full max-w-full">
-      <AprobacionRequerida client:load>
-        <MiPlanComponent client:load />
-      </AprobacionRequerida>
+      <MiPlanComponent client:load />
     </div>
   </EscortAuthGuard>
 </EscortLayout>

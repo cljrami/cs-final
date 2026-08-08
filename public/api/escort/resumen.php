@@ -72,8 +72,13 @@ try {
 
     if (!$cuentaAprobada) {
         $susFallback = $pdo->prepare("
-            SELECT 1 FROM suscripciones 
-            WHERE escort_id = ? AND fecha_aprobacion IS NOT NULL
+            SELECT 1 FROM suscripciones s
+            JOIN planes p ON p.id = s.plan_id AND p.tipo = 'base'
+            WHERE s.escort_id = ?
+              AND s.fecha_aprobacion IS NOT NULL
+              AND s.eliminada = 0
+              AND s.estado IN ('activa', 'pausada')
+              AND (s.estado = 'pausada' OR s.fecha_fin >= CURDATE())
             LIMIT 1
         ");
         $susFallback->execute([$escortId]);

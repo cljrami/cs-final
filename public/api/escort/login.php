@@ -54,7 +54,12 @@ try {
 
     if ((int)$escort['eliminada'] === 1) {
         http_response_code(403);
-        echo json_encode(['success' => false, 'error' => 'Cuenta eliminada']);
+        echo json_encode([
+            'success' => false,
+            'error' => 'Cuenta eliminada',
+            'eliminada' => true,
+            'mensaje' => 'Tu cuenta fue eliminada. Para volver a publicar, regístrate nuevamente con este mismo email: tu cuenta se reactivará automáticamente y deberás seleccionar un plan de pago.'
+        ]);
         exit;
     }
 

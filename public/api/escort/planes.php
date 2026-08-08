@@ -75,6 +75,7 @@ try {
             p.duracion_dias,
             p.nombre as plan_nombre,
             CASE 
+                WHEN s.estado = 'cancelada' THEN 'cancelada'
                 WHEN s.fecha_aprobacion IS NULL THEN 'pendiente_aprobacion'
                 WHEN s.estado = 'pausada' THEN 'pausada'
                 WHEN s.estado = 'activa' AND s.fecha_fin >= CURDATE() THEN 'activa'
@@ -98,13 +99,21 @@ try {
     $tienePlanBaseVigente = $planBaseActivo && in_array($planBaseActivo['estado_calculado'], array('activa', 'pausada'));
     $diasRestantesBase = $planBaseActivo ? (int)$planBaseActivo['dias_restantes'] : 0;
 
-    // Verificar si ya usó plan gratuito (plan_id = 1)
+    // Verificar si ya usó un plan de uso único (gratuito)
     $stmtUsado = $pdo->prepare("
         SELECT COUNT(*) as usado 
-        FROM planes_usados 
-        WHERE email = ? AND plan_id = 1
+        FROM (
+            SELECT 1 FROM planes_usados pu
+            JOIN planes p ON p.id = pu.plan_id
+            WHERE pu.email = ? AND p.uso_unico = 1
+            UNION
+            SELECT 1 FROM suscripciones s
+            JOIN planes p ON p.id = s.plan_id
+            JOIN escorts e ON e.id = s.escort_id
+            WHERE e.email = ? AND p.uso_unico = 1 AND s.fecha_aprobacion IS NOT NULL
+        ) u
     ");
-    $stmtUsado->execute(array($escortEmail));
+    $stmtUsado->execute(array($escortEmail, $escortEmail));
     $yaUsoGratis = (bool)$stmtUsado->fetch(PDO::FETCH_ASSOC)['usado'];
 
     // Obtener todos los planes activos
@@ -141,8 +150,8 @@ try {
 
         // Lógica para planes BASE
         if ($plan['tipo'] === 'base') {
-            // Plan gratuito (id=1) solo se puede usar una vez
-            if ($plan['id'] == 1 && $yaUsoGratis) {
+            // Plan de uso único (gratuito) solo se puede usar una vez
+            if (!empty($plan['uso_unico']) && $yaUsoGratis) {
                 $planFormateado['no_disponible'] = true;
                 $planFormateado['motivo_no_disponible'] = 'Ya usaste el plan gratuito';
             }

@@ -8,6 +8,9 @@ interface Escort {
   email: string;
   foto_principal: string | null;
   ciudad: string | null;
+  ciudad_base: string | null;
+  en_gira: number | null;
+  gira_ciudad: string | null;
   sticky: boolean;
   sticky_orden: number;
   sticky_expira: string | null;
@@ -314,7 +317,17 @@ export default function StickyAdmin() {
                         )}
                       </p>
                       <p className="text-gray-500 text-xs truncate flex items-center gap-2 mt-0.5">
-                        {e.ciudad || 'Sin ciudad'}
+                        {e.en_gira ? (
+                          <>
+                            <i className="fas fa-car-side text-blue-400"></i>
+                            <span className="text-blue-400">{e.gira_ciudad || 'En gira'}</span>
+                            <span className="text-gray-600">← base: {e.ciudad_base || '—'}</span>
+                          </>
+                        ) : (
+                          <>
+                            {e.ciudad || 'Sin ciudad'}
+                          </>
+                        )}
                         <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[0.55rem] font-medium ${badge.bg} ${badge.text}`}>
                           {badge.label}
                         </span>

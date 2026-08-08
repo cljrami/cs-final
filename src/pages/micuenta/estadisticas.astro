@@ -1,8 +1,16 @@
 ---
 import EscortLayout from "../../layouts/EscortLayout.astro";
+import EscortAuthGuard from "../../components/escort/EscortAuthGuard";
+import AprobacionRequerida from "../../components/escort/AprobacionRequerida";
 import EstadisticasDashboard from "../../components/escort/EstadisticasDashboard";
 ---
 
-<EscortLayout title="Estadísticas">
-  <EstadisticasDashboard client:load />
+<EscortLayout title="Estadísticas - CS Panel" activePage="estadisticas">
+  <EscortAuthGuard client:load>
+    <div class="w-full max-w-full">
+      <AprobacionRequerida client:load>
+        <EstadisticasDashboard client:load />
+      </AprobacionRequerida>
+    </div>
+  </EscortAuthGuard>
 </EscortLayout>

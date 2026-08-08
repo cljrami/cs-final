@@ -18,6 +18,7 @@ try {
         exit;
     }
 
+    $ciudadNorm = normalizar_ciudad($ciudad);
     $pdo = getDBConnection();
 
     // Obtener ciudad_id para sticky_posiciones
@@ -33,9 +34,10 @@ try {
     $joinCategorias = "LEFT JOIN categorias c ON e.categoria_id = c.id";
 
     $giraCond = gira_activa();
-    $efectivaCond = "(({$giraCond} AND gc.nombre = ?) OR (NOT ({$giraCond}) AND e.ciudad = ?))";
+    // Comparación normalizada: insensible a acentos y mayúsculas
+    $efectivaCond = "(({$giraCond} AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(gc.nombre, 'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u'),'ñ','n')) = ?) OR (NOT ({$giraCond}) AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(e.ciudad, 'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u'),'ñ','n')) = ?))";
     $baseWhere = "e.activa = 1 AND e.eliminada = 0 AND {$efectivaCond} AND EXISTS (SELECT 1 FROM suscripciones s JOIN planes p ON p.id = s.plan_id AND p.extra_tipo IS NULL WHERE s.escort_id = e.id AND s.fecha_aprobacion IS NOT NULL AND s.estado = 'activa' AND s.fecha_fin >= CURDATE())";
-    $paramsBase = [$ciudad, $ciudad];
+    $paramsBase = [$ciudadNorm, $ciudadNorm];
 
     // Búsqueda completa en TODOS los campos del perfil + servicios + categorías
     if (!empty($_GET['q'])) {
@@ -108,12 +110,20 @@ try {
         c.nombre as categoria_nombre
     ";
 
-    // Una escort es efefectivamente sticky si tiene sticky vigente o un extra sticky activo.
-    // (Solo esas pueden ocupar posiciones fijas; el resto va al pool random.)
-    $stickySQL = "(e.sticky = 1 AND (e.sticky_expira IS NULL OR e.sticky_expira >= CURDATE()) OR EXISTS (SELECT 1 FROM suscripciones se JOIN planes pe ON pe.id = se.plan_id AND pe.extra_tipo = 'sticky' WHERE se.escort_id = e.id AND se.estado = 'activa' AND se.fecha_fin >= CURDATE()))";
+    // Una escort es efefectivamente sticky en la ciudad destino solo si tiene posición sticky
+    // asignada EN ESA CIUDAD (sp.orden > 0 con sp.ciudad_id = ciudadId).
+    // NOTA: para escorts en gira, el sticky de su ciudad base NO debe excluirlos del random
+    //       en la ciudad destino. Por eso NO usamos e.sticky global aquí.
+    // Importante: usamos COALESCE para manejar LEFT JOIN sin sticky_posiciones (NULL → 0).
+    // Sin COALESCE, "NOT (sp.ciudad_id = ? AND sp.orden > 0)" evalúa a NOT(NULL) = NULL (falso),
+    // excluyendo TODOS los escorts no sticky del pool random.
+    $stickySQL = "(COALESCE(sp.ciudad_id, 0) = {$ciudadId} AND COALESCE(sp.orden, 0) > 0)";
 
     // === Sort por nuevas (sección "Nuevas en {ciudad}"): aprobadas en los últimos 5 días ===
+    // NOTA: escorts en gira a otra ciudad se incluyen siempre (no filtramos por fecha_aprobacion
+    //       porque pueden haber sido aprobadas meses antes de hacerse cargo en gira).
     if ($sort === 'nuevas' || $sort === 'created_at') {
+        $giraCond = gira_activa();
         $stmt = $pdo->prepare("
             SELECT $selectFields,
                    (SELECT COUNT(*) FROM favoritos f WHERE f.escort_id = e.id) as likes
@@ -123,8 +133,8 @@ try {
             LEFT JOIN escort_fotos pf ON pf.escort_id = e.id AND pf.es_portada = 1
             LEFT JOIN sticky_posiciones sp ON sp.escort_id = e.id AND sp.ciudad_id = ?
             WHERE $baseWhere
-              AND (SELECT MIN(s2.fecha_aprobacion) FROM suscripciones s2 JOIN planes p2 ON p2.id = s2.plan_id WHERE s2.escort_id = e.id AND p2.tipo = 'base' AND s2.fecha_aprobacion IS NOT NULL) >= (CURDATE() - INTERVAL 5 DAY)
-            ORDER BY fecha_aprobacion DESC, e.created_at DESC
+              AND ({$giraCond} OR (SELECT MIN(s2.fecha_aprobacion) FROM suscripciones s2 JOIN planes p2 ON p2.id = s2.plan_id WHERE s2.escort_id = e.id AND p2.tipo = 'base' AND s2.fecha_aprobacion IS NOT NULL) >= (CURDATE() - INTERVAL 5 DAY))
+            ORDER BY e.sticky DESC, e.destacado DESC, fecha_aprobacion DESC, e.created_at DESC
             LIMIT ? OFFSET ?
         ");
         $stmt->execute(array_merge([$ciudadId], $paramsBase, [$limit, $offset]));
@@ -175,8 +185,7 @@ try {
                 LEFT JOIN escort_fotos pf ON pf.escort_id = e.id AND pf.es_portada = 1
                 LEFT JOIN sticky_posiciones sp ON sp.escort_id = e.id AND sp.ciudad_id = ?
                 WHERE $baseWhere
-                  AND sp.orden > 0
-                  AND $stickySQL
+                  AND {$stickySQL}
                 ORDER BY sp.orden ASC
                 LIMIT ? OFFSET ?
             ");
@@ -194,7 +203,7 @@ try {
                 LEFT JOIN escort_fotos pf ON pf.escort_id = e.id AND pf.es_portada = 1
                 LEFT JOIN sticky_posiciones sp ON sp.escort_id = e.id AND sp.ciudad_id = ?
                 WHERE $baseWhere
-                  AND NOT (sp.orden > 0 AND $stickySQL)
+                  AND NOT {$stickySQL}
                 ORDER BY RAND()
                 LIMIT ?
             ");
@@ -211,9 +220,8 @@ try {
                 LEFT JOIN escort_fotos pf ON pf.escort_id = e.id AND pf.es_portada = 1
                 LEFT JOIN sticky_posiciones sp ON sp.escort_id = e.id AND sp.ciudad_id = ?
                 WHERE $baseWhere
-                  AND sp.orden > 0
-                  AND $stickySQL
-                  AND sp.orden BETWEEN ? AND ?
+                  AND {$stickySQL}
+                  AND COALESCE(sp.orden, 0) BETWEEN ? AND ?
                 ORDER BY sp.orden ASC
             ");
             $stmtFijos->execute(array_merge([$ciudadId], $paramsBase, [$offset + 1, $offset + $limit]));
@@ -233,7 +241,7 @@ try {
                 LEFT JOIN escort_fotos pf ON pf.escort_id = e.id AND pf.es_portada = 1
                 LEFT JOIN sticky_posiciones sp ON sp.escort_id = e.id AND sp.ciudad_id = ?
                 WHERE $baseWhere
-                  AND NOT (sp.orden > 0 AND $stickySQL)
+                  AND NOT {$stickySQL}
             ");
             $stmtRand->execute(array_merge([$ciudadId], $paramsBase));
             $todosRandom = $stmtRand->fetchAll(PDO::FETCH_ASSOC);

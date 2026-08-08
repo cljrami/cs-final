@@ -6,7 +6,7 @@ import { FreeMode, Navigation } from 'swiper/modules';
 import type { Swiper as SwiperInstance } from 'swiper';
 import 'swiper/css';
 import 'swiper/css/navigation';
-import EscortCard from './EscortCard';
+import EscortCardCompact from './EscortCardCompact';
 import { Skeleton } from './ui/Skeleton';
 import { AVISOS_CAROUSEL, CAROUSEL_DISPONIBLES } from '../lib/carousel';
 
@@ -77,16 +77,24 @@ export default function CiudadCarousel({ ciudad, modo = 'nuevas', limit = 12 }: 
       <div className="relative">
         {loading ? (
           <div className="flex gap-2 pb-2 overflow-hidden">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="flex-1 min-w-0 bg-surface rounded-xl overflow-hidden border border-white/5 animate-pulse">
-                <Skeleton className="aspect-[3/4] w-full !rounded-none" />
-                <div className="p-3 space-y-2">
-                  <Skeleton className="w-2/3 h-3 !rounded-md" />
-                  <Skeleton className="w-1/2 h-2.5 !rounded-md" />
-                  <Skeleton className="w-1/3 h-2.5 !rounded-md" />
+            {modo === 'disponibles' ? (
+              Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="flex-1 min-w-0 flex flex-col items-center animate-pulse">
+                  <div className="w-20 h-20 rounded-full bg-raised shrink-0"></div>
+                  <div className="mt-2 w-12 h-3 bg-surface rounded"></div>
                 </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="flex-1 min-width-0 bg-surface rounded-lg overflow-hidden border border-white/5 animate-pulse">
+                  <Skeleton className="aspect-[1/1] w-full !rounded-none" />
+                  <div className="p-2 space-y-1">
+                    <Skeleton className="w-3/4 h-3 !rounded-md" />
+                    <Skeleton className="w-1/2 h-2.5 !rounded-md" />
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         ) : (
           <Swiper
@@ -143,7 +151,7 @@ export default function CiudadCarousel({ ciudad, modo = 'nuevas', limit = 12 }: 
                     </span>
                   </div>
                 ) : (
-                  <EscortCard escort={e} />
+                  <EscortCardCompact escort={e} />
                 )}
               </SwiperSlide>
             ))}

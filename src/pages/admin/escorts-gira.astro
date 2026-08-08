@@ -1,0 +1,14 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import Sidebar from "../../components/admin/Sidebar";
+import AuthGuard from "../../components/admin/AuthGuard";
+import EscortsGira from "../../components/admin/EscortsGira";
+---
+
+<AdminLayout title="Escorts en Gira" activePage="escorts-gira">
+  <Sidebar slot="sidebar" activePage="escorts-gira" client:load />
+
+  <AuthGuard client:load>
+    <EscortsGira client:load />
+  </AuthGuard>
+</AdminLayout>

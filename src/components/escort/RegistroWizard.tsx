@@ -38,7 +38,7 @@ export default function RegistroWizard() {
       if (data.success) {
         localStorage.setItem('escort_token', data.token);
         localStorage.setItem('escort_data', JSON.stringify(data.escort || {}));
-        window.location.href = '/micuenta/onboarding';
+        window.location.href = '/micuenta/onboarding'; '/micuenta/resumen';
       } else if (data.fieldErrors) {
         setErrors(data.fieldErrors);
         if (data.fieldErrors.general) setErrorMsg(data.fieldErrors.general);

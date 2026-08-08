@@ -11,6 +11,9 @@ try {
     $limit = min(200, max(1, intval($_GET['limit'] ?? 20)));
     $offset = ($page - 1) * $limit;
 
+    // JOIN para nombre de ciudad en gira (necesario para ciudad efectiva)
+    $joinGira = "LEFT JOIN ciudades gc ON gc.id = e.gira_ciudad_id";
+
     $giraCond = gira_activa();
 
     $where = ["e.activa = 1", "e.eliminada = 0",
@@ -20,9 +23,10 @@ try {
     // Determinar ciudad_id para sticky (si se filtra por ciudad)
     $ciudadId = 0;
     if (!empty($_GET['ciudad'])) {
-        $where[] = "(({$giraCond} AND gc.nombre = ?) OR (NOT ({$giraCond}) AND e.ciudad = ?))";
-        $params[] = $_GET['ciudad'];
-        $params[] = $_GET['ciudad'];
+        $ciudadNorm = normalizar_ciudad($_GET['ciudad']);
+        $where[] = "(({$giraCond} AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(gc.nombre, 'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u'),'ñ','n')) = ?) OR (NOT ({$giraCond}) AND LOWER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(e.ciudad, 'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u'),'ñ','n')) = ?))";
+        $params[] = $ciudadNorm;
+        $params[] = $ciudadNorm;
         // Obtener ciudad_id para sticky_posiciones
         $stmtC = $pdo->prepare("SELECT id FROM ciudades WHERE nombre = ? LIMIT 1");
         $stmtC->execute([$_GET['ciudad']]);
@@ -61,9 +65,14 @@ try {
     }
     $whereClause = implode(' AND ', $where);
 
-    // Una escort es efectivamente sticky si tiene sticky vigente o un extra sticky activo.
-    // (Solo esas pueden ocupar posiciones fijas; el resto va al pool random.)
-    $stickySQL = "(e.sticky = 1 AND (e.sticky_expira IS NULL OR e.sticky_expira >= CURDATE()) OR EXISTS (SELECT 1 FROM suscripciones se JOIN planes pe ON pe.id = se.plan_id AND pe.extra_tipo = 'sticky' WHERE se.escort_id = e.id AND se.estado = 'activa' AND se.fecha_fin >= CURDATE()))";
+    // Una escort es efefectivamente sticky en la ciudad destino solo si tiene posición sticky
+    // asignada EN ESA CIUDAD (sp.orden > 0 con sp.ciudad_id = ciudadId).
+    // NOTA: para escorts en gira, el sticky de su ciudad base NO debe excluirlos del random
+    //       en la ciudad destino. Por eso NO usamos e.sticky global aquí.
+    // Importante: usamos COALESCE para manejar LEFT JOIN sin sticky_posiciones (NULL → 0).
+    // Sin COALESCE, "NOT (sp.ciudad_id = ? AND sp.orden > 0)" evalúa a NOT(NULL) = NULL (falso),
+    // excluyendo TODOS los escorts no sticky del pool random.
+    $stickySQL = "(COALESCE(sp.ciudad_id, 0) = {$ciudadId} AND COALESCE(sp.orden, 0) > 0)";
 
     $countStmt = $pdo->prepare("SELECT COUNT(*) FROM escorts e LEFT JOIN ciudades gc ON gc.id = e.gira_ciudad_id WHERE $whereClause");
     $countStmt->execute($params);
@@ -125,9 +134,8 @@ try {
             LEFT JOIN ciudades gc ON gc.id = e.gira_ciudad_id
             LEFT JOIN sticky_posiciones sp ON sp.escort_id = e.id AND sp.ciudad_id = ?
             WHERE $whereClause
-              AND sp.orden > 0
-              AND $stickySQL
-              AND sp.orden BETWEEN ? AND ?
+              AND {$stickySQL}
+              AND COALESCE(sp.orden, 0) BETWEEN ? AND ?
             ORDER BY sp.orden ASC
         ");
         $stmtFijos->execute(array_merge([$ciudadId], $params, [$slotsInicio, $slotsFin]));

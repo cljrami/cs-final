@@ -12,7 +12,6 @@ export default function EscortAuthGuard({ children }: Props) {
   useEffect(() => {
     const token = localStorage.getItem('escort_token');
     const currentPath = window.location.pathname;
-    const isOnboarding = currentPath.includes('/onboarding');
     const isLogin = currentPath.includes('/login');
 
     // Sin token → login
@@ -34,19 +33,8 @@ export default function EscortAuthGuard({ children }: Props) {
         return;
       }
 
-      const primerLogin = tokenData.primer_login ?? 0;
-
-      // Es primer login pero NO está en onboarding → ir a onboarding
-      if (primerLogin === 1 && !isOnboarding) {
-        window.location.replace('/micuenta/onboarding');
-        return;
-      }
-
-      // NO es primer login pero está en onboarding → ir a perfil
-      if (primerLogin === 0 && isOnboarding) {
-        window.location.replace('/micuenta/perfil');
-        return;
-      }
+      // El panel guía la selección de plan mientras la cuenta no esté aprobada
+      // (las secciones bloqueadas llevan a "Mi Plan"). No se fuerza el onboarding.
 
       // Verificar contra el servidor que la cuenta siga activa
       fetch('/api/escort/verificar-sesion.php', {

@@ -23,7 +23,7 @@ try {
 
     if (!$suscripcionId) {
         http_response_code(400);
-        echo json_encode(['error' => 'ID de suscripciíƒÂ³n requerido']);
+        echo json_encode(['error' => 'ID de suscripción requerido']);
         exit;
     }
 
@@ -45,7 +45,7 @@ try {
     if (!$suscripcion) {
         $db->rollBack();
         http_response_code(404);
-        echo json_encode(['error' => 'SuscripciíƒÂn no encontrada o no estíƒÂ pausada']);
+        echo json_encode(['error' => 'Suscripción no encontrada o no está pausada']);
         exit;
     }
 
@@ -139,13 +139,13 @@ try {
     ]);
 
     $db->prepare("INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, url, escort_id) VALUES (NULL, 'sistema', 'Plan reactivado por admin', ?, '/admin/escorts', ?)")
-        ->execute(["El administrador reactivíƒÂ³ el plan '{$suscripcion['plan_nombre']}' de {$suscripcion['escort_nombre']} (ID {$suscripcion['escort_id']}).", $suscripcion['escort_id']]);
+        ->execute(["El administrador reactivó el plan '{$suscripcion['plan_nombre']}' de {$suscripcion['escort_nombre']} (ID {$suscripcion['escort_id']}).", $suscripcion['escort_id']]);
 
     $db->commit();
 
     echo json_encode([
         'success' => true,
-        'message' => 'SuscripciíƒÂ³n reactivada correctamente',
+        'message' => 'Suscripción reactivada correctamente',
         'nueva_fecha_fin' => $nuevaFechaFin,
         'dias_esta_pausa' => $diasEstaPausa
     ]);

@@ -4,6 +4,7 @@ import "@fortawesome/fontawesome-free/css/fontawesome.min.css";
 import "../styles/fa-fontfaces.css";
 import EscortSidebar from "../components/escort/EscortSidebar";
 import NotificationBell from "../components/escort/NotificationBell";
+import GuidedTour from "../components/escort/GuidedTour";
 
 interface Props {
   title: string;
@@ -33,6 +34,9 @@ const { title, activePage = "dashboard" } = Astro.props;
   <body class="bg-escort-bg text-escort-text antialiased overflow-x-hidden">
     <!-- Sidebar: siempre visible, hidratado como React -->
     <EscortSidebar client:load activePage={activePage} />
+
+    <!-- Tour guiado: solo la primera vez (tour_completado en BD) -->
+    <GuidedTour client:load />
 
     <!-- Contenido principal: SIN margen en móvil, CON margen solo en lg+ -->
     <main

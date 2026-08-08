@@ -39,6 +39,8 @@ try {
     $sinceEscorts = getSince('escorts');
     $escorts = safeCount($pdo, "SELECT COUNT(*) FROM escorts WHERE eliminada = 0" . ($sinceEscorts ? " AND created_at > " . $pdo->quote($sinceEscorts) : ""));
 
+    $escortsEnGira = safeCount($pdo, "SELECT COUNT(*) FROM escorts WHERE en_gira = 1 AND eliminada = 0");
+
     $verificacionesPendientes = safeCount($pdo, "SELECT COUNT(*) FROM verificaciones WHERE estado = 'pendiente'");
 
     $verificacionesRechazadas = safeCount($pdo, "SELECT COUNT(*) FROM verificaciones WHERE estado = 'rechazada'");
@@ -102,6 +104,7 @@ try {
         'success' => true,
         'counts' => [
             'escorts' => $escorts,
+            'escortsEnGira' => $escortsEnGira,
             'verificaciones' => $verificacionesTotal,
             'verificacionesPendientes' => $verificacionesPendientes,
             'solicitudesVip' => $solicitudesVip,

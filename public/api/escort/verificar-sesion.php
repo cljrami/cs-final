@@ -11,10 +11,27 @@ try {
 
     $tokenData = requireEscortAuth();
 
+    $pdo = getDBConnection();
+    $colStmt = $pdo->prepare("
+        SELECT COUNT(*) FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'escorts' AND COLUMN_NAME = 'tour_completado'
+    ");
+    $colStmt->execute();
+    $tieneColumna = (int)$colStmt->fetchColumn() > 0;
+
+    $tourCompletado = 0;
+    if ($tieneColumna) {
+        $tourStmt = $pdo->prepare("SELECT tour_completado FROM escorts WHERE id = ?");
+        $tourStmt->execute([$tokenData['id']]);
+        $tourCompletado = (int)$tourStmt->fetchColumn();
+    }
+
     echo json_encode([
         'success' => true,
         'id' => $tokenData['id'],
-        'usuario' => $tokenData['usuario']
+        'usuario' => $tokenData['usuario'],
+        'primer_login' => $tokenData['primer_login'] ?? 0,
+        'tour_completado' => $tourCompletado
     ]);
 } catch (Throwable $e) {
     error_log("Error verificar-sesion.php: " . $e->getMessage());

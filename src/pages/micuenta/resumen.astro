@@ -3,6 +3,7 @@ import EscortLayout from "../../layouts/EscortLayout.astro";
 import EscortSidebar from "../../components/escort/EscortSidebar";
 import EscortAuthGuard from "../../components/escort/EscortAuthGuard";
 import ResumenData from "../../components/escort/ResumenData";
+import AprobacionRequerida from "../../components/escort/AprobacionRequerida";
 ---
 
 <EscortLayout title="Resumen - CS Panel" activePage="resumen">
@@ -10,7 +11,9 @@ import ResumenData from "../../components/escort/ResumenData";
 
   <EscortAuthGuard client:load>
     <div class="w-full max-w-full">
-      <ResumenData client:load />
+      <AprobacionRequerida client:load>
+        <ResumenData client:load />
+      </AprobacionRequerida>
     </div>
   </EscortAuthGuard>
 </EscortLayout>

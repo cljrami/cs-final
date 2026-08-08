@@ -70,6 +70,9 @@ const subEstadoConfig: Record<string, { bg: string; text: string; icon: string; 
   pendiente: { bg: '#3d3d1a', text: '#fbbf24', icon: 'fa-clock', label: 'Pendiente' },
   rechazada: { bg: '#2a1a1a', text: '#ef4444', icon: 'fa-times-circle', label: 'Rechazada' },
   pausada: { bg: '#1a2d3d', text: '#3b82f6', icon: 'fa-pause-circle', label: 'Pausado' },
+  eliminada: { bg: '#1a1a1a', text: '#9ca3af', icon: 'fa-trash-alt', label: 'Eliminada' },
+  expirada: { bg: '#3d2410', text: '#f97316', icon: 'fa-hourglass-end', label: 'Expirada' },
+  sin_plan: { bg: '#1a1a2e', text: '#6b7280', icon: 'fa-minus-circle', label: 'Sin suscripción' },
   sin_suscripcion: { bg: '#1a1a2e', text: '#6b7280', icon: 'fa-minus-circle', label: 'Sin suscripción' },
 };
 
@@ -96,6 +99,8 @@ export default function EscortsData() {
   const [deleting, setDeleting] = useState(false);
   const [restoreConfirm, setRestoreConfirm] = useState<Escort | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [permanentDeleteConfirm, setPermanentDeleteConfirm] = useState<Escort | null>(null);
+  const [permanentDeleting, setPermanentDeleting] = useState(false);
   const [approveConfirm, setApproveConfirm] = useState<Escort | null>(null);
   const [rejectConfirm, setRejectConfirm] = useState<Escort | null>(null);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
@@ -220,11 +225,32 @@ export default function EscortsData() {
     }
   };
 
+  const handlePermanentDelete = async () => {
+    if (!permanentDeleteConfirm) return;
+    setPermanentDeleting(true);
+    try {
+      const res = await fetch('/api/admin/escort-eliminar-definitivo', {
+        method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ id: permanentDeleteConfirm.id }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Error al eliminar definitivamente');
+      showNotification('Escort eliminada permanentemente');
+      setPermanentDeleteConfirm(null);
+      refetch();
+      window.dispatchEvent(new Event('counts-refresh'));
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setPermanentDeleting(false);
+    }
+  };
+
   const getActions = (item: Escort): ActionItem[] => {
     const isInTrash = item.eliminada === 1 || item.eliminada === '1' || item.eliminated === 1;
     if (isInTrash) {
       return [
         { label: 'Restaurar', icon: 'fa-undo', onClick: () => setRestoreConfirm(item) },
+        { label: 'Eliminar definitivamente', icon: 'fa-trash-can', danger: true, onClick: () => setPermanentDeleteConfirm(item) },
       ];
     }
     const isAdminOsuperior = esAdminOSuperior();
@@ -560,6 +586,18 @@ export default function EscortsData() {
         variant="info"
         onConfirm={handleRestore}
         onCancel={() => setRestoreConfirm(null)}
+      />
+
+      {/* Permanent delete modal */}
+      <ConfirmModal
+        isOpen={permanentDeleteConfirm !== null}
+        title="Eliminar definitivamente"
+        message={permanentDeleteConfirm ? `¿Eliminar a ${permanentDeleteConfirm.nombre} de forma permanente? Se borrarán sus fotos, comprobantes, valoraciones, comentarios, suscripciones y todo su historial. Esta acción no se puede deshacer.` : ''}
+        confirmText={permanentDeleting ? 'Eliminando...' : 'Eliminar definitivamente'}
+        variant="danger"
+        confirmDisabled={permanentDeleting}
+        onConfirm={handlePermanentDelete}
+        onCancel={() => setPermanentDeleteConfirm(null)}
       />
     </div>
   );

@@ -352,6 +352,16 @@ try {
                 }
 
                 $pdo->prepare("UPDATE suscripciones SET estado = 'rechazada', fecha_rechazo = NOW(), rechazado_por = ? WHERE id = ?")->execute([$tokenData['id'], $suscripcionId]);
+                // Limpiar flags extra residuales en escorts (bug bloqueo de duplicado)
+                $extraClean = '';
+                if ($sub['extra_tipo'] === 'sticky') $extraClean = 'sticky = 0, sticky_orden = 0, sticky_expira = NULL, ';
+                elseif ($sub['extra_tipo'] === 'destacado') $extraClean = 'destacado = 0, fecha_destacado_expira = NULL, ';
+                if ($extraClean) {
+                    $pdo->prepare("UPDATE escorts SET {$extraClean} updated_at = NOW() WHERE id = ?")->execute([$sub['escort_id']]);
+                    if ($sub['extra_tipo'] === 'sticky') {
+                        $pdo->prepare("DELETE FROM sticky_posiciones WHERE escort_id = ?")->execute([$sub['escort_id']]);
+                    }
+                }
                 $pdo->prepare("INSERT INTO logs_auditoria (usuario_id, escort_id, accion, tabla_afectada, registro_id, datos_nuevos) VALUES (?, ?, 'rechazar_suscripcion', 'suscripciones', ?, ?)")
                     ->execute([$tokenData['id'], $sub['escort_id'], $suscripcionId, json_encode(['motivo' => $motivo])]);
                 $pdo->prepare("INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url) VALUES (?, 'sistema', 'Extra rechazado', ?, '/micuenta/mi-plan')")

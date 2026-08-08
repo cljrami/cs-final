@@ -94,7 +94,7 @@ try {
         exit;
     }
 
-    if ($planBase['plan_id'] == 1) {
+    if (!empty($planBase['uso_unico'])) {
         echo json_encode(['success' => false, 'error' => 'El plan gratuito no incluye VIP. Actualiza a un plan de pago para acceder a VIP.']);
         exit;
     }

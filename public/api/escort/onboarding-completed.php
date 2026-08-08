@@ -33,6 +33,16 @@ try {
         exit;
     }
 
+    // El onboarding solo se puede completar si la escort ya seleccionó su plan
+    // (tiene al menos una suscripción creada). Evita saltarse el plan.
+    $tienePlan = $pdo->prepare("SELECT 1 FROM suscripciones WHERE escort_id = ? LIMIT 1");
+    $tienePlan->execute([$tokenData['id']]);
+    if (!$tienePlan->fetch()) {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'error' => 'Debes seleccionar tu plan primero']);
+        exit;
+    }
+
     // Actualizar en BD
     $stmt = $pdo->prepare("UPDATE escorts SET primer_login = 0 WHERE id = ?");
     $stmt->execute([$tokenData['id']]);

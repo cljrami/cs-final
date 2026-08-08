@@ -1,5 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import AutocompleteField from '../ui/AutocompleteField';
+import GiraDatePresets from './GiraDatePresets';
+import GiraDateRangePicker from './GiraDateRangePicker';
+import GiraPreviewCard from './GiraPreviewCard';
+import { addDays, format, startOfTomorrow } from 'date-fns';
 
 interface Ciudad {
   id: number;
@@ -26,47 +30,84 @@ export default function GiraActivacionPopup({
   const [fechaInicio, setFechaInicio] = useState(initialFechaInicio);
   const [fechaFin, setFechaFin] = useState(initialFechaFin);
   const [error, setError] = useState('');
+  const [duracion, setDuracion] = useState(0);
 
   const giraOptions = useMemo(
     () => ciudades.filter(c => c.id.toString() !== miCiudadId).map(c => ({ id: c.id, nombre: c.nombre })),
     [ciudades, miCiudadId]
   );
 
+  // Smart defaults: tomorrow + 7 days
+  const smartDefault = useMemo(() => {
+    const tomorrow = startOfTomorrow();
+    const end = addDays(tomorrow, 6);
+    return {
+      inicio: format(tomorrow, 'yyyy-MM-dd'),
+      fin: format(end, 'yyyy-MM-dd'),
+    };
+  }, []);
+
   useEffect(() => {
     if (open) {
       setCiudadId(initialCiudadId);
-      setFechaInicio(initialFechaInicio);
-      setFechaFin(initialFechaFin);
+      // Smart defaults if no initial values
+      setFechaInicio(initialFechaInicio || smartDefault.inicio);
+      setFechaFin(initialFechaFin || smartDefault.fin);
       setError('');
     }
-  }, [open, initialCiudadId, initialFechaInicio, initialFechaFin]);
+  }, [open, initialCiudadId, initialFechaInicio, initialFechaFin, smartDefault]);
 
   if (!open) return null;
 
-  const now = new Date().toISOString().split('T')[0];
+  const now = format(new Date(), 'yyyy-MM-dd');
+  const maxFechaFin = format(addDays(new Date(), 365), 'yyyy-MM-dd'); // max 1 year
 
   const handleConfirm = () => {
     if (!ciudadId) { setError('Selecciona una ciudad destino'); return; }
     if (!fechaInicio) { setError('Selecciona la fecha de inicio'); return; }
     if (!fechaFin) { setError('Selecciona la fecha de fin'); return; }
     if (fechaInicio > fechaFin) { setError('La fecha de fin debe ser posterior a la de inicio'); return; }
+    if (duracion > 60) { setError('La gira no puede durar más de 60 días'); return; }
     onConfirm({ ciudadId, fechaInicio, fechaFin });
   };
 
+  const handleDateChange = (inicio: string, fin: string) => {
+    setFechaInicio(inicio);
+    setFechaFin(fin);
+    setError('');
+  };
+
+  const handlePresetSelect = (inicio: string, fin: string) => {
+    setFechaInicio(inicio);
+    setFechaFin(fin);
+    setError('');
+  };
+
+  const ciudadSeleccionada = ciudades.find(c => c.id.toString() === ciudadId);
+  const ciudadBase = ciudades.find(c => c.id.toString() === miCiudadId)?.nombre || '';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-[#1a1a24] border border-purple-500/30 rounded-2xl p-6 md:p-8 w-full max-w-md mx-4 shadow-2xl shadow-purple-500/10" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-fuchsia-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
-            <i className="fas fa-plane-departure text-white text-xl"></i>
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-white">¿Vas a visitar otra ciudad?</h2>
-            <p className="text-sm text-gray-400">Por algún tiempo... cuéntanos a dónde y por cuánto</p>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="bg-[#1a1a24] border border-purple-500/30 rounded-2xl rounded-b-none sm:rounded-2xl w-full max-w-lg mx-4 mb-0 sm:mb-8 shadow-2xl shadow-purple-500/10"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="p-6 pb-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-fuchsia-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
+              <i className="fas fa-plane-departure text-white"></i>
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white">¿Vas a visitar otra ciudad?</h2>
+              <p className="text-sm text-gray-400">Selecciona la ciudad, las fechas y confirma</p>
+            </div>
           </div>
         </div>
 
-        <div className="space-y-4">
+        {/* Body */}
+        <div className="px-6 pb-4 space-y-4">
+          {/* City selector */}
           <AutocompleteField
             label="¿A qué ciudad vas?"
             icon="fa-map-marker-alt"
@@ -77,24 +118,46 @@ export default function GiraActivacionPopup({
             onSelect={(opt) => setCiudadId(opt.id.toString())}
           />
 
+          {/* Quick Presets */}
           <div>
-            <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">Fecha inicio</label>
-            <div className="relative">
-              <i className="fas fa-calendar absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
-              <input type="date" value={fechaInicio} min={now} onChange={e => setFechaInicio(e.target.value)}
-                className="w-full bg-[#0f0f1a] border border-gray-700 rounded-xl py-3 pl-11 pr-4 text-white focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 transition-all text-sm" />
-            </div>
+            <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">
+              Rápido
+            </label>
+            <GiraDatePresets onSelect={handlePresetSelect} />
           </div>
 
+          {/* Date Range Picker */}
           <div>
-            <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">Fecha fin</label>
-            <div className="relative">
-              <i className="fas fa-calendar-check absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
-              <input type="date" value={fechaFin} min={fechaInicio || now} onChange={e => setFechaFin(e.target.value)}
-                className="w-full bg-[#0f0f1a] border border-gray-700 rounded-xl py-3 pl-11 pr-4 text-white focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500/30 transition-all text-sm" />
-            </div>
+            <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">
+              Fechas de tu gira
+            </label>
+            <GiraDateRangePicker
+              valueInicio={fechaInicio}
+              valueFin={fechaFin}
+              minDate={now}
+              maxDate={maxFechaFin}
+              onChange={handleDateChange}
+              onDurationChange={setDuracion}
+            />
           </div>
 
+          {/* Preview Card */}
+          <GiraPreviewCard
+            ciudadNombre={ciudadSeleccionada?.nombre || ''}
+            fechaInicio={fechaInicio}
+            fechaFin={fechaFin}
+            ciudadBase={ciudadBase}
+          />
+
+          {/* Duration warning */}
+          {duracion > 30 && duracion <= 60 && (
+            <div className="bg-amber-500/10 border border-amber-500/30 text-amber-400 px-4 py-2 rounded-xl text-sm flex items-center gap-2">
+              <i className="fas fa-exclamation-triangle"></i>
+              Gira larga: {duracion} días. Se bloqueará sticky en ciudad destino.
+            </div>
+          )}
+
+          {/* Error */}
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-2 rounded-xl text-sm flex items-center gap-2">
               <i className="fas fa-exclamation-triangle"></i>{error}
@@ -102,14 +165,22 @@ export default function GiraActivacionPopup({
           )}
         </div>
 
-        <div className="flex gap-3 mt-6">
-          <button onClick={onClose}
-            className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl font-medium transition-all text-sm">
+        {/* Footer */}
+        <div className="flex gap-3 p-6 pt-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-3 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl font-medium transition-all text-sm"
+          >
             Cancelar
           </button>
-          <button onClick={handleConfirm}
-            className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-fuchsia-600 hover:opacity-90 text-white rounded-xl font-medium transition-all text-sm">
-            <i className="fas fa-check mr-2"></i>Guardar
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={!ciudadId || duracion > 60}
+            className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-fuchsia-600 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-all text-sm flex items-center justify-center gap-2"
+          >
+            <i className="fas fa-check"></i>Guardar gira
           </button>
         </div>
       </div>

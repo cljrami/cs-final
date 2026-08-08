@@ -21,7 +21,7 @@ try {
 
     if (!$suscripcionId) {
         http_response_code(400);
-        echo json_encode(['error' => 'ID de suscripciíƒÂ³n requerido']);
+        echo json_encode(['error' => 'ID de suscripción requerido']);
         exit;
     }
 
@@ -41,7 +41,7 @@ SELECT s.*, e.nombre as escort_nombre, p.nombre as plan_nombre, p.extra_tipo, p.
     if (!$suscripcion) {
         $db->rollBack();
         http_response_code(404);
-        echo json_encode(['error' => 'SuscripciíƒÂn no encontrada']);
+        echo json_encode(['error' => 'Suscripción no encontrada']);
         exit;
     }
 
@@ -104,14 +104,14 @@ SELECT s.*, e.nombre as escort_nombre, p.nombre as plan_nombre, p.extra_tipo, p.
     ");
     $notif->execute([
         $suscripcion['escort_id'],
-        "Tu plan '{$suscripcion['plan_nombre']}' ha sido cancelado por la administraciíƒÂ³n."
+        "Tu plan '{$suscripcion['plan_nombre']}' ha sido cancelado por la administración."
     ]);
 
     $db->commit();
 
     echo json_encode([
         'success' => true,
-        'message' => 'SuscripciíƒÂ³n cancelada correctamente'
+        'message' => 'Suscripción cancelada correctamente'
     ]);
 } catch (PDOException $e) {
     if (isset($db)) $db->rollBack();

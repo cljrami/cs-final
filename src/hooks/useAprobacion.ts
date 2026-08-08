@@ -26,17 +26,35 @@ export function useAprobacion(): AprobacionState {
       return;
     }
 
-    fetch('/api/escort/micuenta-status.php?_t=' + Date.now(), {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    })
-      .then((r) => r.json())
-      .then((d) => {
-        const aprobada = !!(d?.escort?.cuenta_aprobada);
-        cache = { aprobada, ts: Date.now() };
-        setState({ aprobada, cargando: false });
+    let activo = true;
+
+    const consultar = () => {
+      fetch('/api/escort/micuenta-status.php?_t=' + Date.now(), {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
       })
-      .catch(() => setState({ aprobada: false, cargando: false }));
+        .then((r) => r.json())
+        .then((d) => {
+          if (!activo) return;
+          const aprobada = !!(d?.escort?.cuenta_aprobada);
+          cache = { aprobada, ts: Date.now() };
+          setState({ aprobada, cargando: false });
+        })
+        .catch(() => {
+          if (activo) setState((s) => ({ ...s, cargando: false }));
+        });
+    };
+
+    consultar();
+    // Re-consulta cada 30s para que el panel se desbloquee solo al aprobar
+    const intervalo = setInterval(consultar, 30000);
+    window.addEventListener('sidebar-refresh', consultar);
+
+    return () => {
+      activo = false;
+      clearInterval(intervalo);
+      window.removeEventListener('sidebar-refresh', consultar);
+    };
   }, []);
 
   return state;

@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'MíƒÂ©todo no permitido']);
+    echo json_encode(['success' => false, 'error' => 'Método no permitido']);
     exit;
 }
 
@@ -116,11 +116,14 @@ switch ($estado) {
     $sql = "
         SELECT 
             e.id, e.nombre, e.edad, e.estado, e.verificado, e.vip, e.activa, e.created_at, " . efectiva_ciudad() . " as ciudad, e.ciudad as ciudad_base, e.email, e.foto_principal, e.rating, e.total_valoraciones, e.eliminada as eliminada,
-            -- Estado de la escort basado en activa (la íƒÂºnica fuente de verdad)
+            -- Estado de la escort basado en activa y el estado real del plan base
             CASE 
+                WHEN e.eliminada = 1 THEN 'eliminada'
                 WHEN e.activa = -1 THEN 'rechazada'
                 WHEN sb.estado = 'pausada' THEN 'pausada'
+                WHEN e.activa = 1 AND (sb.estado IS NULL OR sb.estado <> 'activa' OR sb.fecha_fin < CURDATE()) THEN 'expirada'
                 WHEN e.activa = 1 THEN 'aprobada'
+                WHEN sb.estado IS NULL THEN 'sin_plan'
                 ELSE 'pendiente'
             END as suscripcion_estado,
             -- Base plan (extra_tipo IS NULL)

@@ -94,6 +94,7 @@ try {
         FROM suscripciones s
         JOIN planes p ON p.id = s.plan_id
         WHERE s.escort_id = ? AND p.tipo = 'base'
+          AND NOT (p.uso_unico = 1 AND s.estado = 'cancelada')
         ORDER BY 
             CASE 
                 WHEN s.estado = 'activa' AND (s.fecha_fin IS NULL OR s.fecha_fin >= CURDATE()) THEN 0
@@ -119,10 +120,18 @@ try {
         $yaUsoGratis = false;
         if ($email) {
             $usoGratis = $pdo->prepare("
-                SELECT COUNT(*) FROM planes_usados 
-                WHERE plan_id = 1 AND email = ?
+                SELECT COUNT(*) FROM (
+                    SELECT 1 FROM planes_usados pu
+                    JOIN planes p ON p.id = pu.plan_id
+                    WHERE pu.email = ? AND p.uso_unico = 1
+                    UNION
+                    SELECT 1 FROM suscripciones s
+                    JOIN planes p ON p.id = s.plan_id
+                    JOIN escorts e ON e.id = s.escort_id
+                    WHERE e.email = ? AND p.uso_unico = 1 AND s.fecha_aprobacion IS NOT NULL
+                ) u
             ");
-            $usoGratis->execute(array($email));
+            $usoGratis->execute(array($email, $email));
             $yaUsoGratis = (int)$usoGratis->fetchColumn() > 0;
         }
 
@@ -214,8 +223,13 @@ try {
 
     $yaUsoGratis = false;
     if ($email) {
-        $usoGratis = $pdo->prepare("SELECT COUNT(*) FROM planes_usados WHERE plan_id = 1 AND email = ?");
-        $usoGratis->execute(array($email));
+        $usoGratis = $pdo->prepare("SELECT COUNT(*) FROM (
+            SELECT 1 FROM planes_usados pu JOIN planes p ON p.id = pu.plan_id WHERE pu.email = ? AND p.uso_unico = 1
+            UNION
+            SELECT 1 FROM suscripciones s JOIN planes p ON p.id = s.plan_id JOIN escorts e ON e.id = s.escort_id
+            WHERE e.email = ? AND p.uso_unico = 1 AND s.fecha_aprobacion IS NOT NULL
+        ) u");
+        $usoGratis->execute(array($email, $email));
         $yaUsoGratis = (int)$usoGratis->fetchColumn() > 0;
     }
 

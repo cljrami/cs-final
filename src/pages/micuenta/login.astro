@@ -147,11 +147,12 @@ import Layout from "../../layouts/Layout.astro";
         if (data.success) {
           localStorage.setItem("escort_token", data.token);
           localStorage.setItem("escort_data", JSON.stringify(data.escort));
-          if (data.primerLogin === 1) {
-            window.location.replace("/micuenta/onboarding");
-          } else {
-            window.location.replace("/micuenta/resumen");
-          }
+          window.location.replace(data.primerLogin === 1 ? "/micuenta/onboarding" : "/micuenta/resumen");
+        } else if (data.eliminada) {
+          window.location.replace(
+            "/micuenta/cuenta-eliminada?email=" +
+              encodeURIComponent(email)
+          );
         } else {
           errorText.textContent = data.error || "Credenciales incorrectas";
           errorDiv.classList.remove("hidden");

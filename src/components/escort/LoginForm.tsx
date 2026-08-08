@@ -33,13 +33,11 @@ export default function LoginForm() {
       if (data.success) {
         localStorage.setItem('escort_token', data.token);
         localStorage.setItem('escort_data', JSON.stringify(data.escort));
-        
-        // Usar replace para no dejar el login en el historial
-        if (data.primerLogin === 1) {
-          window.location.replace('/micuenta/onboarding');
-        } else {
-          window.location.replace('/micuenta/resumen');
-        }
+
+        // El panel guía la selección de plan mientras la cuenta no esté aprobada
+        window.location.replace('/micuenta/resumen');
+      } else if (data.eliminada) {
+        window.location.replace('/micuenta/cuenta-eliminada?email=' + encodeURIComponent(form.email));
       } else {
         setErrors({ general: data.error || 'Credenciales incorrectas' });
       }

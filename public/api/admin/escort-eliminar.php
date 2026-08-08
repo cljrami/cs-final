@@ -43,6 +43,10 @@ try {
     $stmt = $pdo->prepare("UPDATE escorts SET eliminada = 1, activa = 0, estado = 'eliminada', updated_at = NOW() WHERE id = ?");
     $stmt->execute([$id]);
 
+    // Cancelar suscripciones activas o pendientes: la escort eliminada no puede
+    // mantener planes vigentes (al reactivar deberá contratar un plan base nuevo)
+    $pdo->prepare("UPDATE suscripciones SET estado = 'cancelada', actualizado_en = NOW() WHERE escort_id = ? AND estado IN ('activa', 'pendiente_aprobacion')")->execute([$id]);
+
     // Limpiar posiciones sticky de la escort eliminada
     $pdo->prepare("DELETE FROM sticky_posiciones WHERE escort_id = ?")->execute([$id]);
 

@@ -9,6 +9,21 @@
 // - Al pasar gira_fecha_fin, limpiar_gira_vencida() auto-revierte a su ciudad base.
 
 /**
+ * Normaliza un nombre de ciudad para comparación insensible a acentos/mayúsculas.
+ * Quita acentos, convierte a minúsculas y elimina espacios en exceso.
+ * Usable tanto en PHP como en SQL (MySQL 5.7+ compatible).
+ */
+function normalizar_ciudad($str)
+{
+    if ($str === null) return '';
+    $str = trim($str);
+    $str = preg_replace('/[\x{0300}-\x{036f}]/u', '', $str); // quitar diacríticos (nfd)
+    $str = strtolower($str);
+    $str = trim($str);
+    return $str;
+}
+
+/**
  * Expresión SQL booleana: ¿la gira está activa hoy?
  * Asume que la tabla escorts tiene alias "e".
  */
@@ -29,10 +44,29 @@ function efectiva_ciudad()
 
 /**
  * Auto-revert: limpia giras vencidas.
+ * Además limpia sticky_posiciones que se crearon en la ciudad destino de la gira.
  * Devuelve el número de filas actualizadas.
  */
 function limpiar_gira_vencida(PDO $pdo)
 {
+    // Obtener IDs de escorts con gira vencida antes de limpiar
+    $vencidas = $pdo->prepare("
+        SELECT id, gira_ciudad_id FROM escorts
+        WHERE en_gira = 1
+          AND gira_fecha_fin IS NOT NULL
+          AND gira_fecha_fin < CURDATE()
+    ");
+    $vencidas->execute();
+    $rows = $vencidas->fetchAll(PDO::FETCH_ASSOC);
+
+    // Limpiar sticky_posiciones en la ciudad destino de la gira
+    foreach ($rows as $row) {
+        if (!empty($row['gira_ciudad_id'])) {
+            $pdo->prepare("DELETE FROM sticky_posiciones WHERE escort_id = ? AND ciudad_id = ?")
+                ->execute([$row['id'], $row['gira_ciudad_id']]);
+        }
+    }
+
     $stmt = $pdo->prepare("
         UPDATE escorts
         SET en_gira = 0,

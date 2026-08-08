@@ -267,6 +267,30 @@ try {
             exit;
         }
 
+        // Validar defensiva: no puede solicitar un extra si la escort aún tiene flags activos en tabla escorts.
+        // Esto previene el bug donde se elimina la suscripción pero no se limpian los flags.
+        $extraTipoQuery = $pdo->prepare("SELECT tipo_flag FROM planes WHERE id = ? AND tipo = 'extra'");
+        $extraTipoQuery->execute([$extraId]);
+        $extraTipo = $extraTipoQuery->fetchColumn();
+        $bloqueanteEscort = false;
+        if ($extraTipo === 'sticky') {
+            $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM escorts WHERE id = ? AND sticky = 1 AND sticky_expira >= CURDATE()");
+            $checkStmt->execute([$escortId]);
+            $bloqueanteEscort = (int)$checkStmt->fetchColumn() > 0;
+        } elseif ($extraTipo === 'destacado') {
+            $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM escorts WHERE id = ? AND destacado = 1 AND fecha_destacado_expira >= CURDATE()");
+            $checkStmt->execute([$escortId]);
+            $bloqueanteEscort = (int)$checkStmt->fetchColumn() > 0;
+        }
+        if ($bloqueanteEscort) {
+            http_response_code(409);
+            echo json_encode([
+                'success' => false,
+                'error' => 'Ya tienes un extra activo en tu perfil. Contacta al soporte si persiste el problema.'
+            ]);
+            exit;
+        }
+
         // Calcular fechas
         $fechaInicio = date('Y-m-d');
         $fechaFin = date('Y-m-d', min(

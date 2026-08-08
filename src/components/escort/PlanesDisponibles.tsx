@@ -106,13 +106,12 @@ export default function PlanesEscort() {
 
     return (
       <div
-        onClick={onSelect}
         className={`
-          relative bg-[#13131a] border rounded-2xl p-6 cursor-pointer transition-all
+          relative bg-[#13131a] border rounded-2xl p-6 transition-all
           ${isSelected
             ? 'border-red-500 shadow-lg shadow-red-500/10'
             : plan.no_disponible
-              ? 'border-gray-800 opacity-60 cursor-not-allowed'
+              ? 'border-gray-800 opacity-60'
               : 'border-gray-800 hover:border-gray-600 hover:shadow-lg hover:shadow-black/20'
           }
         `}
@@ -195,6 +194,38 @@ export default function PlanesEscort() {
             <i className="fas fa-check text-white text-sm" />
           </div>
         )}
+
+        {/* Botón seleccionar */}
+        <button
+          onClick={onSelect}
+          disabled={plan.no_disponible || isSelected}
+          className={`
+            w-full mt-5 py-2.5 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 text-sm
+            ${plan.no_disponible
+              ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
+              : isSelected
+                ? 'bg-green-500/15 text-green-400 border border-green-500/30 cursor-default'
+                : 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-400 hover:to-red-500 text-white shadow-lg shadow-red-500/20 cursor-pointer'
+            }
+          `}
+        >
+          {plan.no_disponible ? (
+            <>
+              <i className="fas fa-ban" />
+              No disponible
+            </>
+          ) : isSelected ? (
+            <>
+              <i className="fas fa-check-circle" />
+              Seleccionado
+            </>
+          ) : (
+            <>
+              <i className="fas fa-hand-pointer" />
+              Seleccionar plan
+            </>
+          )}
+        </button>
       </div>
     );
   };
@@ -374,6 +405,7 @@ export default function PlanesEscort() {
                 plan={plan}
                 isSelected={selectedPlan === plan.id}
                 onSelect={() => {
+                  if (plan.no_disponible) return;
                   setSelectedPlan(plan.id);
                   setShowWarning(false);
                 }}

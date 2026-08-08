@@ -55,9 +55,18 @@ export default function EscortSidebar({ activePage }: Props) {
     const interval = setInterval(fetchSidebar, 15000);
     const onRefresh = () => fetchSidebar();
     window.addEventListener('sidebar-refresh', onRefresh);
+
+    // El tour guiado puede abrir/cerrar el drawer del sidebar (móvil)
+    const onTourDrawer = (e: Event) => {
+      const detail = (e as CustomEvent<{ open: boolean }>).detail;
+      setMobileOpen(!!detail?.open);
+    };
+    window.addEventListener('escort-tour-drawer', onTourDrawer);
+
     return () => {
       clearInterval(interval);
       window.removeEventListener('sidebar-refresh', onRefresh);
+      window.removeEventListener('escort-tour-drawer', onTourDrawer);
     };
   }, [fetchSidebar]);
 
@@ -219,6 +228,9 @@ export default function EscortSidebar({ activePage }: Props) {
   const planData = getPlanData();
   const extrasData = getExtrasData();
 
+  // Mientras la cuenta no esté aprobada (plan en moderación) el panel está bloqueado
+  const bloqueado = escort !== null && !escort.aprobada;
+
   const isActive = (id: string) => activePage === id;
 
   const renderMenuItem = (item: { 
@@ -227,27 +239,37 @@ export default function EscortSidebar({ activePage }: Props) {
     icon: string; 
     href: string; 
     badge?: { text: string; color: string } | null;
+    bloqueable?: boolean;
   }) => {
     const active = isActive(item.id);
+    // Bloqueado salvo excepciones (Mi Plan sigue accesible para elegir plan)
+    const deshabilitado = bloqueado && item.bloqueable !== false;
     return (
       <a
         key={item.id}
-        href={item.href}
-        onClick={closeMobile}
+        href={deshabilitado ? undefined : item.href}
+        onClick={(e) => {
+          if (deshabilitado) e.preventDefault();
+          closeMobile();
+        }}
+        title={deshabilitado ? 'Se habilitará cuando tu plan esté aprobado' : undefined}
         className={`
           flex items-center gap-3.5 px-3 py-2.5 rounded-lg mb-1 text-sm
           transition-all duration-200
           ${active 
             ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20' 
-            : 'text-gray-400 hover:bg-[#2d2d44] hover:text-white'
+            : deshabilitado
+              ? 'text-gray-600 cursor-not-allowed select-none'
+              : 'text-gray-400 hover:bg-[#2d2d44] hover:text-white'
           }
         `}
       >
-        <i className={`fas ${item.icon} w-6 text-center`}></i>
+        <i className={`fas ${item.icon} w-6 text-center ${deshabilitado ? 'opacity-50' : ''}`}></i>
         <div className="flex-1 min-w-0">
           <span>{item.label}</span>
         </div>
-        {item.badge && (
+        {deshabilitado && <i className="fas fa-lock text-[10px] text-gray-600"></i>}
+        {!deshabilitado && item.badge && (
           <span className={`text-xs font-bold min-w-[22px] h-[22px] flex items-center justify-center rounded-full px-1.5 shadow-lg ${item.badge.color}`}>
             {item.badge.text}
           </span>
@@ -269,20 +291,29 @@ export default function EscortSidebar({ activePage }: Props) {
     cta?: boolean;
     subText?: string;
     subTextColor?: string;
+    bloqueable?: boolean;
   }, loading?: boolean) => {
     const active = isActive(data.href.split('/').pop() || '');
+    // Bloqueado salvo excepciones (Mi Plan sigue accesible para elegir plan)
+    const deshabilitado = bloqueado && data.bloqueable !== false;
     return (
       <a
-        href={data.href}
-        onClick={closeMobile}
+        href={deshabilitado ? undefined : data.href}
+        onClick={(e) => {
+          if (deshabilitado) e.preventDefault();
+          closeMobile();
+        }}
+        title={deshabilitado ? 'Se habilitará cuando tu plan esté aprobado' : undefined}
         className={`
           flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1
           transition-all duration-200 group
           ${active 
             ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg shadow-red-500/20' 
-            : data.cta 
-              ? 'bg-[#252538] border border-amber-500/30 hover:border-amber-500/60' 
-              : 'hover:bg-[#2d2d44]'
+            : deshabilitado
+              ? 'opacity-50 cursor-not-allowed select-none bg-[#23233a]'
+              : data.cta 
+                ? 'bg-[#252538] border border-amber-500/30 hover:border-amber-500/60' 
+                : 'hover:bg-[#2d2d44]'
           }
         `}
       >
@@ -353,6 +384,19 @@ export default function EscortSidebar({ activePage }: Props) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 min-h-0">
+          {bloqueado && (
+            <div className="mb-3 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">
+              <div className="flex items-center gap-2 text-amber-400 text-xs font-semibold mb-1">
+                <i className="fas fa-lock"></i>
+                Cuenta en moderación
+              </div>
+              <p className="text-gray-400 text-[11px] leading-relaxed">
+                Tus datos estarán disponibles cuando se apruebe tu suscripción.
+                Selecciona tu plan desde <strong className="text-amber-400">Mi Plan</strong>.
+              </p>
+            </div>
+          )}
+
           {/* ── PRINCIPAL ── */}
           <div className="text-[0.7rem] text-gray-500 uppercase tracking-widest px-3 mb-2">
             Principal
@@ -371,6 +415,7 @@ export default function EscortSidebar({ activePage }: Props) {
           {renderStatusCard({
             ...planData,
             icon: 'fa-credit-card',
+            bloqueable: false,
           }, !escort)}
           {renderStatusCard({
             ...extrasData,

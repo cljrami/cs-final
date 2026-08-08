@@ -20,10 +20,14 @@ try {
     $suscripcionId = intval($data['suscripcion_id'] ?? 0);
     $motivo = trim($data['motivo'] ?? '');
 
-    if (!$suscripcionId || !$motivo) {
+    if (!$suscripcionId) {
         http_response_code(400);
-        echo json_encode(['error' => 'ID de suscripciíƒÂ³n y motivo requeridos']);
+        echo json_encode(['error' => 'ID de suscripción requerido']);
         exit;
+    }
+
+    if ($motivo === '') {
+        $motivo = 'Solicitud rechazada por el administrador';
     }
 
     $db = getDBConnection();
@@ -43,7 +47,7 @@ try {
     if (!$suscripcion) {
         $db->rollBack();
         http_response_code(404);
-        echo json_encode(['error' => 'SuscripciíƒÂn no encontrada']);
+        echo json_encode(['error' => 'Suscripción no encontrada']);
         exit;
     }
 
@@ -57,7 +61,7 @@ try {
     if ($suscripcion['estado'] === 'rechazada') {
         $db->rollBack();
         http_response_code(400);
-        echo json_encode(['error' => 'Esta suscripciíƒÂ³n ya fue rechazada']);
+        echo json_encode(['error' => 'Esta suscripción ya fue rechazada']);
         exit;
     }
 
@@ -107,7 +111,7 @@ try {
 
     echo json_encode([
         'success' => true,
-        'message' => 'SuscripciíƒÂ³n rechazada correctamente'
+        'message' => 'Suscripción rechazada correctamente'
     ]);
 } catch (PDOException $e) {
     if (isset($db)) $db->rollBack();

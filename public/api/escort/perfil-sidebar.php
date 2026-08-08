@@ -88,11 +88,18 @@ try {
         || ($escort['estado_cuenta'] ?? '') === 'aprobada'
         || $escort['escort_activa'] == 1;
 
-    // Fallback: si tiene suscripción aprobada, considerar aprobada
+    // Fallback: considerar aprobada solo si tiene una suscripción base aprobada
+    // y vigente (NO cancelada/expirada). Evita que una cuenta re-registrada con
+    // suscripciones canceladas aparezca como "aprobada" sin plan activo.
     if (!$escort['aprobada']) {
         $susCheck = $pdo->prepare("
-            SELECT 1 FROM suscripciones 
-            WHERE escort_id = ? AND fecha_aprobacion IS NOT NULL
+            SELECT 1 FROM suscripciones s
+            JOIN planes p ON p.id = s.plan_id AND p.tipo = 'base'
+            WHERE s.escort_id = ?
+              AND s.fecha_aprobacion IS NOT NULL
+              AND s.eliminada = 0
+              AND s.estado IN ('activa', 'pausada')
+              AND (s.estado = 'pausada' OR s.fecha_fin >= CURDATE())
             LIMIT 1
         ");
         $susCheck->execute([$escortId]);

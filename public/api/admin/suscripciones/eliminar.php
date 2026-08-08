@@ -22,7 +22,7 @@ try {
 
     if (!$suscripcionId) {
         http_response_code(400);
-        echo json_encode(['error' => 'ID de suscripciíƒÂ³n requerido']);
+        echo json_encode(['error' => 'ID de suscripción requerido']);
         exit;
     }
 
@@ -44,7 +44,7 @@ try {
     if (!$suscripcion) {
         $db->rollBack();
         http_response_code(404);
-        echo json_encode(['error' => 'SuscripciíƒÂn no encontrada']);
+        echo json_encode(['error' => 'Suscripción no encontrada']);
         exit;
     }
 
@@ -139,7 +139,7 @@ try {
 
     echo json_encode([
         'success' => true,
-        'message' => 'SuscripciíƒÂ³n eliminada correctamente'
+        'message' => 'Suscripción eliminada correctamente'
     ]);
 } catch (PDOException $e) {
     if (isset($db)) $db->rollBack();

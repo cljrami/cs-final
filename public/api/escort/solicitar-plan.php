@@ -145,8 +145,8 @@ try {
 
     // ---------- PLAN BASE ----------
     if ($plan['tipo'] === 'base') {
-        // Si tiene solicitud pendiente, bloquear
-        if ($planBase && $planBase['fecha_aprobacion'] === null) {
+        // Si tiene solicitud pendiente, bloquear (solo si realmente sigue pendiente)
+        if ($planBase && $planBase['estado'] === 'pendiente_aprobacion') {
             echo json_encode([
                 'success' => false,
                 'error' => 'Tienes una solicitud de plan pendiente de aprobación. Espera la respuesta antes de solicitar otro.'
@@ -172,13 +172,19 @@ try {
             exit;
         }
 
-        // Plan gratuito (id=1) solo una vez por email
-        if ($plan['id'] == 1) {
+        // Plan de uso único (gratuito) solo una vez por email
+        if (!empty($plan['uso_unico'])) {
             $stmtUsado = $pdo->prepare("
                 SELECT 1 FROM planes_usados 
-                WHERE email = ? AND plan_id = 1
+                WHERE email = ? AND plan_id = ?
+                UNION
+                SELECT 1 FROM suscripciones s
+                JOIN planes p ON p.id = s.plan_id
+                JOIN escorts e ON e.id = s.escort_id
+                WHERE e.email = ? AND p.id = ? AND p.uso_unico = 1 AND s.fecha_aprobacion IS NOT NULL
+                LIMIT 1
             ");
-            $stmtUsado->execute([$escortEmail]);
+            $stmtUsado->execute([$escortEmail, $plan['id'], $escortEmail, $plan['id']]);
             if ($stmtUsado->fetch()) {
                 echo json_encode([
                     'success' => false,

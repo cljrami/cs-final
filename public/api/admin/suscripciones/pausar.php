@@ -23,7 +23,7 @@ try {
 
     if (!$suscripcionId || !$motivo) {
         http_response_code(400);
-        echo json_encode(['error' => 'ID de suscripciíƒÂ³n y motivo requeridos']);
+        echo json_encode(['error' => 'ID de suscripción y motivo requeridos']);
         exit;
     }
 
@@ -45,7 +45,7 @@ SELECT s.*, e.nombre as escort_nombre, p.nombre as plan_nombre,
     if (!$suscripcion) {
         $db->rollBack();
         http_response_code(404);
-        echo json_encode(['error' => 'SuscripciíƒÂn no encontrada']);
+        echo json_encode(['error' => 'Suscripción no encontrada']);
         exit;
     }
 
@@ -135,13 +135,13 @@ SELECT s.*, e.nombre as escort_nombre, p.nombre as plan_nombre,
     ]);
 
     $db->prepare("INSERT INTO notificaciones (usuario_id, tipo, titulo, mensaje, url, escort_id) VALUES (NULL, 'sistema', 'Plan pausado por admin', ?, '/admin/escorts', ?)")
-        ->execute(["El administrador pausíƒÂ³ el plan '{$suscripcion['plan_nombre']}' de {$suscripcion['escort_nombre']} (ID {$suscripcion['escort_id']}). Motivo: {$motivo}", $suscripcion['escort_id']]);
+        ->execute(["El administrador pausó el plan '{$suscripcion['plan_nombre']}' de {$suscripcion['escort_nombre']} (ID {$suscripcion['escort_id']}). Motivo: {$motivo}", $suscripcion['escort_id']]);
 
     $db->commit();
 
     echo json_encode([
         'success' => true,
-        'message' => 'SuscripciíƒÂ³n pausada correctamente'
+        'message' => 'Suscripción pausada correctamente'
     ]);
 } catch (PDOException $e) {
     if (isset($db)) $db->rollBack();
