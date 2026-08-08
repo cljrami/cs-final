@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Sortable from 'sortablejs';
 import ConfirmModal from '../ui/ConfirmModal';
+import { videoSrcToGif, uploadGifBlob } from '../../lib/gifUtils';
 
 interface Foto {
   id: number;
@@ -8,6 +9,7 @@ interface Foto {
   tipo?: string;
   esPortada: number;
   orden: number;
+  gif_url?: string | null;
 }
 
 interface UploadItem {
@@ -40,6 +42,7 @@ export default function GaleriaManager() {
   const [maxFotos, setMaxFotos] = useState(5);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+  const [gifProgress, setGifProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -198,22 +201,50 @@ export default function GaleriaManager() {
   };
 
   const setPortada = async (id: number) => {
+    const foto = fotos.find(f => f.id === id);
+    let gifUrl: string | null = null;
+
     try {
+      if (foto && foto.tipo === 'video') {
+        setError('');
+        setGifProgress(10);
+        const gifResult = await videoSrcToGif(foto.url, 'gif_portada.gif', {
+          onProgress: (pct) => setGifProgress(pct)
+        });
+        setGifProgress(0);
+        const token = localStorage.getItem('escort_token') || '';
+        const uploadRes = await uploadGifBlob(gifResult.blob, token);
+        if (!uploadRes.success || !uploadRes.url) {
+          throw new Error(uploadRes.error || 'Error subiendo GIF');
+        }
+        gifUrl = uploadRes.url;
+        setTimeout(() => URL.revokeObjectURL(gifResult.url), 5000);
+      }
+
+      const payload: { fotoId: number; gifUrl?: string } = { fotoId: id };
+      if (gifUrl) payload.gifUrl = gifUrl;
+
       const res = await fetch(`${API_BASE}/fotos/portada.php`, {
         method: 'POST',
         headers: {
           ...getAuthHeaders(),
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ fotoId: id })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
-      setFotos(prev => prev.map(f => ({ ...f, esPortada: f.id === id ? 1 : 0 })));
-      setSuccessMsg('Portada actualizada');
-      setTimeout(() => setSuccessMsg(''), 2000);
+
+      setFotos(prev => prev.map(f => ({
+        ...f,
+        esPortada: f.id === id ? 1 : 0,
+        gif_url: f.id === id ? (gifUrl || f.gif_url) : f.gif_url
+      })));
+      setSuccessMsg(foto?.tipo === 'video' ? 'Portada GIF actualizada' : 'Portada actualizada');
+      setTimeout(() => { setSuccessMsg(''); setGifProgress(0); }, 2000);
     } catch (err: any) {
       setError(err.message);
+      setGifProgress(0);
     }
   };
 
@@ -308,6 +339,18 @@ export default function GaleriaManager() {
           <button onClick={() => setError('')} className="ml-auto text-red-400/70 hover:text-red-400">
             <i className="fas fa-times"></i>
           </button>
+        </div>
+      )}
+
+      {gifProgress > 0 && gifProgress < 100 && (
+        <div className="bg-blue-500/10 border border-blue-500/30 text-blue-400 px-4 py-3 rounded-xl">
+          <div className="flex items-center gap-3">
+            <i className="fas fa-magic text-blue-400"></i>
+            <span>Generando portada animada (GIF)… {gifProgress}%</span>
+          </div>
+          <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden mt-2">
+            <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${gifProgress}%` }} />
+          </div>
         </div>
       )}
 

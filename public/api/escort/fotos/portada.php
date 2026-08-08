@@ -37,6 +37,7 @@ try {
 
     $input = json_decode(file_get_contents('php://input'), true);
     $fotoId = (int)($input['fotoId'] ?? 0);
+    $gifUrl = $input['gifUrl'] ?? null; // opcional: URL del GIF generado client-side
     $escortId = $tokenData['id'];
 
     if ($fotoId <= 0) {
@@ -57,12 +58,44 @@ try {
     $pdo->prepare("UPDATE escort_fotos SET es_portada = 0 WHERE escort_id = ?")->execute([$escortId]);
     $pdo->prepare("UPDATE escort_fotos SET es_portada = 1, created_at = NOW() WHERE id = ? AND escort_id = ?")->execute([$fotoId, $escortId]);
 
-    // Sincronizar la portada en la tabla escorts para que se refleje en el index/perfil
-    $fotoStmt = $pdo->prepare("SELECT url FROM escort_fotos WHERE id = ? AND escort_id = ?");
+    // Si se proporcionó un GIF (video->gif), almacenarlo en gif_url
+    if (!empty($gifUrl)) {
+        $colCheck = $pdo->query(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS "
+            . "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'escort_fotos' AND COLUMN_NAME = 'gif_url'"
+        );
+        $hasGifColumn = (int)($colCheck ? $colCheck->fetchColumn() : 0) > 0;
+        if ($hasGifColumn) {
+            $pdo->prepare("UPDATE escort_fotos SET gif_url = ? WHERE id = ? AND escort_id = ?")
+                ->execute([$gifUrl, $fotoId, $escortId]);
+        }
+    }
+
+    // Determinar qué URL usar como foto_principal
+    // Video → usar GIF si existe; Imagen → usar URL directa
+    $colCheck = $pdo->query(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS "
+        . "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'escort_fotos' AND COLUMN_NAME = 'gif_url'"
+    );
+    $hasGifColumn = (int)($colCheck ? $colCheck->fetchColumn() : 0) > 0;
+
+    $colList = $hasGifColumn ? "url, tipo, gif_url" : "url, tipo";
+    $fotoStmt = $pdo->prepare("SELECT $colList FROM escort_fotos WHERE id = ? AND escort_id = ?");
     $fotoStmt->execute([$fotoId, $escortId]);
     $foto = $fotoStmt->fetch(PDO::FETCH_ASSOC);
+
     if ($foto && !empty($foto['url'])) {
-        $pdo->prepare("UPDATE escorts SET foto_principal = ? WHERE id = ?")->execute([$foto['url'], $escortId]);
+        $mainUrl = $foto['url'];
+        // Si es video y tiene gif_url → usar el GIF animado como portada
+        if (isset($foto['tipo']) && $foto['tipo'] === 'video') {
+            $gifUrlStored = $hasGifColumn ? ($foto['gif_url'] ?? null) : null;
+            if (!empty($gifUrlStored)) {
+                $mainUrl = $gifUrlStored;
+            } elseif (!empty($gifUrl)) {
+                $mainUrl = $gifUrl; // fallback: usar el gifUrl del request
+            }
+        }
+        $pdo->prepare("UPDATE escorts SET foto_principal = ? WHERE id = ?")->execute([$mainUrl, $escortId]);
     }
 
     // Notificar a la escort y a los admins

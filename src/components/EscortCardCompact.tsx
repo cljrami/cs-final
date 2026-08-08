@@ -5,6 +5,7 @@ function getResizedSrc(src: string): string {
   if (!src) return '';
   const base = src.split('?')[0];
   const ext = base.split('.').pop()?.toLowerCase();
+  if (ext === 'gif') return base;
   if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext || '')) return src;
   return `${base}?w=320&q=65&fm=webp`;
 }
@@ -13,6 +14,7 @@ function getImageSrcSet(src: string): string {
   if (!src) return '';
   const base = src.split('?')[0];
   const ext = base.split('.').pop()?.toLowerCase();
+  if (ext === 'gif') return '';
   if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext || '')) return '';
   const widths = [200, 320];
   return widths.map(w => `${base}?w=${w}&q=65&fm=webp ${w}w`).join(', ');
