@@ -16,8 +16,8 @@ try {
     $stmt = $db->prepare("
         SELECT e.id, e.nombre, e.slug, e.edad,
                COALESCE(NULLIF(e.foto_principal, ''), pf.url) as foto_principal,
-               e.vip, e.verificado,
-               gc.nombre AS gira_ciudad,
+                e.vip, e.verificado, e.audio_preview,
+                gc.nombre AS gira_ciudad,
                e.gira_fecha_inicio, e.gira_fecha_fin
         FROM escorts e
         LEFT JOIN escort_fotos pf ON pf.escort_id = e.id AND pf.es_portada = 1

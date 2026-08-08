@@ -2,6 +2,7 @@
 import type { Escort, EscortCardProps } from '../types/escort';
 import { isNueva } from '../utils/fecha';
 import { Skeleton } from './ui/Skeleton';
+import AudioPreviewPlayer from './escort/AudioPreviewPlayer';
 
 function getImageSrcSet(src: string): string {
   if (!src) return '';
@@ -86,6 +87,9 @@ export default function EscortCard({ escort, skeleton = false, priority = false 
             </div>
           </div>
         )}
+
+        {/* Audio preview play button */}
+        <AudioPreviewPlayer audioUrl={escort.audio_preview ?? null} size="md" />
 
         {escort.disponible_ahora === 1 && (
           <span className="absolute top-2 left-2 z-10 flex items-center justify-center w-4 h-4 rounded-full bg-green-500 shadow-lg shadow-green-600/50 animate-pulse" title="Disponible">

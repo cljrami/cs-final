@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Skeleton } from '../ui/Skeleton';
 import { sanitizeHtml } from '../../lib/sanitize';
+import AudioPreviewPlayer from './AudioPreviewPlayer';
 
 const renderHtmlSeguro = (htmlRaw: string | null): string => {
   if (!htmlRaw) return '';
@@ -51,9 +52,10 @@ interface EscortPerfil {
   color_ojos: string | null;
   color_pelo: string | null;
   estilo: string | null;
-  descripcion_corta: string | null;
-  descripcion_larga: string | null;
-  foto_principal: string | null;
+   descripcion_corta: string | null;
+   descripcion_larga: string | null;
+   audio_preview: string | null;
+   foto_principal: string | null;
   video_presentacion: string | null;
   verificado: number;
   vip: number;
@@ -315,24 +317,34 @@ export default function PerfilPublico() {
           
           <div className="flex flex-col lg:flex-row gap-6 lg:gap-10">
             {/* COLUMNA IZQUIERDA */}
-            <div className="lg:w-80 shrink-0">
-              {/* Foto principal */}
-              <div className="relative group">
-                <div className="w-full max-w-xs mx-auto rounded-2xl overflow-hidden bg-surface border border-gray-800" style={{ aspectRatio: '3/4' }}>
-                  {fotoPrincipal ? (
-                    <img 
-                      src={fotoPrincipal} 
-                      alt={perfil!.nombre}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <i className="fas fa-user text-gray-700 text-6xl"></i>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+             <div className="lg:w-80 shrink-0">
+               {/* Foto principal */}
+               <div className="relative group">
+                 <div className="w-full max-w-xs mx-auto rounded-2xl overflow-hidden bg-surface border border-gray-800" style={{ aspectRatio: '3/4' }}>
+                   {fotoPrincipal ? (
+                     <img 
+                       src={fotoPrincipal} 
+                       alt={perfil!.nombre}
+                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                     />
+                   ) : (
+                     <div className="w-full h-full flex items-center justify-center">
+                       <i className="fas fa-user text-gray-700 text-6xl"></i>
+                     </div>
+                   )}
+                 </div>
+                 {/* Audio preview overlay */}
+                 <AudioPreviewPlayer audioUrl={perfil!.audio_preview} size="md" />
+               </div>
+
+               {/* Mini leyenda audio */}
+               {perfil!.audio_preview && (
+                 <p className="text-center mt-2 text-xs text-muted flex items-center justify-center gap-1.5">
+                   <i className="fas fa-microphone text-red-400"></i>
+                   Audio de presentación — toca ▶ para escuchar
+                 </p>
+               )}
+             </div>
             
             {/* COLUMNA DERECHA */}
             <div className="flex-1 min-w-0">

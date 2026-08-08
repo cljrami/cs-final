@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Sortable from 'sortablejs';
 import ConfirmModal from '../ui/ConfirmModal';
 import { videoSrcToGif, uploadGifBlob } from '../../lib/gifUtils';
+import AudioUploader from './AudioUploader';
 
 interface Foto {
   id: number;
@@ -43,6 +44,7 @@ export default function GaleriaManager() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [gifProgress, setGifProgress] = useState(0);
+  const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -59,6 +61,23 @@ export default function GaleriaManager() {
   useEffect(() => {
     fetchFotos();
   }, []);
+
+  const fetchAudioPreview = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/fotos/upload-audio.php`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) setCurrentAudioUrl(data.url ?? null);
+    } catch {
+      setCurrentAudioUrl(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAudioPreview();
+  }, [fetchAudioPreview]);
 
   useEffect(() => {
     if (!esTactil || !gridRef.current || fotos.length < 2) return;
@@ -506,6 +525,14 @@ export default function GaleriaManager() {
         variant="danger"
         onConfirm={eliminarFoto}
         onCancel={() => setDeleteId(null)}
+      />
+
+      <AudioUploader
+        currentAudioUrl={currentAudioUrl}
+        onAudioUpdate={(url) => {
+          setCurrentAudioUrl(url);
+          if (!url) fetchAudioPreview();
+        }}
       />
     </div>
   );

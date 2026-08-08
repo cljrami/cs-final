@@ -102,6 +102,7 @@ try {
         " . efectiva_ciudad() . " as ciudad, e.ciudad as ciudad_base,
         COALESCE(NULLIF(e.foto_principal, ''), pf.url) as foto_principal,
         e.vip, e.verificado, e.destacado, e.sticky, e.estado,
+        e.disponible_ahora, e.audio_preview,
         e.visitas_perfil, e.rating, e.total_valoraciones, e.created_at,
         (SELECT MIN(s2.fecha_aprobacion) FROM suscripciones s2 JOIN planes p2 ON p2.id = s2.plan_id WHERE s2.escort_id = e.id AND p2.tipo = 'base' AND s2.fecha_aprobacion IS NOT NULL) as fecha_aprobacion,
         COALESCE(sp.orden, 0) as sticky_orden, e.disponible_ahora, e.en_gira, gc.nombre AS gira_ciudad,

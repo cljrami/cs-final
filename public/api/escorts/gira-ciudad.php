@@ -20,8 +20,8 @@ try {
     $stmt = $pdo->prepare("
         SELECT e.id, e.nombre, e.slug, e.edad,
                COALESCE(NULLIF(e.foto_principal, ''), pf.url) AS foto_principal,
-               e.vip, e.verificado,
-               gc.nombre AS gira_ciudad,
+                e.vip, e.verificado, e.audio_preview,
+                gc.nombre AS gira_ciudad,
                e.gira_fecha_inicio, e.gira_fecha_fin,
                " . gira_activa() . " AS gira_activa
         FROM escorts e

@@ -18,6 +18,7 @@ try {
             e.destacado,
             e.sticky,
             e.estado,
+            e.audio_preview,
             e.visitas_perfil,
             e.rating,
             e.total_valoraciones,

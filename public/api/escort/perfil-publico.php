@@ -141,6 +141,7 @@ try {
             'estilo' => $perfil['estilo'],
             'descripcion_corta' => $perfil['descripcion_corta'],
             'descripcion_larga' => $perfil['descripcion_larga'],
+            'audio_preview' => $perfil['audio_preview'] ?? null,
             'privacidad' => $perfil['privacidad'] ?? null,
             'plan' => $perfil['plan_nombre'] ? [
                 'nombre' => $perfil['plan_nombre'],

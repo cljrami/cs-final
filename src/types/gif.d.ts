@@ -22,6 +22,7 @@ declare module 'gif.js' {
   }
 
   interface GIF {
+    running?: boolean;
     on(event: 'progress', listener: (progress: number) => void): void;
     on(event: 'finished', listener: (blob: Blob) => void): void;
     on(event: 'start', listener: () => void): void;

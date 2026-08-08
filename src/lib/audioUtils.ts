@@ -1,0 +1,61 @@
+// src/lib/audioUtils.ts
+// Helpers para subir y eliminar el audio de presentación de la escort.
+// - uploadAudioPreview: FormData con barra de progreso
+// - deleteAudioPreview: elimina el audio actual del escort
+
+const API_BASE = '/api/escort/fotos';
+
+export async function uploadAudioPreview(
+  file: File,
+  token: string,
+  onProgress?: (pct: number) => void
+): Promise<{ success: boolean; url?: string; error?: string }> {
+  return new Promise((resolve) => {
+    const formData = new FormData();
+    formData.append('audio_preview', file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${API_BASE}/upload-audio.php`);
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText);
+        if (data.success) {
+          resolve({ success: true, url: data.url });
+        } else {
+          resolve({ success: false, error: data.error || 'Error al subir audio' });
+        }
+      } catch {
+        resolve({ success: false, error: 'Error de conexión' });
+      }
+    };
+
+    xhr.onerror = () => {
+      resolve({ success: false, error: 'Error de red' });
+    };
+
+    xhr.send(formData);
+  });
+}
+
+export async function deleteAudioPreview(
+  token: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${API_BASE}/upload-audio.php`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const data = await res.json();
+    return { success: data.success, error: data.error };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Error de conexión' };
+  }
+}

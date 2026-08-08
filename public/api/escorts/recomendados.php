@@ -49,18 +49,18 @@ try {
         SELECT e.id, e.nombre, e.slug, e.edad,
                " . efectiva_ciudad() . " as ciudad, e.ciudad as ciudad_base,
                COALESCE(NULLIF(e.foto_principal, ''), pf.url) as foto_principal,
-               e.vip, e.verificado, e.destacado, e.estado,
-               e.disponible_ahora,
-               e.rating, e.total_valoraciones, e.en_gira,
-               gc.nombre AS gira_ciudad,
-               " . gira_activa() . " as gira_activa
-        FROM escorts e
-        LEFT JOIN escort_fotos pf ON pf.escort_id = e.id AND pf.es_portada = 1
-        LEFT JOIN ciudades gc ON gc.id = e.gira_ciudad_id
-        WHERE $where
-        ORDER BY e.destacado DESC, e.vip DESC, e.rating DESC, RAND()
-        LIMIT 12
-    ");
+                e.vip, e.verificado, e.destacado, e.estado,
+                e.disponible_ahora, e.audio_preview,
+                e.rating, e.total_valoraciones, e.en_gira,
+                gc.nombre AS gira_ciudad,
+                " . gira_activa() . " as gira_activa
+         FROM escorts e
+         LEFT JOIN escort_fotos pf ON pf.escort_id = e.id AND pf.es_portada = 1
+         LEFT JOIN ciudades gc ON gc.id = e.gira_ciudad_id
+         WHERE $where
+         ORDER BY e.destacado DESC, e.vip DESC, e.rating DESC, RAND()
+         LIMIT 12
+     ");
     $stmt->execute($params);
     $recomendados = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -82,7 +82,7 @@ try {
                    " . efectiva_ciudad() . " as ciudad, e.ciudad as ciudad_base,
                    COALESCE(NULLIF(e.foto_principal, ''), pf.url) as foto_principal,
                    e.vip, e.verificado, e.destacado, e.estado,
-                   e.disponible_ahora,
+                   e.disponible_ahora, e.audio_preview,
                    e.rating, e.total_valoraciones, e.en_gira,
                    gc.nombre AS gira_ciudad,
                    " . gira_activa() . " as gira_activa

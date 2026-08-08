@@ -117,11 +117,11 @@ export async function videoSrcToGif(
         const vW = video.videoWidth;
         const vH = video.videoHeight;
         gifWidth = width;
-        gifHeight = height;
-        if (gifHeight === null) {
-          gifHeight = Math.round(gifWidth * (vH / vW));
+        let calculatedHeight = height;
+        if (calculatedHeight === null) {
+          calculatedHeight = Math.round(gifWidth * (vH / vW));
         }
-        gifHeight = Math.min(gifHeight, 520);
+        gifHeight = Math.min(calculatedHeight, 520);
         gifWidth = Math.min(gifWidth, 320);
 
         gif = new GIF({

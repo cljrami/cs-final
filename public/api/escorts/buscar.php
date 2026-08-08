@@ -69,7 +69,8 @@ try {
             COALESCE(NULLIF(e.foto_principal, ''), pf.url) as foto_principal,
             e.vip,
             e.verificado,
-            e.estado
+            e.estado,
+            e.audio_preview
         FROM escorts e
         LEFT JOIN escort_fotos pf ON pf.escort_id = e.id AND pf.es_portada = 1
         LEFT JOIN ciudades gc ON gc.id = e.gira_ciudad_id

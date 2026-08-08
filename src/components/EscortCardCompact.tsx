@@ -1,5 +1,6 @@
 import type { Escort, EscortCardProps } from '../types/escort';
 import { Skeleton } from './ui/Skeleton';
+import AudioPreviewPlayer from './escort/AudioPreviewPlayer';
 
 function getResizedSrc(src: string): string {
   if (!src) return '';
@@ -83,6 +84,9 @@ export default function EscortCardCompact({ escort, skeleton = false, priority =
             <i className="fas fa-plane-departure text-[0.4rem]"></i>
           </span>
         )}
+
+        {/* Audio preview play button */}
+        <AudioPreviewPlayer audioUrl={escort.audio_preview ?? null} size="sm" />
       </div>
 
       <div className="p-2">

@@ -28,9 +28,10 @@ export interface Escort {
   gira_fecha_inicio?: string | null;
   gira_fecha_fin?: string | null;
   ciudad_base?: string;
-  descripcion_corta?: string;
-  created_at?: string;
-  fecha_aprobacion?: string;
+   descripcion_corta?: string;
+   audio_preview?: string | null;
+   created_at?: string;
+   fecha_aprobacion?: string;
   sticky?: number;
   sticky_orden?: number;
   disponible_ahora?: number;

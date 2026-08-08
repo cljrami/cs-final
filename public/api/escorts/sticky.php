@@ -32,6 +32,7 @@ try {
             e.vip,
             e.verificado,
             e.destacado,
+            e.audio_preview,
             COALESCE(sp.orden, 0) as sticky_orden,
             e.visitas_perfil,
             e.rating,
