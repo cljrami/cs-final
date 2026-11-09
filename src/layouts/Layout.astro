@@ -45,6 +45,15 @@ if (!siteConfig.site_nombre || siteConfig.site_nombre === "CSEscorts") {
   } catch (e) {}
 }
 
+// Normalización de URLs para evitar typos en BD
+function normalizeUrl(u?: string): string {
+  if (!u) return '';
+  return u.replace(/consxvip\.xl/gi, 'consexvip.cl').replace(/kimi\.zona8\.cl/gi, 'consexvip.cl');
+}
+siteConfig.seo_url = normalizeUrl(siteConfig.seo_url);
+siteConfig.schema_url = normalizeUrl(siteConfig.schema_url);
+siteConfig.seo_canonical = normalizeUrl(siteConfig.seo_canonical);
+
 let siteName = siteConfig.site_nombre;
 let siteDescripcion = siteConfig.site_descripcion;
 
@@ -194,22 +203,20 @@ if (schemaHabilitado) {
       if (Array.isArray(parsed)) sameAs = parsed.map(String);
     } catch (e) {}
   }
-  const schema: Record<string, unknown> = {
-    "@context": "https://schema.org",
+  const organization: Record<string, unknown> = {
     "@type": siteConfig.schema_tipo || "Organization",
     name: siteConfig.schema_nombre || siteName,
     url: siteConfig.schema_url || seoUrl,
   };
-  if (siteConfig.schema_description) schema.description = siteConfig.schema_description;
-  if (siteConfig.schema_logo) schema.logo = siteConfig.schema_logo;
-  if (siteConfig.schema_imagen) schema.image = resolverUrlAbsoluta(String(siteConfig.schema_imagen));
-  if (siteConfig.schema_email) schema.email = siteConfig.schema_email;
-  if (siteConfig.schema_telefono) schema.telephone = siteConfig.schema_telefono;
-  if (sameAs) schema.sameAs = sameAs;
+  if (siteConfig.schema_description) organization.description = siteConfig.schema_description;
+  if (siteConfig.schema_logo) organization.logo = siteConfig.schema_logo;
+  if (siteConfig.schema_imagen) organization.image = resolverUrlAbsoluta(String(siteConfig.schema_imagen));
+  if (siteConfig.schema_email) organization.email = siteConfig.schema_email;
+  if (siteConfig.schema_telefono) organization.telephone = siteConfig.schema_telefono;
+  if (sameAs) organization.sameAs = sameAs;
 
   // WebSite con SearchAction → habilita el buscador en resultados (sitelinks)
   const website: Record<string, unknown> = {
-    "@context": "https://schema.org",
     "@type": "WebSite",
     name: siteConfig.schema_nombre || siteName,
     url: siteConfig.schema_url || seoUrl,
@@ -223,12 +230,11 @@ if (schemaHabilitado) {
     },
   };
 
-  // Embeber el WebSite dentro del Organization principal (más compatible)
-  if (schema["@type"] === "Organization") {
-    schema.website = website;
-  }
-
-  schemaOrg = schema;
+  // Usar @graph para evitar propiedad website inválida en Organization
+  schemaOrg = {
+    "@context": "https://schema.org",
+    "@graph": [organization, website],
+  };
 }
 
 // BreadcrumbList: útil para páginas de ciudad (Inicio > Ciudad) y perfiles
