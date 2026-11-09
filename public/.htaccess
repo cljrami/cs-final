@@ -1,5 +1,8 @@
 RewriteEngine On
 
+# Detectar bots sociales para servir versión PHP con OG server-side
+SetEnvIf User-Agent "facebookexternalhit|Twitterbot|LinkedInBot|WhatsApp|Slackbot|Pinterest|TelegramBot|Discordbot|Googlebot" is_social_bot
+
 # Redirigir www
 RewriteCond %{HTTP_HOST} ^consexvip\.cl$ [NC]
 RewriteRule ^(.*)$ https://www.consexvip.cl/$1 [R=301,L]
@@ -19,6 +22,10 @@ RewriteRule ^sitemap\.xml$ sitemap.php [L]
 RewriteRule ^negocio/([0-9]+)?$ negocio.php?id=$1 [L,QSA]
 
 # Escorts
+# Servir versión PHP con OG server-side para bots sociales
+RewriteCond %{ENV:is_social_bot} 1
+RewriteRule ^cs(\d+)/?$ escort.php?id=$1 [L,QSA]
+
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^cs(\d+)/?$ /perfil/?id=$1 [L,QSA]

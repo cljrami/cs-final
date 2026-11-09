@@ -94,9 +94,13 @@ try {
         exit;
     }
 
+    // Detectar bots para no inflar visitas
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+    $isBot = preg_match('/facebookexternalhit|Twitterbot|LinkedInBot|WhatsApp|Slackbot|Pinterest|TelegramBot|Discordbot|Googlebot/i', $ua);
+
     // === Registrar visita (con dedup por cookie para evitar inflar con recargas) ===
     $cookieName = 'visited_' . $id;
-    $esNuevaVisita = empty($_COOKIE[$cookieName]);
+    $esNuevaVisita = empty($_COOKIE[$cookieName]) && !$isBot;
     try {
         if ($esNuevaVisita) {
             $updateVisita = $pdo->prepare("UPDATE escorts SET visitas_perfil = visitas_perfil + 1 WHERE id = ?");
