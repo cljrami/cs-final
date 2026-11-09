@@ -1,7 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
 ---
-<Layout title="Iniciar sesión" showNavFooter={false} page="login">
+<Layout title="Iniciar sesión" robots="noindex, nofollow" showNavFooter={false} page="login">
   <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-page to-surface">
     <div class="w-full max-w-md mx-4 bg-admin-card rounded-2xl p-8 md:p-10">
       <div class="text-center mb-8">
@@ -25,7 +25,10 @@ import Layout from "../layouts/Layout.astro";
           <label class="block text-sm text-admin-muted mb-2"><i class="fas fa-lock mr-2"></i>Contraseña</label>
           <div class="flex items-center bg-page rounded-xl px-4 focus-within:bg-raised transition-colors">
             <i class="fas fa-lock text-muted"></i>
-            <input type="password" id="password" class="flex-1 bg-transparent border-none text-ink px-4 py-3 outline-none" placeholder="••••••••" required />
+            <input type="password" id="password" class="flex-1 bg-transparent border-none text-ink px-4 py-3 outline-none pr-10" placeholder="••••••••" required />
+            <button type="button" id="togglePassword" class="ml-2 text-muted hover:text-ink transition-colors" aria-label="Mostrar contraseña">
+              <i class="fas fa-eye"></i>
+            </button>
           </div>
         </div>
 
@@ -65,10 +68,20 @@ import Layout from "../layouts/Layout.astro";
   const form = document.getElementById('loginForm');
   const emailInput = document.getElementById('email');
   const passwordInput = document.getElementById('password');
+  const togglePassword = document.getElementById('togglePassword');
   const errorDiv = document.getElementById('error');
   const errorText = document.getElementById('errorText');
   const submitBtn = document.getElementById('submitBtn');
   if (!form || !emailInput || !passwordInput) return;
+
+  let showPassword = false;
+  if (togglePassword && passwordInput) {
+    togglePassword.addEventListener('click', () => {
+      showPassword = !showPassword;
+      passwordInput.type = showPassword ? 'text' : 'password';
+      togglePassword.innerHTML = showPassword ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+    });
+  }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();

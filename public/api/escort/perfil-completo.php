@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 try {
     require_once __DIR__ . '/../bootstrap.php';
     require_once __DIR__ . '/../lib/gira.php';
+    require_once __DIR__ . '/../lib/escort_status.php';
 
     $pdo = getDBConnection();
     $headers = getallheaders();
@@ -26,7 +27,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || (isset($tokenData['exp']) ? $tokenData['exp'] : 0) < time()) {
         http_response_code(401);
@@ -38,13 +39,18 @@ try {
 
     limpiar_gira_vencida($pdo);
 
+    // Obtener suscripción base para calcular plan_vencido
+    $suscripcionBase = getPlanBaseSuscripcion($pdo, $escortId);
+    $planVencido = getPlanVencidoFromSubscription($suscripcionBase);
+
     $stmt = $pdo->prepare("
         SELECT id, nombre, edad, altura, peso, medidas,
                ciudad, categoria_id, whatsapp, telefono, 
                nacionalidad, etnia, color_ojos, color_pelo, orientacion, estilo,
                descripcion_corta, descripcion_larga,
-               estado, verificado, vip, privacidad,
-               en_gira, gira_ciudad_id, gira_fecha_inicio, gira_fecha_fin
+               estado, verificado, vip, destacado, sticky, activa, privacidad,
+               en_gira, gira_ciudad_id, gira_fecha_inicio, gira_fecha_fin,
+               fecha_vip_expira, fecha_destacado_expira, sticky_expira
         FROM escorts 
         WHERE id = ? AND eliminada = 0
     ");
@@ -56,6 +62,9 @@ try {
         echo json_encode(['success' => false, 'error' => 'Perfil no encontrado']);
         exit;
     }
+
+    // Agregar estados efectivos
+    $perfil = array_merge($perfil, getEscortEffectiveStatus($perfil, $planVencido, $suscripcionBase !== null));
 
     // Cargar servicios de la escort con su tipo (incluido/adicional)
     $servStmt = $pdo->prepare("

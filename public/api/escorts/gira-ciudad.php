@@ -37,6 +37,10 @@ try {
     $stmt->execute([$ciudad]);
     $escorts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Badges vigentes para el modal de gira
+    require_once __DIR__ . '/../lib/escort_status.php';
+    attachVigenciaBadges($pdo, $escorts);
+
     echo json_encode([
         'success' => true,
         'ciudad' => $ciudad,

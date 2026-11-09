@@ -2,6 +2,7 @@
 import type { Escort, EscortCardProps } from '../types/escort';
 import { isNueva } from '../utils/fecha';
 import { Skeleton } from './ui/Skeleton';
+import { useSiteTexts } from '../hooks/useSiteTexts';
 import AudioPreviewPlayer from './escort/AudioPreviewPlayer';
 
 function getImageSrcSet(src: string): string {
@@ -36,6 +37,20 @@ export default function EscortCard({ escort, skeleton = false, priority = false 
   const imgSrc = getResizedSrc(escort.foto_principal);
   const srcSet = getImageSrcSet(imgSrc || '');
   const blurDataURL = getBlurDataURL(imgSrc || '');
+  const texts = useSiteTexts();
+
+  const T = {
+    disponible: texts?.badge_disponible || 'Disponible',
+    gira: texts?.badge_gira || 'En gira',
+    giraCiudad: texts?.badge_gira_ciudad || 'En gira en {ciudad}',
+    nueva: texts?.badge_nueva || 'Nueva',
+    verificada: texts?.badge_verificada || 'Verificada',
+    vips: texts?.badge_vip || 'VIP',
+    anios: texts?.badge_anios || '{edad} años',
+    valoracion: texts?.badge_valoracion || 'Valoración: {rating} estrellas, {reseñas} reseñas',
+  };
+
+  const fmt = (tpl: string, vars: Record<string, string>) => tpl.replace(/\{(\w+)\}/g, (m, k) => vars[k] ?? m);
 
   if (skeleton) {
     return (
@@ -55,7 +70,7 @@ export default function EscortCard({ escort, skeleton = false, priority = false 
 
   return (
     <a
-      href={`/${escort.id}`}
+      href={`/cs${escort.id}`}
       className="group block bg-surface rounded-xl overflow-hidden border border-white/5 hover:border-red-500/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-red-500/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-page"
     >
       <div className="relative aspect-[3/4] bg-gradient-to-b from-raised to-surface overflow-hidden">
@@ -92,7 +107,7 @@ export default function EscortCard({ escort, skeleton = false, priority = false 
         <AudioPreviewPlayer audioUrl={escort.audio_preview ?? null} size="md" />
 
         {escort.disponible_ahora === 1 && (
-          <span className="absolute top-2 left-2 z-10 flex items-center justify-center w-4 h-4 rounded-full bg-green-500 shadow-lg shadow-green-600/50 animate-pulse" title="Disponible">
+          <span className="absolute top-2 left-2 z-10 flex items-center justify-center w-4 h-4 rounded-full bg-green-500 shadow-lg shadow-green-600/50 animate-pulse" title={T.disponible}>
           </span>
         )}
 
@@ -104,9 +119,9 @@ export default function EscortCard({ escort, skeleton = false, priority = false 
               rounded-full flex items-center gap-1
               shadow-md shadow-purple-500/30
               border border-white/20"
-            title={escort.gira_ciudad ? `En gira en ${escort.gira_ciudad}` : 'En gira'}
+            title={escort.gira_ciudad ? fmt(T.giraCiudad, { ciudad: escort.gira_ciudad }) : T.gira}
           >
-            <i className="fas fa-plane-departure text-[0.5rem]"></i>{escort.gira_ciudad || 'En gira'}
+            <i className="fas fa-plane-departure text-[0.5rem]"></i>{escort.gira_ciudad || T.gira}
           </span>
         )}
 
@@ -118,9 +133,9 @@ export default function EscortCard({ escort, skeleton = false, priority = false 
               rounded-full flex items-center gap-1
               shadow-md shadow-amber-500/30
               border border-white/20"
-            title="Nueva"
+            title={T.nueva}
           >
-            <i className="fas fa-star text-[0.5rem]"></i>Nueva
+            <i className="fas fa-star text-[0.5rem]"></i>{T.nueva}
           </span>
         )}
 
@@ -130,19 +145,32 @@ export default function EscortCard({ escort, skeleton = false, priority = false 
         <div className="flex items-start justify-between mb-1.5">
           <div className="flex items-center gap-1 min-w-0">
             <h3 className="text-ink font-semibold text-sm leading-tight truncate">{escort.nombre}</h3>
-            {escort.verificado === 1 && (
-              <span className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center shrink-0" title="Verificada">
-                <i className="fas fa-check text-[0.35rem] text-white"></i>
+            {escort.verificado_vigente === 1 && (
+              <span className="w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center shrink-0" title={T.verificada}>
+                <i className="fas fa-check text-[0.55rem] text-white"></i>
               </span>
             )}
-            {escort.vip === 1 && (
-              <span className="w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center shrink-0" title="VIP">
-                <i className="fas fa-crown text-[0.35rem] text-black"></i>
+            {escort.verificado === 1 && escort.verificado_vigente === 0 && (
+              <span className="w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center shrink-0" title="Verificada (expirada)">
+                <i className="fas fa-exclamation-triangle text-[0.55rem] text-white"></i>
+              </span>
+            )}
+            {escort.vip_vigente === 1 && (
+              <span className="w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center shrink-0" title={T.vips}>
+                <i className="fas fa-crown text-[0.55rem] text-black"></i>
+              </span>
+            )}
+            {escort.vip === 1 && escort.vip_vigente === 0 && (
+              <span className="w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center shrink-0" title="VIP (expirado)">
+                <i className="fas fa-exclamation-triangle text-[0.55rem] text-white"></i>
               </span>
             )}
           </div>
           {(escort.total_valoraciones ?? 0) > 0 && (
-            <div className="flex items-center gap-1 text-yellow-400 text-xs flex-shrink-0" aria-label={`Valoración: ${Number(escort.rating).toFixed(1)} estrellas, ${escort.total_valoraciones} reseñas`}>
+            <div className="flex items-center gap-1 text-yellow-400 text-xs flex-shrink-0" aria-label={fmt(T.valoracion, {
+              rating: Number(escort.rating).toFixed(1),
+              reseñas: String(escort.total_valoraciones),
+            })}>
               <i className="fas fa-star text-[0.55rem]" aria-hidden="true"></i>
               <span>{Number(escort.rating).toFixed(1)}</span>
             </div>
@@ -152,7 +180,7 @@ export default function EscortCard({ escort, skeleton = false, priority = false 
           <i className="fas fa-map-marker-alt text-[0.55rem] flex-shrink-0" aria-hidden="true"></i>
           <span className="truncate">{escort.ciudad}</span>
           <span className="text-gray-700" aria-hidden="true">•</span>
-          <span className="text-red-400">{escort.edad} años</span>
+          <span className="text-red-400">{fmt(T.anios, { edad: String(escort.edad) })}</span>
         </div>
       </div>
     </a>

@@ -37,6 +37,12 @@ $offset = ($page - 1) * $limit;
     $esPausada = "COALESCE($ultimoBaseEstado, '') = 'pausada'";
     $noPausada = "COALESCE($ultimoBaseEstado, '') <> 'pausada'";
     $esVenceHoy = "COALESCE($ultimoBaseEstado, '') = 'activa' AND COALESCE($ultimoBaseFin, '') = CURDATE()";
+    // Espejo del CASE suscripcion_estado='expirada' del SELECT principal:
+    // e.activa=1 y el último plan base no está pausado y (no hay plan, no está en 'activa' o ya venció)
+    $esExpirada = "e.activa = 1 AND $noPausada AND (COALESCE($ultimoBaseEstado, '') = '' OR COALESCE($ultimoBaseEstado, '') <> 'activa' OR COALESCE($ultimoBaseFin, '') < CURDATE())";
+    // Activa REAL: último plan base en 'activa' y con fecha vigente.
+    // Las vencidas van a su tarjeta de expiradas (nunca a activas).
+    $planVigente = "COALESCE($ultimoBaseEstado, '') = 'activa' AND COALESCE($ultimoBaseFin, '') >= CURDATE()";
 
     // Stats por suscripcion_estado + eliminadas
     $statsSql = "
@@ -44,12 +50,13 @@ $offset = ($page - 1) * $limit;
             SUM(CASE WHEN e.eliminada = 1 THEN 1 ELSE 0 END) as papelera,
             SUM(CASE WHEN e.eliminada = 0 THEN 1 ELSE 0 END) as total,
             SUM(CASE WHEN e.eliminada = 0 AND e.activa = 0 AND $noPausada THEN 1 ELSE 0 END) as pendientes,
-            SUM(CASE WHEN e.eliminada = 0 AND e.activa = 1 AND $noPausada THEN 1 ELSE 0 END) as activas,
+            SUM(CASE WHEN e.eliminada = 0 AND e.activa = 1 AND $planVigente THEN 1 ELSE 0 END) as activas,
             SUM(CASE WHEN e.eliminada = 0 AND e.activa = -1 THEN 1 ELSE 0 END) as rechazadas,
             SUM(CASE WHEN e.eliminada = 0 AND e.activa <> -1 AND COALESCE($ultimoBaseEstado, '') = 'pausada' THEN 1 ELSE 0 END) as pausadas,
             SUM(CASE WHEN e.eliminada = 0 AND e.verificado = 1 THEN 1 ELSE 0 END) as verificadas,
             SUM(CASE WHEN e.eliminada = 0 AND e.vip = 1 THEN 1 ELSE 0 END) as vip,
-            SUM(CASE WHEN e.eliminada = 0 AND $esVenceHoy THEN 1 ELSE 0 END) as vencen_hoy
+            SUM(CASE WHEN e.eliminada = 0 AND $esVenceHoy THEN 1 ELSE 0 END) as vencen_hoy,
+            SUM(CASE WHEN e.eliminada = 0 AND $esExpirada THEN 1 ELSE 0 END) as expiradas
         FROM escorts e
     ";
     $statsRow = $pdo->query($statsSql)->fetch(PDO::FETCH_ASSOC);
@@ -63,10 +70,11 @@ $offset = ($page - 1) * $limit;
         'verificadas' => (int)$statsRow['verificadas'],
         'vip' => (int)$statsRow['vip'],
         'vencen_hoy' => (int)$statsRow['vencen_hoy'],
+        'expiradas' => (int)$statsRow['expiradas'],
         'papelera' => (int)$statsRow['papelera'],
     ];
 
-    // Construir WHERE diníƒÂ¡micamente
+    // Construir WHERE din?micamente
     $where = [];
     $params = [];
 
@@ -79,13 +87,16 @@ switch ($estado) {
                 $where[] = 'e.activa = 0 AND ' . $noPausada;
                 break;
             case 'activas':
-                $where[] = 'e.activa = 1 AND ' . $noPausada;
+                $where[] = 'e.activa = 1 AND ' . $planVigente;
                 break;
             case 'pausadas':
                 $where[] = 'e.activa <> -1 AND ' . $esPausada;
                 break;
             case 'vencen_hoy':
                 $where[] = 'e.activa = 1 AND ' . $esVenceHoy;
+                break;
+            case 'expiradas':
+                $where[] = $esExpirada;
                 break;
             case 'rechazadas':
                 $where[] = 'e.activa = -1';

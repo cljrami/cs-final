@@ -1,15 +1,19 @@
 ---
 import UserLayout from "../layouts/UserLayout.astro";
 ---
-<UserLayout title="Mis Valoraciones" activePage="valoraciones">
+<UserLayout title="Mis Valoraciones" activePage="valoraciones" robots="noindex, nofollow">
   <div class="mb-8">
     <h1 class="text-2xl font-bold text-white flex items-center gap-3">
       <i class="fas fa-star text-amber-400"></i>Mis Valoraciones
     </h1>
   </div>
 
-  <div id="loading" class="flex items-center justify-center h-64">
-    <div class="w-10 h-10 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+  <div id="loading" class="space-y-3 p-4">
+    <div class="skel h-4 w-full"></div>
+    <div class="skel h-4 w-5/6"></div>
+    <div class="skel h-4 w-full"></div>
+    <div class="skel h-4 w-4/6"></div>
+    <div class="skel h-4 w-full"></div>
   </div>
 
   <div id="noAuth" class="hidden text-center py-16">
@@ -79,6 +83,19 @@ import UserLayout from "../layouts/UserLayout.astro";
   }
   const userId = JSON.parse(userDataRaw).id;
 
+  // Escape para interpolar datos en HTML (nombres vienen de la BD)
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function safeUrl(u) {
+    u = String(u || '');
+    if (!/^(https?:\/\/|\/)[^\s"'<>`]+$/i.test(u)) return '';
+    return u;
+  }
+  function safeId(v) { return parseInt(v, 10) || 0; }
+
   fetch('/api/escorts/valorar.php?usuario_id=' + userId, {
     headers: { 'Authorization': 'Bearer ' + token }
   })
@@ -98,21 +115,21 @@ import UserLayout from "../layouts/UserLayout.astro";
       const stars = Array.from({length: 5}, function(_, i) {
         return '<i class="fas fa-star ' + (i < Number(v.general) ? 'text-amber-400' : 'text-gray-700') + ' text-xs"></i>';
       }).join('');
-      var escortAvatar = v.escort_foto
-        ? '<img src="' + v.escort_foto + '" alt="" class="w-8 h-8 rounded-full object-cover" loading="lazy" onerror="this.style.display=\'none\'" />'
+      var escortAvatar = v.escort_foto && safeUrl(v.escort_foto)
+        ? '<img src="' + safeUrl(v.escort_foto) + '" alt="" class="w-8 h-8 rounded-full object-cover" loading="lazy" onerror="this.style.display=\'none\'" />'
         : '<div class="w-8 h-8 rounded-full bg-[#2a2a3e] flex items-center justify-center"><i class="fas fa-user text-gray-600 text-xs"></i></div>';
       card.innerHTML =
         '<div class="flex items-center justify-between mb-2">' +
           '<div class="flex items-center gap-2">' +
             '<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">Valoración</span>' +
             escortAvatar +
-            '<strong class="text-white text-sm">' + (v.escort_nombre || 'Escort') + '</strong>' +
+            '<strong class="text-white text-sm">' + esc(v.escort_nombre || 'Escort') + '</strong>' +
           '</div>' +
           '<div class="flex items-center gap-0.5">' + stars + '</div>' +
         '</div>' +
         '<div class="flex items-center justify-between">' +
           '<span class="text-gray-600 text-xs">' + (v.fecha ? new Date(v.fecha).toLocaleDateString('es-CL') : '') + '</span>' +
-          '<button onclick="confirmEliminarValoracion(' + v.id + ')" class="text-xs text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 px-2 py-0.5 rounded transition-colors">' +
+          '<button onclick="confirmEliminarValoracion(' + safeId(v.id) + ')" class="text-xs text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 px-2 py-0.5 rounded transition-colors">' +
             '<i class="fas fa-trash-alt mr-1"></i>Eliminar' +
           '</button>' +
         '</div>';

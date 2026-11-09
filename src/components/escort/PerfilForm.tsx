@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import SearchAutocomplete from '../ui/SearchAutocomplete';
+import { showToast } from '../ui/Toast';
 import { decodeHtml } from '../../lib/sanitize';
 import GiraActivacionPopup from './GiraActivacionPopup';
 
@@ -113,7 +114,8 @@ export default function PerfilForm() {
   const [opciones, setOpciones] = useState<Record<string, { id: number; nombre: string; icono?: string }[]>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+  const [successMsg] = useState('');
+  const setSuccessMsg = (m: string) => showToast(m);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Autocomplete servicios
@@ -164,6 +166,19 @@ export default function PerfilForm() {
   const quillRef = useRef<any>(null);
   const [quillReady, setQuillReady] = useState(false);
   const contenidoCargadoRef = useRef(false);
+
+  // Refs para foco y scroll a campos obligatorios
+  const nombreRef = useRef<HTMLInputElement>(null);
+  const edadRef = useRef<HTMLInputElement>(null);
+  const ciudadRef = useRef<HTMLDivElement>(null);
+  const whatsappRef = useRef<HTMLInputElement>(null);
+  const telefonoRef = useRef<HTMLInputElement>(null);
+  const serviciosRef = useRef<HTMLDivElement>(null);
+  // Refs de sección
+  const informacionBasicaRef = useRef<HTMLDivElement>(null);
+  const ubicacionRef = useRef<HTMLDivElement>(null);
+  // Errores por sección
+  const [sectionErrors, setSectionErrors] = useState<Record<string, string>>({});
 
   const cargarQuill = () => {
     if ((window as any).Quill) { setQuillReady(true); return; }
@@ -226,6 +241,45 @@ export default function PerfilForm() {
     contenidoCargadoRef.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quillReady, form.descripcionLarga]);
+
+  // Validación en tiempo real por sección y campos
+  useEffect(() => {
+    const sectionErrs: Record<string, string> = {};
+    const fieldErrs: Record<string, string> = {};
+
+    // Información Básica
+    if (!form.nombre.trim()) {
+      sectionErrs.informacionBasica = 'Nombre artístico requerido';
+      fieldErrs.nombre = 'Nombre artístico requerido';
+    } else if (!form.edad || parseInt(form.edad) < 18) {
+      sectionErrs.informacionBasica = 'Debes ser mayor de 18 años';
+      fieldErrs.edad = 'Debes ser mayor de 18 años';
+    } else {
+      const waVal = form.whatsapp ? validarTelefono(form.whatsapp) : { valido: false };
+      const telVal = form.telefono ? validarTelefono(form.telefono) : { valido: false };
+      const whatsappValido = form.whatsapp && waVal.valido;
+      const telefonoValido = form.telefono && telVal.valido;
+      if (!whatsappValido && !telefonoValido) {
+        sectionErrs.informacionBasica = 'Debes proporcionar al menos un teléfono válido (WhatsApp o Teléfono)';
+        fieldErrs.telefono = 'Debes proporcionar al menos un teléfono válido (WhatsApp o Teléfono)';
+      }
+    }
+
+    // Ubicación
+    if (!form.ciudadId) {
+      sectionErrs.ubicacion = 'Selecciona una ciudad';
+      fieldErrs.ciudad = 'Selecciona una ciudad';
+    }
+
+    // Servicios
+    if (form.servicios.length === 0) {
+      sectionErrs.servicios = 'Selecciona al menos un servicio';
+      fieldErrs.servicios = 'Selecciona al menos un servicio';
+    }
+
+    setSectionErrors(sectionErrs);
+    setFieldErrors(fieldErrs);
+  }, [form.nombre, form.edad, form.whatsapp, form.telefono, form.ciudadId, form.servicios]);
 
   const fetchData = async () => {
     try {
@@ -312,6 +366,7 @@ export default function PerfilForm() {
         ...prev, 
         servicios: [...prev.servicios, { id: servicioId, incluido }] 
       }));
+      setSectionErrors(prev => { const { servicios, ...rest } = prev; return rest; });
     }
   };
 
@@ -382,6 +437,9 @@ export default function PerfilForm() {
     // Solo permitir números
     const nums = val.replace(/\D/g, '');
     setForm(prev => ({ ...prev, edad: nums }));
+    if (fieldErrors.edad) {
+      setFieldErrors(prev => { const { edad, ...r } = prev; return r; });
+    }
   };
 
   const edadError = edadTouched && (form.edad && parseInt(form.edad) < 18) 
@@ -396,6 +454,62 @@ export default function PerfilForm() {
   const showNotification = (msg: string) => {
     setSuccessMsg(msg);
     setTimeout(() => setSuccessMsg(''), 3000);
+  };
+
+  // Scroll y foco al primer campo con error
+  const scrollToFirstError = (errors: Record<string, string>) => {
+    const priority = ['nombre', 'edad', 'ciudad', 'whatsapp', 'telefono', 'servicios'];
+    const firstError = priority.find(k => errors[k]);
+    if (!firstError) return;
+
+    const refMap: Record<string, React.RefObject<HTMLElement>> = {
+      nombre: nombreRef,
+      edad: edadRef,
+      ciudad: ciudadRef,
+      whatsapp: whatsappRef,
+      telefono: telefonoRef,
+      servicios: serviciosRef,
+    };
+
+    // Priorizar scroll a sección para errores de presencia
+    let sectionRef: React.RefObject<HTMLElement> | null = null;
+    if (['nombre', 'edad', 'whatsapp', 'telefono'].includes(firstError)) {
+      sectionRef = informacionBasicaRef;
+    } else if (firstError === 'ciudad') {
+      sectionRef = ubicacionRef;
+    } else if (firstError === 'servicios') {
+      sectionRef = serviciosRef;
+    }
+
+    const fieldEl = refMap[firstError]?.current;
+    const sectionEl = sectionRef?.current;
+
+    const doScroll = (el: HTMLElement) => {
+      try { 
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } catch {}
+    };
+
+    if (sectionEl) {
+      doScroll(sectionEl);
+      // Focus campo específico si existe
+      if (fieldEl) {
+        const focusable = fieldEl instanceof HTMLElement && (fieldEl.tagName === 'INPUT' || fieldEl.tagName === 'TEXTAREA' || fieldEl.tagName === 'SELECT' || fieldEl.getAttribute('tabindex') !== null);
+        if (focusable) {
+          setTimeout(() => {
+            try { fieldEl.focus(); } catch {}
+          }, 300);
+        }
+      }
+    } else if (fieldEl) {
+      const focusable = fieldEl instanceof HTMLElement && (fieldEl.tagName === 'INPUT' || fieldEl.tagName === 'TEXTAREA' || fieldEl.tagName === 'SELECT' || fieldEl.getAttribute('tabindex') !== null);
+      if (focusable) {
+        try { fieldEl.focus(); } catch {}
+      }
+      doScroll(fieldEl);
+    } else {
+      console.warn('PerfilForm: ref no encontrado para', firstError, errors);
+    }
   };
 
   const saveForm = async (showMsg = true, overrides?: Partial<typeof form>) => {
@@ -456,23 +570,62 @@ export default function PerfilForm() {
     
     if (!form.ciudadId) errors.ciudad = 'Selecciona una ciudad';
     
-    const waVal = validarTelefono(form.whatsapp);
-    if (!waVal.valido) errors.whatsapp = waVal.error!;
+    // Validar al menos un teléfono (WhatsApp o Teléfono)
+    const waVal = form.whatsapp ? validarTelefono(form.whatsapp) : { valido: false, error: 'WhatsApp requerido' };
+    const telVal = form.telefono ? validarTelefono(form.telefono) : { valido: false, error: 'Teléfono requerido' };
     
-    const telVal = validarTelefono(form.telefono);
-    if (!telVal.valido) errors.telefono = telVal.error!;
+    const whatsappValido = form.whatsapp && waVal.valido;
+    const telefonoValido = form.telefono && telVal.valido;
+    
+    if (!whatsappValido && !telefonoValido) {
+      errors.telefono = 'Debes proporcionar al menos un teléfono válido (WhatsApp o Teléfono)';
+    } else {
+      if (form.whatsapp && !waVal.valido) errors.whatsapp = waVal.error!;
+      if (form.telefono && !telVal.valido) errors.telefono = telVal.error!;
+    }
     
     if (form.servicios.length === 0) errors.servicios = 'Selecciona al menos un servicio';
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
+      // Mapear errores de presencia a errores por sección
+      const sectionErrs: Record<string, string> = {};
+      if (errors.nombre || errors.edad || errors.telefono) {
+        // Priorizar nombre > edad > teléfono
+        if (errors.nombre) sectionErrs.informacionBasica = errors.nombre;
+        else if (errors.edad) sectionErrs.informacionBasica = errors.edad;
+        else if (errors.telefono) sectionErrs.informacionBasica = errors.telefono;
+      }
+      if (errors.ciudad) {
+        sectionErrs.ubicacion = errors.ciudad;
+      }
+      if (errors.servicios) {
+        sectionErrs.servicios = errors.servicios;
+      }
+      setSectionErrors(sectionErrs);
       setEdadTouched(true);
       setWhatsappTouched(true);
       setTelefonoTouched(true);
+      
+      // Toast y scroll al primer error
+      console.log('PerfilForm: Validación fallida', errors);
+      
+      setError('Por favor completa los campos obligatorios marcados * ' + Object.keys(errors).join(', '));
+      try {
+        showToast('Por favor completa los campos obligatorios marcados', 'error');
+      } catch (e) {
+        console.error('Error mostrando toast', e);
+      }
+      
+      setTimeout(() => scrollToFirstError(errors), 100);
+      setTimeout(() => scrollToFirstError(errors), 500);
+      setTimeout(() => scrollToFirstError(errors), 1000);
+      
       return;
     }
 
     setFieldErrors({});
+    setSectionErrors({});
     await saveForm();
   };
 
@@ -623,25 +776,34 @@ export default function PerfilForm() {
 
       <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
         {/* Sección 1: Información básica */}
-        <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-4 md:p-6">
+        <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-4 md:p-6" ref={informacionBasicaRef}>
           <h2 className="text-red-400 text-sm font-bold uppercase tracking-wider mb-4 md:mb-6 flex items-center gap-2">
             <span className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center text-xs">1</span>
-            Información Básica
+            Información Básica*
           </h2>
+          {sectionErrors.informacionBasica && (
+            <p className="text-red-400 text-xs mb-4 md:mb-6 flex items-center gap-1.5 animate-pulse">
+              <i className="fas fa-exclamation-circle"></i>{sectionErrors.informacionBasica}
+            </p>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5">
             {/* Nombre */}
             <div>
-              <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">Nombre Artístico</label>
+              <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">Nombre Artístico*</label>
               <div className="relative">
                 <i className="fas fa-star absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
                 <input
+                  ref={nombreRef}
                   type="text"
                   value={form.nombre}
                   onChange={(e) => {
                     setForm({ ...form, nombre: e.target.value });
                     if (fieldErrors.nombre) {
                       setFieldErrors(prev => { const { nombre, ...r } = prev; return r; });
+                    }
+                    if (sectionErrors.informacionBasica) {
+                      setSectionErrors(prev => { const { informacionBasica, ...r } = prev; return r; });
                     }
                   }}
                   placeholder="Cómo te verán los clientes"
@@ -657,10 +819,11 @@ export default function PerfilForm() {
 
             {/* EDAD con validación visual */}
             <div>
-              <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">Edad</label>
+              <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">Edad*</label>
               <div className="relative">
                 <i className="fas fa-birthday-cake absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
                 <input
+                  ref={edadRef}
                   type="text"
                   inputMode="numeric"
                   value={form.edad}
@@ -668,7 +831,7 @@ export default function PerfilForm() {
                   onBlur={() => setEdadTouched(true)}
                   placeholder="25"
                   className={`w-full bg-[#1a1a24] border ${
-                    edadInvalida || fieldErrors.edad 
+                    edadInvalida || fieldErrors.edad
                       ? 'border-red-500 ring-1 ring-red-500/20' 
                       : edadTouched && edadNum >= 18 
                         ? 'border-green-500/50' 
@@ -745,13 +908,14 @@ export default function PerfilForm() {
 
             {/* WHATSAPP con bandera y validación */}
             <div>
-              <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">WhatsApp</label>
+              <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">WhatsApp*</label>
               <div className="relative">
                 {/* Bandera del país */}
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg select-none" title="Chile">
                   {PAIS_FLAG}
                 </span>
                 <input
+                  ref={whatsappRef}
                   type="text"
                   value={form.whatsapp}
                   onChange={handleWhatsappChange}
@@ -783,16 +947,22 @@ export default function PerfilForm() {
                 </p>
               )}
               <p className="text-gray-600 text-[10px] mt-1">Incluye el código de país (ej: +56)</p>
+              {fieldErrors.telefono && (
+                <p className="text-red-400 text-xs mt-1.5 flex items-center gap-1.5 animate-pulse">
+                  <i className="fas fa-exclamation-circle"></i>{fieldErrors.telefono}
+                </p>
+              )}
             </div>
 
             {/* TELÉFONO con bandera y validación */}
             <div className="sm:col-span-2 lg:col-span-1">
-              <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">Teléfono Llamadas</label>
+              <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">Teléfono Llamadas*</label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-lg select-none" title="Chile">
                   {PAIS_FLAG}
                 </span>
                 <input
+                  ref={telefonoRef}
                   type="text"
                   value={form.telefono}
                   onChange={handleTelefonoChange}
@@ -821,20 +991,30 @@ export default function PerfilForm() {
                 </p>
               )}
               <p className="text-gray-600 text-[10px] mt-1">Incluye el código de país (ej: +56)</p>
+              {fieldErrors.telefono && (
+                <p className="text-red-400 text-xs mt-1.5 flex items-center gap-1.5 animate-pulse">
+                  <i className="fas fa-exclamation-circle"></i>{fieldErrors.telefono}
+                </p>
+              )}
             </div>
           </div>
         </div>
 
         {/* Sección 2: Ubicación con Autocomplete */}
-        <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-4 md:p-6">
+        <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-4 md:p-6" ref={ubicacionRef}>
           <h2 className="text-red-400 text-sm font-bold uppercase tracking-wider mb-4 md:mb-6 flex items-center gap-2">
             <span className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center text-xs">2</span>
-            Ubicación
+            Ubicación*
           </h2>
+          {sectionErrors.ubicacion && (
+            <p className="text-red-400 text-xs mb-4 md:mb-6 flex items-center gap-1.5 animate-pulse">
+              <i className="fas fa-exclamation-circle"></i>{sectionErrors.ubicacion}
+            </p>
+          )}
 
-          <div className="max-w-md">
+          <div className="max-w-md" ref={ciudadRef}>
             <SearchAutocomplete
-              label="Ciudad donde atiendes"
+              label="Ciudad donde atiendes*"
               icon="fa-map-marker-alt"
               itemIcon="fa-city"
               placeholder="Busca tu ciudad..."
@@ -847,6 +1027,7 @@ export default function PerfilForm() {
               onSelect={(opt) => {
                 setForm(prev => ({ ...prev, ciudadId: opt.id.toString(), ciudadNombre: opt.nombre }));
                 setFieldErrors(prev => { const { ciudad, ...rest } = prev; return rest; });
+                setSectionErrors(prev => { const { ubicacion, ...rest } = prev; return rest; });
               }}
               error={fieldErrors.ciudad}
             />
@@ -996,16 +1177,16 @@ export default function PerfilForm() {
         </div>
 
         {/* Sección 4: Servicios */}
-        <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-4 md:p-6">
+        <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-4 md:p-6" ref={serviciosRef}>
           <h2 className="text-red-400 text-sm font-bold uppercase tracking-wider mb-4 md:mb-6 flex items-center gap-2">
             <span className="w-6 h-6 rounded-full bg-red-500/20 flex items-center justify-center text-xs">4</span>
-            Servicios que ofreces
-            {fieldErrors.servicios && (
-              <span className="text-red-400 ml-2 text-xs normal-case">
-                <i className="fas fa-exclamation-circle"></i> {fieldErrors.servicios}
-              </span>
-            )}
+            Servicios que ofreces*
           </h2>
+          {sectionErrors.servicios && (
+            <p className="text-red-400 text-xs mb-4 md:mb-6 flex items-center gap-1.5 animate-pulse">
+              <i className="fas fa-exclamation-circle"></i>{sectionErrors.servicios}
+            </p>
+          )}
 
           {/* Buscador de servicios con popup */}
           {!serviciosLoaded ? (

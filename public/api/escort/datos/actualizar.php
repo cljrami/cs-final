@@ -21,7 +21,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || ($tokenData['exp'] ?? 0) < time()) {
         http_response_code(401);
@@ -57,7 +57,7 @@ try {
 
     $stmt = $pdo->prepare("
         UPDATE escorts 
-        SET email = ?, telefono = ?, whatsapp = ?, actualizado_en = NOW()
+        SET email = ?, telefono = ?, whatsapp = ?, updated_at = NOW()
         WHERE id = ?
     ");
     $stmt->execute([$email, $telefono, $whatsapp, $escortId]);

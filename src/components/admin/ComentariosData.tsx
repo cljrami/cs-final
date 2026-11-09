@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { esAdminOSuperior } from '../../lib/adminRole';
 import DataTable from '../ui/DataTable';
+import ConfirmModal from '../ui/ConfirmModal';
 import type { Column, ActionItem } from '../ui/DataTable';
 import StatCard from '../ui/StatCard';
 
@@ -22,6 +23,9 @@ export default function ComentariosData() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [selected, setSelected] = useState<Set<string | number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState<{ ids: (string | number)[]; message: string } | null>(null);
   const [viewComment, setViewComment] = useState<any | null>(null);
 
   const fetchItems = useCallback(async () => {
@@ -67,6 +71,29 @@ export default function ComentariosData() {
     } catch (err: any) {
       setError(err.message);
     }
+  };
+
+  const handleBulkDelete = (sel: Set<string | number>) => {
+    if (sel.size === 0) return;
+    setBulkConfirm({
+      ids: Array.from(sel),
+      message: `Estas a punto de eliminar ${sel.size} comentario(s) seleccionado(s). Esta accion no se puede deshacer.`,
+    });
+  };
+
+  const confirmBulkDelete = async () => {
+    if (!bulkConfirm) return;
+    const ids = bulkConfirm.ids;
+    setBulkConfirm(null);
+    setBulkDeleting(true);
+    try {
+      for (const id of ids) {
+        await fetch(API_URL, { method: 'DELETE', headers: getAuthHeaders(), body: JSON.stringify({ id: Number(id) }) });
+      }
+      setSelected(new Set());
+      fetchItems(); window.dispatchEvent(new Event('counts-refresh'));
+    } catch (err: any) { setError(err.message); }
+    finally { setBulkDeleting(false); }
   };
 
   const handleEliminar = async (id: number) => {
@@ -210,7 +237,23 @@ export default function ComentariosData() {
         emptyMessage="No hay comentarios"
         emptyIcon="fa-comments"
         getRowKey={(item) => item.id}
+        selectable
+        selected={selected}
+        onSelectionChange={setSelected}
+        onBulkDelete={handleBulkDelete}
         getActions={getActions}
+      />
+
+      <ConfirmModal
+        isOpen={bulkConfirm !== null}
+        title="Eliminar seleccionados"
+        message={bulkConfirm?.message || ''}
+        confirmText={bulkDeleting ? 'Eliminando...' : 'Eliminar'}
+        cancelText="Cancelar"
+        variant="danger"
+        confirmDisabled={bulkDeleting}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkConfirm(null)}
       />
 
       {totalPages > 1 && !isLoading && (

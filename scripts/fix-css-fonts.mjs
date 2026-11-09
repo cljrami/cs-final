@@ -4,9 +4,8 @@ import { join } from 'path';
 const dir = join(process.cwd(), 'public_html', '_astro');
 
 if (!existsSync(dir)) {
-  console.log('fix-css-fonts: no se encontró public_html/_astro');
-  process.exit(0);
-}
+  console.log('fix-css-fonts: no se encontró public_html/_astro (continuando)');
+} else {
 
 let changed = 0;
 for (const f of readdirSync(dir)) {
@@ -21,3 +20,4 @@ for (const f of readdirSync(dir)) {
   }
 }
 console.log(`fix-css-fonts: ${changed} archivo(s) actualizado(s)`);
+}

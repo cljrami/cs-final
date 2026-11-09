@@ -5,9 +5,10 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { uploadAudioPreview, deleteAudioPreview } from '../../lib/audioUtils';
+import { showToast } from '../ui/Toast';
 
 const MAX_DURATION = 15;
-const MAX_SIZE = 2 * 1024 * 1024;
+const MAX_SIZE = 20 * 1024 * 1024;
 
 export interface AudioUploaderProps {
   currentAudioUrl?: string | null;
@@ -21,9 +22,15 @@ export default function AudioUploader({ currentAudioUrl, onAudioUpdate, disabled
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [success] = useState('');
+  const setSuccess = (m: string) => showToast(m);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentAudioUrl ?? null);
   const [duration, setDuration] = useState<number | null>(null);
+
+  // Sync prop changes (e.g. after parent refetch or after delete confirm from server)
+  useEffect(() => {
+    setPreviewUrl(currentAudioUrl ?? null);
+  }, [currentAudioUrl]);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<BlobPart[]>([]);
@@ -54,17 +61,22 @@ export default function AudioUploader({ currentAudioUrl, onAudioUpdate, disabled
     if (previewUrl && previewUrl.startsWith('blob:')) {
       URL.revokeObjectURL(previewUrl);
     }
-    setPreviewUrl(null);
     setDuration(null);
     try {
       if (token) {
         const res = await deleteAudioPreview(token);
-        if (!res.success) setError(res.error || 'Error al eliminar audio');
+        if (!res.success) {
+          setError(res.error || 'Error al eliminar audio');
+          return;
+        }
       }
+      setPreviewUrl(null);
+      setSuccess('Audio eliminado');
+      onAudioUpdate(null);
+      setTimeout(() => setSuccess(''), 2000);
     } catch (e: any) {
       setError(e.message || 'Error al eliminar audio');
     }
-    onAudioUpdate(null);
   };
 
   const stopTimer = () => {
@@ -87,11 +99,7 @@ export default function AudioUploader({ currentAudioUrl, onAudioUpdate, disabled
       audio.onloadedmetadata = () => {
         URL.revokeObjectURL(audio.src);
         const dur = audio.duration || 0;
-        if (dur > MAX_DURATION) {
-          resolve({ valid: false, error: `El audio supera los ${MAX_DURATION}s` });
-        } else {
-          resolve({ valid: true, duration: dur });
-        }
+        resolve({ valid: true, duration: dur });
       };
       audio.onerror = () => resolve({ valid: false, error: 'No se pudo leer el audio' });
       audio.src = URL.createObjectURL(file);

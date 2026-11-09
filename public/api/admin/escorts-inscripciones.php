@@ -18,7 +18,7 @@ requireAdminRole($tokenData);
 try {
     $pdo = getDBConnection();
 
-    // Contar escorts inscritas por díƒÂ­a en los íƒÂºltimos 7 díƒÂ­as
+    // Contar escorts inscritas por d?a en los ?ltimos 7 d?as
     $stmt = $pdo->prepare("
         SELECT 
             DATE(created_at) as fecha,
@@ -32,9 +32,9 @@ try {
     $stmt->execute();
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Crear array con los 7 díƒÂ­as (incluyendo los que tienen 0 inscripciones)
+    // Crear array con los 7 d?as (incluyendo los que tienen 0 inscripciones)
     $data = [];
-    $diasSemana = ['Dom', 'Lun', 'Mar', 'MiíƒÂ©', 'Jue', 'Vie', 'SíƒÂ¡b'];
+    $diasSemana = ['Dom', 'Lun', 'Mar', 'Mi?', 'Jue', 'Vie', 'S?b'];
 
     for ($i = 6; $i >= 0; $i--) {
         $fecha = date('Y-m-d', strtotime("-$i days"));

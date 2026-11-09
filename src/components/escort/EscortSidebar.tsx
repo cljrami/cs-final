@@ -20,15 +20,27 @@ interface EscortData {
   pausas_restantes: number;
   verificado: number;
   vip: number;
+  destacado: number;
+  sticky: number;
+  activa: number;
+  estado: string;
   comentarios_count: number;
   aprobada?: number;
   vip_solicitud_estado?: 'enviado' | 'rechazado' | null;
+  // Estados efectivos
+  verificado_vigente?: number;
+  vip_vigente?: number;
+  destacado_vigente?: number;
+  sticky_vigente?: number;
+  activa_vigente?: number;
+  plan_vencido?: boolean;
   verificacion_estado?: 'pendiente' | 'en_revision' | 'aprobada' | 'rechazada' | null;
 }
 
 export default function EscortSidebar({ activePage }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [escort, setEscort] = useState<EscortData | null>(null);
+  const [loadingEscort, setLoadingEscort] = useState(true);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [notifMsg, setNotifMsg] = useState('');
   const [notifType, setNotifType] = useState<'error' | 'success'>('error');
@@ -37,6 +49,7 @@ export default function EscortSidebar({ activePage }: Props) {
     const token = localStorage.getItem('escort_token');
     if (!token) return;
 
+    setLoadingEscort(true);
     const ts = Date.now();
     fetch(`/api/escort/perfil-sidebar.php?_=${ts}`, {
       headers: { 'Authorization': `Bearer ${token}` }
@@ -47,7 +60,8 @@ export default function EscortSidebar({ activePage }: Props) {
           setEscort(data.escort);
         }
       })
-      .catch(err => console.error('Sidebar fetch error:', err));
+      .catch(err => console.error('Sidebar fetch error:', err))
+      .finally(() => setLoadingEscort(false));
   }, []);
 
   useEffect(() => {
@@ -79,8 +93,22 @@ export default function EscortSidebar({ activePage }: Props) {
   };
 
   const handleLogoutConfirm = () => {
-    localStorage.removeItem('escort_token');
-    window.location.href = '/micuenta/login';
+    const token = localStorage.getItem('escort_token');
+    // Revocar en servidor (best-effort) y limpiar local
+    if (token) {
+      fetch('/api/auth/logout.php', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token }
+      }).catch(() => {}).finally(() => {
+        localStorage.removeItem('escort_token');
+        localStorage.removeItem('escort_data');
+        window.location.href = '/micuenta/login';
+      });
+    } else {
+      localStorage.removeItem('escort_token');
+      localStorage.removeItem('escort_data');
+      window.location.href = '/micuenta/login';
+    }
   };
 
   const menuItems = [
@@ -95,13 +123,25 @@ export default function EscortSidebar({ activePage }: Props) {
 
   // ── VERIFICACIÓN ──
   const getVerificacionData = () => {
+    const icon = 'fa-shield-alt';
     if (escort?.verificado === 1) {
+      if (escort?.verificado_vigente === 0) {
+        return {
+          label: 'Verificación',
+          statusText: 'Expirada (plan vencido)',
+          statusColor: 'text-amber-400',
+          iconColor: 'text-amber-400',
+          href: '/micuenta/verificacion',
+          icon,
+        };
+      }
       return {
         label: 'Verificación',
         statusText: 'Verificada',
         statusColor: 'text-green-400',
         iconColor: 'text-amber-400',
         href: '/micuenta/verificacion',
+        icon,
       };
     }
     if (escort?.verificacion_estado === 'pendiente' || escort?.verificacion_estado === 'en_revision') {
@@ -111,6 +151,7 @@ export default function EscortSidebar({ activePage }: Props) {
         statusColor: 'text-yellow-400',
         iconColor: 'text-amber-400',
         href: '/micuenta/verificacion',
+        icon,
       };
     }
     if (escort?.verificacion_estado === 'rechazada') {
@@ -120,26 +161,40 @@ export default function EscortSidebar({ activePage }: Props) {
         statusColor: 'text-red-400',
         iconColor: 'text-red-400',
         href: '/micuenta/verificacion',
+        icon,
       };
     }
     return {
       label: 'Verificación',
-      statusText: 'No verificada',
+      statusText: 'Sin solicitar',
       statusColor: 'text-gray-500',
       iconColor: 'text-gray-500',
       href: '/micuenta/verificacion',
+      icon,
     };
   };
 
   // ── VIP ──
   const getVipData = () => {
-    if (escort?.vip === 1) {
+    const icon = 'fa-crown';
+    if (escort?.vip_vigente === 1) {
       return {
         label: 'VIP',
         statusText: 'Activo',
         statusColor: 'text-green-400',
         iconColor: 'text-amber-400',
         href: '/micuenta/vip',
+        icon,
+      };
+    }
+    if (escort?.vip === 1 && escort?.vip_vigente === 0) {
+      return {
+        label: 'VIP',
+        statusText: 'Expirado (plan vencido)',
+        statusColor: 'text-amber-400',
+        iconColor: 'text-amber-400',
+        href: '/micuenta/vip',
+        icon,
       };
     }
     if (escort?.vip_solicitud_estado === 'enviado') {
@@ -149,6 +204,7 @@ export default function EscortSidebar({ activePage }: Props) {
         statusColor: 'text-yellow-400',
         iconColor: 'text-amber-400',
         href: '/micuenta/vip',
+        icon,
       };
     }
     if (escort?.vip_solicitud_estado === 'rechazado') {
@@ -158,27 +214,32 @@ export default function EscortSidebar({ activePage }: Props) {
         statusColor: 'text-red-400',
         iconColor: 'text-red-400',
         href: '/micuenta/vip',
+        icon,
       };
     }
     return {
       label: 'VIP',
-      statusText: 'Solicitar',
-      statusColor: 'text-amber-400',
-      iconColor: 'text-amber-400',
+      statusText: 'Sin solicitar',
+      statusColor: 'text-gray-500',
+      iconColor: 'text-gray-500',
       href: '/micuenta/vip',
       cta: true,
+      icon,
     };
   };
 
   // ── MI PLAN ──
   const getPlanData = () => {
+    const icon = 'fa-credit-card';
     if (!escort?.plan_nombre) {
       return {
         label: 'Mi Plan',
-        statusText: 'Sin plan',
-        statusColor: 'text-gray-500',
-        iconColor: 'text-gray-500',
+        statusText: 'Sin plan · Seleccionar plan',
+        statusColor: 'text-amber-400',
+        iconColor: 'text-amber-400',
         href: '/micuenta/mi-plan',
+        cta: true,
+        icon,
       };
     }
     const estado = escort.plan_estado;
@@ -206,20 +267,55 @@ export default function EscortSidebar({ activePage }: Props) {
       href: '/micuenta/mi-plan',
       subText,
       subTextColor,
+      icon,
     };
   };
 
   // ── EXTRAS AL PLAN ──
   const getExtrasData = () => {
+    const icon = 'fa-plus-circle';
     const extras = escort?.extras_activos ?? '';
     const hasExtras = extras.length > 0;
+    const estado = escort?.extras_solicitud_estado;
+    let statusText = 'Sin solicitar';
+    let statusColor = 'text-gray-500';
+    let iconColor = 'text-gray-500';
+    let cta = true;
+    let subText = '';
+
+    if (hasExtras) {
+      statusText = 'Aprobados';
+      statusColor = 'text-green-400';
+      iconColor = 'text-amber-400';
+      cta = false;
+      subText = extras;
+    } else if (estado === 'pendiente' || estado === 'enviado') {
+      statusText = 'En proceso';
+      statusColor = 'text-yellow-400';
+      iconColor = 'text-amber-400';
+      cta = false;
+    } else if (estado === 'rechazada') {
+      statusText = 'Rechazada';
+      statusColor = 'text-red-400';
+      iconColor = 'text-red-400';
+      cta = true;
+    } else {
+      statusText = 'Sin solicitar';
+      statusColor = 'text-gray-500';
+      iconColor = 'text-gray-500';
+      cta = true;
+    }
+
     return {
       label: 'Extras al Plan',
-      statusText: hasExtras ? extras : 'Sin extras',
-      statusColor: hasExtras ? 'text-green-400' : 'text-gray-500',
-      iconColor: hasExtras ? 'text-amber-400' : 'text-gray-500',
+      statusText,
+      statusColor,
+      iconColor,
       href: '/micuenta/extras',
-      cta: !hasExtras,
+      cta,
+      subText,
+      subTextColor: 'text-gray-500',
+      icon,
     };
   };
 
@@ -401,12 +497,25 @@ export default function EscortSidebar({ activePage }: Props) {
           <div className="text-[0.7rem] text-gray-500 uppercase tracking-widest px-3 mb-2">
             Principal
           </div>
-          {menuItems.map(item => renderMenuItem({
-            ...item,
-            badge: item.id === 'comentarios' && (escort?.comentarios_count ?? 0) > 0
-              ? { text: String(escort.comentarios_count), color: 'bg-red-500 text-white shadow-red-500/30' }
-              : null
-          }))}
+          {loadingEscort ? (
+            <div className="px-3 pb-2 space-y-2">
+              <Skeleton height={44} width="100%" borderRadius="0.75rem" />
+              <Skeleton height={44} width="100%" borderRadius="0.75rem" />
+              <Skeleton height={44} width="100%" borderRadius="0.75rem" />
+            </div>
+          ) : (escort && escort.aprobada) ? (
+            <>{menuItems.map(item => renderMenuItem({
+              ...item,
+              badge: item.id === 'comentarios' && (escort?.comentarios_count ?? 0) > 0
+                ? { text: String(escort.comentarios_count), color: 'bg-red-500 text-white shadow-red-500/30' }
+                : null
+            }))}</>
+          ) : (
+            <a href="/micuenta/planes" className="flex items-center gap-3 px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 font-medium hover:bg-red-500/20 transition-colors">
+              <i className="fas fa-credit-card w-5 text-center"></i>
+              <span>Seleccionar plan</span>
+            </a>
+          )}
 
           {/* ── MI PLAN ── */}
           <div className="text-[0.7rem] text-gray-500 uppercase tracking-widest px-3 mt-4 lg:mt-6 mb-2">

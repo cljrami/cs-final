@@ -2,11 +2,14 @@
 import EscortLayout from "../../layouts/EscortLayout.astro";
 import SolicitarVip from "../../components/escort/SolicitarVip";
 import AprobacionRequerida from "../../components/escort/AprobacionRequerida";
+import PlanRequerido from "../../components/escort/PlanRequerido";
 
 ---
 
 <EscortLayout title="Solicitar VIP" activePage="vip">
   <AprobacionRequerida client:load>
-    <SolicitarVip client:only="react" />
+    <PlanRequerido client:only="react">
+      <SolicitarVip client:only="react" />
+    </PlanRequerido>
   </AprobacionRequerida>
 </EscortLayout>

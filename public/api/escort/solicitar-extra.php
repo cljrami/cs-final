@@ -23,7 +23,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || !isset($tokenData['exp']) || $tokenData['exp'] < time()) {
         http_response_code(401);
@@ -77,7 +77,7 @@ try {
 
     // Verificar plan base activo
     $stmtBase = $pdo->prepare("
-        SELECT s.*, p.nombre as plan_nombre, p.duracion_dias
+        SELECT s.*, p.nombre as plan_nombre, p.duracion_dias, p.permite_destacado
         FROM suscripciones s
         JOIN planes p ON p.id = s.plan_id
         WHERE s.escort_id = ? AND s.estado = 'activa' AND p.tipo = 'base'
@@ -93,6 +93,16 @@ try {
         exit;
     }
 
+    // Bloquear extra "Destacado"/"Fijo" (sticky) si el plan base no lo incluye (permite_destacado = 0).
+    if (in_array((string)$plan['extra_tipo'], ['destacado', 'sticky'], true) && (int)($planBase['permite_destacado'] ?? 0) !== 1) {
+        http_response_code(400);
+        echo json_encode([
+            'success' => false,
+            'error' => 'Tu plan base no incluye el extra de Destacado. Actualiza tu plan base para poder contratarlo.'
+        ]);
+        exit;
+    }
+
     // Verificar que el extra no dure mas que el plan base
     $diasBaseRestantes = max(0, (int)((new DateTime($planBase['fecha_fin']))->diff(new DateTime())->days));
     if ((int)$plan['duracion_dias'] > $diasBaseRestantes) {
@@ -105,14 +115,19 @@ try {
     }
 
     // Crear la solicitud de extra como suscripcion
+    $fechaInicio = date('Y-m-d');
+    $fechaFin = date('Y-m-d', strtotime('+' . $plan['duracion_dias'] . ' days'));
+
     $stmtInsert = $pdo->prepare("
         INSERT INTO suscripciones 
-        (escort_id, plan_id, estado, precio_pagado, moneda, creado_en, actualizado_en)
-        VALUES (?, ?, 'pendiente_aprobacion', ?, ?, NOW(), NOW())
+        (escort_id, plan_id, fecha_inicio, fecha_fin, estado, precio_pagado, moneda, creado_en, actualizado_en)
+        VALUES (?, ?, ?, ?, 'pendiente_aprobacion', ?, ?, NOW(), NOW())
     ");
     $stmtInsert->execute([
         $escortId,
         $planId,
+        $fechaInicio,
+        $fechaFin,
         $plan['precio'],
         $plan['moneda']
     ]);

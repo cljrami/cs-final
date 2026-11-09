@@ -21,7 +21,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || !isset($tokenData['exp']) || $tokenData['exp'] < time()) {
         http_response_code(401);
@@ -37,20 +37,18 @@ try {
     }
 
     $pdo = getDBConnection();
+
+    $tipo = $_POST['tipo'] ?? 'suscripcion';
+    $id = isset($_POST['id']) ? intval($_POST['id']) : 0;
+    $esVerificacion = $tipo === 'verificacion';
+
     if (!isset($_FILES['comprobante']) || $_FILES['comprobante']['error'] !== UPLOAD_ERR_OK) {
         http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'No se recibió el archivo o hubo un error']);
+        echo json_encode(['success' => false, 'error' => 'No se recibio el archivo o hubo un error']);
         exit;
     }
 
     $file = $_FILES['comprobante'];
-
-    $tiposPermitidos = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
-    if (!validarMIME($file['tmp_name'], $tiposPermitidos)) {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'Solo se permiten imágenes (JPG, PNG, GIF, WebP) o PDF']);
-        exit;
-    }
 
     if ($file['size'] > 5 * 1024 * 1024) {
         http_response_code(400);
@@ -58,35 +56,75 @@ try {
         exit;
     }
 
-    $uploadDir = __DIR__ . '/../../uploads/comprobantes/' . $escortId . '/';
+    if ($esVerificacion) {
+        $tiposPermitidos = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $errorTipo = 'La selfie debe ser una imagen (JPG, PNG, GIF o WebP)';
+        $extPermitidas = ['jpg' => 'jpg', 'jpeg' => 'jpg', 'png' => 'png', 'gif' => 'gif', 'webp' => 'webp'];
+    } else {
+        $tiposPermitidos = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+        $errorTipo = 'Solo se permiten imagenes (JPG, PNG, GIF, WebP) o PDF';
+        $extPermitidas = ['jpg' => 'jpg', 'jpeg' => 'jpg', 'png' => 'png', 'gif' => 'gif', 'webp' => 'webp', 'pdf' => 'pdf'];
+    }
+
+    if (!validarMIME($file['tmp_name'], $tiposPermitidos)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => $errorTipo]);
+        exit;
+    }
+
+    // Normalizar y restringir la extension del archivo guardado al tipo validado
+    $ext = $extPermitidas[strtolower(pathinfo($file['name'], PATHINFO_EXTENSION))] ?? '';
+    if ($ext === '') {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Extension no permitida']);
+        exit;
+    }
+
+    if ($esVerificacion) {
+        $uploadDir = __DIR__ . '/../../uploads/verificaciones/' . $escortId . '/';
+        $filename = date('Ymd_His') . '_perfil_' . uniqid() . '.' . $ext;
+        $rutaRelativa = 'uploads/verificaciones/' . $escortId . '/' . $filename;
+    } else {
+        $uploadDir = __DIR__ . '/../../uploads/comprobantes/' . $escortId . '/';
+        $filename = date('Ymd_His') . '_comprobante_' . uniqid() . '.' . $ext;
+        $rutaRelativa = 'uploads/comprobantes/' . $escortId . '/' . $filename;
+    }
+
     if (!is_dir($uploadDir)) {
         mkdir($uploadDir, 0755, true);
     }
 
-    // Normalizar y restringir la extensión del archivo guardado al tipo validado
-    $extPermitidas = ['jpg' => 'jpg', 'jpeg' => 'jpg', 'png' => 'png', 'gif' => 'gif', 'webp' => 'webp', 'pdf' => 'pdf'];
-    $ext = $extPermitidas[strtolower(pathinfo($file['name'], PATHINFO_EXTENSION))] ?? '';
-    if ($ext === '') {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'Extensión no permitida']);
-        exit;
-    }
-    $filename = date('Ymd_His') . '_comprobante_' . uniqid() . '.' . $ext;
     $filepath = $uploadDir . $filename;
 
     if (!move_uploaded_file($file['tmp_name'], $filepath)) {
         throw new Exception('Error al guardar el archivo');
     }
 
-    $rutaRelativa = 'uploads/comprobantes/' . $escortId . '/' . $filename;
-
-    $tipo = $_POST['tipo'] ?? 'suscripcion';
-    $id = isset($_POST['id']) ? intval($_POST['id']) : 0;
+    // Verificacion y VIP inicial solo guardan el archivo; la solicitud lo
+    // asocia a la base de datos en el siguiente paso (patron de Mi Plan).
+    if ($esVerificacion || ($tipo === 'vip' && $id <= 0)) {
+        echo json_encode([
+            'success' => true,
+            'message' => $esVerificacion ? 'Selfie subida correctamente' : 'Comprobante subido correctamente',
+            'comprobante_url' => '/' . $rutaRelativa,
+            'path' => $rutaRelativa,
+        ]);
+        exit;
+    }
 
     if ($tipo === 'pago' && $id > 0) {
         // Actualizar comprobante de un pago existente (plan base)
+        $stmt = $pdo->prepare("SELECT suscripcion_id FROM pagos WHERE id = ? AND escort_id = ?");
+        $stmt->execute([$id, $escortId]);
+        $suscripcionId = (int)$stmt->fetchColumn();
+
         $stmt = $pdo->prepare("UPDATE pagos SET comprobante_url = ? WHERE id = ? AND escort_id = ?");
         $stmt->execute([$rutaRelativa, $id, $escortId]);
+
+        if ($suscripcionId > 0) {
+            $stmt = $pdo->prepare("UPDATE suscripciones SET comprobante_pago = ?, estado_pago = 'comprobante_subido' WHERE id = ? AND escort_id = ?");
+            $stmt->execute([$rutaRelativa, $suscripcionId, $escortId]);
+        }
     } elseif ($tipo === 'suscripcion' && $id > 0) {
         // Actualizar comprobante de una suscripción existente (extra)
         $stmt = $pdo->prepare("UPDATE suscripciones SET comprobante_pago = ?, estado_pago = 'comprobante_subido' WHERE id = ? AND escort_id = ?");
@@ -125,7 +163,7 @@ try {
         $body .= '</table>';
         $body .= '<p>Verifica el comprobante y aprueba el pago.</p>';
         $body .= '<p style="text-align:center;margin-top:24px"><a class="btn" href="' . SITE_URL . '/admin/pagos">Revisar pagos</a></p>';
-        sendAdminNotification('pagos', 'Nuevo comprobante de pago - Kimi', $body);
+        sendAdminNotification('pagos', 'Nuevo comprobante de pago - ConsexVIP', $body);
     } catch (\Throwable $e2) {
         error_log("subir-comprobante notify error: " . $e2->getMessage());
     }

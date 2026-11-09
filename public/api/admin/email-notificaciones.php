@@ -93,7 +93,7 @@ try {
         }
 
         $body = mailHeader('Prueba de notificaciones');
-        $body .= '<p>Este es un correo de prueba de las <strong style="color:#ffffff">notificaciones a administradores</strong> de Kimi.</p>';
+        $body .= '<p>Este es un correo de prueba de las <strong style="color:#ffffff">notificaciones a administradores</strong> de ConsexVIP.</p>';
         $body .= '<p>Si recibes este mensaje, el envío de notificaciones está configurado correctamente.</p>';
         $body .= '<p class="text-green">Destinos activos: <strong style="color:#ffffff">' . htmlspecialchars(implode(', ', $targets), ENT_QUOTES, 'UTF-8') . '</strong></p>';
         $html = $body . mailFooter();
@@ -101,7 +101,7 @@ try {
         $results = [];
         $allOk = true;
         foreach ($targets as $email) {
-            $ok = sendMail($email, 'Kimi - Prueba de notificaciones', $html);
+            $ok = sendMail($email, 'ConsexVIP - Prueba de notificaciones', $html);
             $results[$email] = $ok;
             if (!$ok) $allOk = false;
         }

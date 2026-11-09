@@ -174,15 +174,31 @@ try {
         }
         // For escorts, check that comment belongs to their profile
         // For regular users, check that comment belongs to them
-        $check = $pdo->prepare("SELECT id FROM comentarios WHERE id = ? AND (usuario_id = ? OR escort_id = ?)");
+        $check = $pdo->prepare("SELECT id, escort_id FROM comentarios WHERE id = ? AND (usuario_id = ? OR escort_id = ?)");
         $check->execute([$id, $usuarioId, $usuarioId]);
-        if (!$check->fetch()) {
+        $comentario = $check->fetch(PDO::FETCH_ASSOC);
+        if (!$comentario) {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Valoración no encontrada o no pertenece al usuario']);
             exit;
         }
+        $escortId = intval($comentario['escort_id']);
+
         $stmt = $pdo->prepare("DELETE FROM comentarios WHERE id = ?");
         $stmt->execute([$id]);
+
+        // Recalcular rating y total_valoraciones de la escort
+        try {
+            $statsStmt = $pdo->prepare("SELECT COUNT(*) as total, COALESCE(AVG(puntuacion), 0) as promedio FROM comentarios WHERE escort_id = ? AND aprobado = 1");
+            $statsStmt->execute([$escortId]);
+            $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
+            $totalVal = (int)($stats['total'] ?? 0);
+            $promedioVal = (float)($stats['promedio'] ?? 0);
+            $pdo->prepare("UPDATE escorts SET rating = ?, total_valoraciones = ? WHERE id = ?")->execute([$promedioVal, $totalVal, $escortId]);
+        } catch (Throwable $e) {
+            error_log("Error recalcular rating tras borrar valoración (valorar.php): " . $e->getMessage());
+        }
+
         echo json_encode(['success' => true, 'message' => 'Valoración eliminada']);
         exit;
     }

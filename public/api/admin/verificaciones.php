@@ -172,10 +172,10 @@ try {
         foreach ($data as &$row) {
             $cb = !empty($row['creado_en']) ? '&_=' . strtotime($row['creado_en']) : '';
             if (!empty($row['foto_perfil_real'])) {
-                $row['foto_perfil_real'] = '/api/serve-upload.php?path=' . urlencode($row['foto_perfil_real']) . $cb;
+                $row['foto_perfil_real'] = '/api/serve-upload.php?path=/' . ltrim($row['foto_perfil_real'], '/') . $cb;
             }
             if (!empty($row['comprobante_pago'])) {
-                $row['comprobante_pago'] = '/api/serve-upload.php?path=' . urlencode($row['comprobante_pago']) . $cb;
+                $row['comprobante_pago'] = '/api/serve-upload.php?path=/' . ltrim($row['comprobante_pago'] ?? '', '/') . $cb;
             }
         }
         unset($row);

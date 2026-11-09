@@ -1,12 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { esAdminOSuperior } from '../../lib/adminRole';
+import { adminFileUrl } from '../../lib/fileUrl';
+import ComprobanteThumb from '../ui/ComprobanteThumb';
 import { Skeleton } from '../ui/Skeleton';
-import '@fancyapps/ui/dist/fancybox/fancybox.css';
+import ActionMenu from '../ui/ActionMenu';
+import type { ActionItem } from '../ui/ActionMenu';
 import SearchFilters from './SearchFilters';
 import StatCard from '../ui/StatCard';
 
 interface Suscripcion {
   suscripcion_id: number;
+  sin_plan: boolean;
   escort_id: number;
   escort_nombre: string;
   escort_email: string;
@@ -134,30 +138,28 @@ export default function SuscripcionesData() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [selectedSubs, setSelectedSubs] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // Leer parámetros de la URL al montar
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const estadoParam = params.get('estado');
-    if (estadoParam && ['pendiente', 'activa', 'expirada', 'cancelada', 'pausada', 'rechazada'].includes(estadoParam)) {
-      setFilterEstado(estadoParam === 'pendiente' ? 'pendientes' : estadoParam);
+    if (estadoParam) {
+      const estadoMapUrl: Record<string, string> = {
+        pendiente: 'pendientes',
+        activa: 'activas',
+        pausada: 'pausadas',
+        expirada: 'expiradas',
+        rechazada: 'rechazadas',
+        cancelada: 'canceladas',
+      };
+      if (estadoMapUrl[estadoParam]) {
+        setFilterEstado(estadoMapUrl[estadoParam]);
+      }
     }
   }, []);
-
-  useEffect(() => {
-    let disposed = false;
-    import('@fancyapps/ui').then((mod) => {
-      if (disposed) return;
-      const F = mod.Fancybox;
-      F.bind('[data-fancybox]', {
-        compact: false,
-        idle: false,
-        Toolbar: { display: ['close'] },
-      });
-    });
-    return () => { disposed = true; };
-  }, []);
-
+  
   const [detalleModal, setDetalleModal] = useState<SuscripcionDetalle | null>(null);
   const [detalleLoading, setDetalleLoading] = useState(false);
   const [editModal, setEditModal] = useState<Suscripcion | null>(null);
@@ -178,6 +180,7 @@ export default function SuscripcionesData() {
   const transformData = (items: any[]): Suscripcion[] => {
     return items.map((s: any) => ({
       suscripcion_id: s.suscripcion_id ?? 0,
+      sin_plan: s.sin_plan === true,
       escort_id: s.escort?.id ?? 0,
       escort_nombre: s.escort?.nombre ?? '',
       escort_email: s.escort?.email ?? '',
@@ -264,6 +267,7 @@ export default function SuscripcionesData() {
 
   useEffect(() => {
     setPage(1);
+    setSelectedSubs(new Set());
     fetchData(1, false);
   }, [filterEstado, search]);
 
@@ -404,6 +408,64 @@ export default function SuscripcionesData() {
     }
   };
 
+  const confirmBulkDelete = async () => {
+    if (selectedSubs.size === 0) return;
+    const ids = Array.from(selectedSubs);
+    setBulkDeleting(true);
+    try {
+      const fallos: string[] = [];
+      for (const id of ids) {
+        const res = await fetch('/api/admin/suscripciones/eliminar.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAdminToken()}` },
+          body: JSON.stringify({ suscripcion_id: id }),
+        });
+        const data = await res.json().catch(() => ({ success: false, error: 'Error de conexión' }));
+        if (!data.success) fallos.push(`#${id}: ${data.error || 'Error'}`);
+      }
+      if (fallos.length > 0) {
+        setError(`No se pudieron eliminar ${fallos.length} suscripción(es): ${fallos.slice(0, 3).join(' | ')}`);
+      }
+      setSelectedSubs(new Set());
+      fetchData(page, false);
+      window.dispatchEvent(new Event('counts-refresh'));
+    } catch {
+      setError('Error de conexión');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedSubs.size === 0) return;
+    confirmAction(
+      `Estás a punto de eliminar ${selectedSubs.size} suscripción(es) seleccionada(s). Esta acción no se puede deshacer.`,
+      confirmBulkDelete
+    );
+  };
+
+  const toggleSubSelected = (id: number) => {
+    setSelectedSubs(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllSubsSelected = () => {
+    setSelectedSubs(prev => {
+      const deletables = suscripciones.filter(s => !s.sin_plan && s.suscripcion_id > 0);
+      const allSelected = deletables.length > 0 && deletables.every(s => prev.has(s.suscripcion_id));
+      const next = new Set(prev);
+      if (allSelected) {
+        deletables.forEach(s => next.delete(s.suscripcion_id));
+      } else {
+        deletables.forEach(s => next.add(s.suscripcion_id));
+      }
+      return next;
+    });
+  };
+
   const handleCancelar = async (id: number) => {
     setActionLoading(id);
     try {
@@ -467,10 +529,36 @@ export default function SuscripcionesData() {
 
   const isAdminOsuperior = esAdminOSuperior();
 
+  const getRowActions = (s: Suscripcion): ActionItem[] => {
+    const acts: ActionItem[] = [];
+    if (!s.sin_plan) {
+      acts.push({ label: 'Ver detalle', icon: 'fa-eye', onClick: () => fetchDetalle(s.suscripcion_id) });
+    }
+    if (isAdminOsuperior && !s.sin_plan) {
+      acts.push({ label: 'Editar', icon: 'fa-edit', onClick: () => setEditModal(s), disabled: actionLoading === s.suscripcion_id });
+    }
+    if (isAdminOsuperior && s.estado_calculado === 'pendiente_aprobacion') {
+      acts.push({ label: 'Aprobar', icon: 'fa-check', onClick: () => setAprobarModal(s), disabled: actionLoading === s.suscripcion_id });
+      acts.push({ label: 'Rechazar', icon: 'fa-times', danger: true, onClick: () => { setRechazarModal(s); setMotivoRechazo(''); }, disabled: actionLoading === s.suscripcion_id });
+    }
+    if (isAdminOsuperior && s.estado_calculado === 'activa') {
+      acts.push({ label: 'Cancelar', icon: 'fa-ban', onClick: () => confirmAction('¿Cancelar esta suscripción?', () => handleCancelar(s.suscripcion_id)), disabled: actionLoading === s.suscripcion_id });
+    }
+    if (isAdminOsuperior && s.estado_calculado === 'pausada') {
+      acts.push({ label: 'Reactivar', icon: 'fa-play', onClick: () => confirmAction('¿Reactivar esta suscripción?', () => handleReactivar(s.suscripcion_id)), disabled: actionLoading === s.suscripcion_id });
+    }
+    if (isAdminOsuperior && !s.sin_plan) {
+      acts.push({ label: 'Eliminar', icon: 'fa-trash-alt', danger: true, onClick: () => confirmAction('¿Eliminar esta suscripción? Esta acción no se puede deshacer.', () => handleEliminar(s.suscripcion_id)), disabled: actionLoading === s.suscripcion_id });
+    }
+    return acts;
+  };
+
   return (
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold mb-2">Gestión de Suscripciones</h1>
-        <p className="text-admin-muted mb-8">Administra las suscripciones de escorts: aprueba, rechaza, pausa y reactiva</p>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-extrabold bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent mb-2">Gestión de Suscripciones</h1>
+          <p className="text-gray-400 mb-8">Administra las suscripciones de escorts: aprueba, rechaza, pausa y reactiva</p>
+        </div>
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           {statConfig.map((stat) => (
@@ -495,6 +583,15 @@ export default function SuscripcionesData() {
           activeFilter={filterEstado}
           onFilterChange={setFilterEstado}
         />
+        {isAdminOsuperior && selectedSubs.size > 0 && (
+          <div className="flex items-center justify-between px-4 py-3 mb-4 border border-[#2a2a3e] rounded-xl bg-red-500/5">
+            <span className="text-sm text-gray-300"><span className="font-semibold text-white">{selectedSubs.size}</span> seleccionado(s)</span>
+            <button type="button" onClick={handleBulkDelete} disabled={bulkDeleting}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold rounded-lg text-sm transition-colors">
+              {bulkDeleting ? <i className="fas fa-circle-notch fa-spin" /> : <i className="fas fa-trash-alt" />} Eliminar seleccionados
+            </button>
+          </div>
+        )}
         {/* Table */}
         <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl overflow-hidden">
           {loading ? (
@@ -502,17 +599,20 @@ export default function SuscripcionesData() {
               <table className="w-full" style={{ minWidth: 1100 }}>
                 <thead>
                   <tr className="border-b border-[#2a2a3e] text-left text-xs text-gray-400 uppercase">
+                    <th className="px-4 py-3 w-10">&nbsp;</th>
                     <th className="px-4 py-3">Escort</th>
                     <th className="px-4 py-3">Plan</th>
-                    <th className="px-4 py-3">Estado</th>
-                    <th className="px-4 py-3">Pago</th>
-                    <th className="px-4 py-3">Vence</th>
-                    <th className="px-4 py-3 text-right">Acciones</th>
+                      <th className="px-4 py-3">Estado</th>
+                      <th className="px-4 py-3">Pago</th>
+                      <th className="px-4 py-3">Comprobante</th>
+                      <th className="px-4 py-3">Vence</th>
+                      <th className="px-4 py-3 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {[...Array(5)].map((_, i) => (
                     <tr key={i} className="border-b border-[#2a2a3e]">
+                      <td className="px-4 py-3"><Skeleton width={16} height={16} /></td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <Skeleton width={40} height={40} circle />
@@ -525,7 +625,9 @@ export default function SuscripcionesData() {
                       <td className="px-4 py-3"><Skeleton width={120} height={20} /></td>
                       <td className="px-4 py-3"><Skeleton width={80} height={20} /></td>
                       <td className="px-4 py-3"><Skeleton width={100} height={20} /></td>
-                      <td className="px-4 py-3 text-right"><Skeleton width={80} height={32} /></td>
+                      <td className="px-4 py-3"><Skeleton width={80} height={20} /></td>
+                      <td className="px-4 py-3"><Skeleton width={60} height={32} /></td>
+                      <td className="px-4 py-3"></td>
                        </tr>
                      ))}
                    </tbody>
@@ -542,19 +644,30 @@ export default function SuscripcionesData() {
                 <table className="w-full" style={{ minWidth: 1100 }}>
                   <thead>
                     <tr className="border-b border-[#2a2a3e] text-left text-xs text-gray-400 uppercase">
+                      <th className="px-4 py-3 w-10">
+                        <input type="checkbox" checked={suscripciones.some(s => !s.sin_plan && s.suscripcion_id > 0) && suscripciones.filter(s => !s.sin_plan && s.suscripcion_id > 0).every(s => selectedSubs.has(s.suscripcion_id))}
+                          onChange={toggleAllSubsSelected} className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" aria-label="Seleccionar todo" />
+                      </th>
                       <th className="px-4 py-3">Escort</th>
                       <th className="px-4 py-3">Plan</th>
                       <th className="px-4 py-3">Estado</th>
 
                       <th className="px-4 py-3">Pago</th>
+                      <th className="px-4 py-3">Comprobante</th>
                       <th className="px-4 py-3">Vence</th>
                       <th className="px-4 py-3 text-right">Acciones</th>
                     </tr>
                   </thead>
-                   <tbody>
-                     {suscripciones.map((s) => (
-                        <tr key={s.suscripcion_id} className="border-b border-[#2a2a3e] last:border-0 hover:bg-[#252538] transition-colors">
-                        <td className="px-4 py-3 whitespace-nowrap">
+                    <tbody>
+                      {suscripciones.map((s) => (
+                         <tr key={s.suscripcion_id ? `s${s.suscripcion_id}` : `np${s.escort_id}`} className={`border-b border-[#2a2a3e] last:border-0 hover:bg-[#252538] transition-colors ${!s.sin_plan && selectedSubs.has(s.suscripcion_id) ? 'bg-blue-500/10' : ''}`}>
+                         <td className="px-4 py-3 text-center">
+                           {!s.sin_plan && s.suscripcion_id > 0 ? (
+                             <input type="checkbox" checked={selectedSubs.has(s.suscripcion_id)} onChange={() => toggleSubSelected(s.suscripcion_id)}
+                               className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" aria-label={`Seleccionar suscripción de ${s.escort_nombre}`} />
+                           ) : null}
+                         </td>
+                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-[#2a2a3e] flex items-center justify-center text-gray-400 overflow-hidden flex-shrink-0">
                               {s.foto_principal ? (
@@ -600,11 +713,12 @@ export default function SuscripcionesData() {
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="text-sm text-white font-medium">{formatMoney(s.precio_pagado)}</div>
                           <div className="text-xs text-gray-500">{s.moneda}</div>
-                          {s.comprobante_pago && (
-                            <a href={s.comprobante_pago} data-fancybox="susc-comprobante"
-                              className="text-[10px] text-rose-400 hover:text-rose-300 inline-flex items-center gap-0.5 mt-0.5">
-                              {s.comprobante_pago.match(/\.pdf$/i) ? <i className="fas fa-file-pdf" /> : <i className="fas fa-file-image" />}Comprobante
-                            </a>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {s.comprobante_pago ? (
+                            <ComprobanteThumb url={s.comprobante_pago} scope="admin" group="susc-comprobante" />
+                          ) : (
+                            <span className="text-gray-600 text-xs">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
@@ -622,62 +736,14 @@ export default function SuscripcionesData() {
                             );
                           })()}
                         </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-2">
-                             <button onClick={() => fetchDetalle(s.suscripcion_id)}
-                               className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#2a2a3e] text-gray-400 hover:text-blue-400 hover:bg-blue-500/10 transition-colors" title="Ver detalle">
-                               <i className="fas fa-eye text-sm"></i>
-                             </button>
-                             {isAdminOsuperior && (
-                               <button onClick={() => setEditModal(s)}
-                                 className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#2a2a3e] text-gray-400 hover:text-amber-400 hover:bg-amber-500/10 transition-colors" title="Editar">
-                                 <i className="fas fa-edit text-sm"></i>
-                               </button>
-                             )}
-
-                             {isAdminOsuperior && s.estado_calculado === 'pendiente_aprobacion' && (
-                               <>
-                                 <button onClick={() => setAprobarModal(s)}
-                                   className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] rounded-md font-medium transition-colors flex items-center gap-1">
-                                   <i className="fas fa-check text-[10px]" />
-                                   Aprobar
-                                 </button>
-                                 <button onClick={() => { setRechazarModal(s); setMotivoRechazo(''); }} disabled={actionLoading === s.suscripcion_id}
-                                   className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white text-[11px] rounded-md font-medium transition-colors disabled:opacity-50 flex items-center gap-1">
-                                   <i className="fas fa-times text-[10px]" />Rechazar
-                                 </button>
-                               </>
-                             )}
-
-                             {isAdminOsuperior && s.estado_calculado === 'activa' && (
-                               <>
-                                 <button onClick={() => confirmAction('¿Cancelar esta suscripción?', () => handleCancelar(s.suscripcion_id))} disabled={actionLoading === s.suscripcion_id}
-                                   className="px-2.5 py-1 bg-gray-600 hover:bg-gray-700 text-white text-[11px] rounded-md font-medium transition-colors disabled:opacity-50 flex items-center gap-1">
-                                   <i className="fas fa-ban text-[10px]" />Cancelar
-                                 </button>
-                               </>
-                             )}
-
-                             {isAdminOsuperior && s.estado_calculado === 'pausada' && (
-                               <button onClick={() => confirmAction('¿Reactivar esta suscripción?', () => handleReactivar(s.suscripcion_id))} disabled={actionLoading === s.suscripcion_id}
-                                 className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white text-[11px] rounded-md font-medium transition-colors disabled:opacity-50 flex items-center gap-1">
-                                 <i className="fas fa-play text-[10px]" />Reactivar
-                               </button>
-                             )}
-
-                             {isAdminOsuperior && (
-                               <button onClick={() => confirmAction('¿Eliminar esta suscripción? Esta acción no se puede deshacer.', () => handleEliminar(s.suscripcion_id))} disabled={actionLoading === s.suscripcion_id}
-                                 className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#2a2a3e] text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Eliminar">
-                               <i className="fas fa-trash-alt text-sm"></i>
-                             </button>
-                             )}
-                          </div>
+                        <td className="px-4 py-3 text-right">
+                          <ActionMenu actions={getRowActions(s)} />
                         </td>
                        </tr>
                      ))}
                    </tbody>
-                </table>
-              </div>
+                 </table>
+               </div>
 
               {hasMore && (
                 <div className="p-4 text-center border-t border-[#2a2a3e]">
@@ -785,9 +851,9 @@ export default function SuscripcionesData() {
                       <div className="text-sm">
                         <div className="text-white font-medium">{formatMoney(detalleModal.precio_pagado)} {detalleModal.moneda}</div>
                         {detalleModal.comprobante_pago && (
-                          <a href={detalleModal.comprobante_pago} data-fancybox="susc-comprobante" className="text-rose-400 hover:text-rose-300 text-xs mt-1 inline-block">
-                            {detalleModal.comprobante_pago.match(/\.pdf$/i) ? <i className="fas fa-file-pdf mr-1" /> : <i className="fas fa-file-image mr-1" />}Ver comprobante
-                          </a>
+                          <div className="mt-2 max-w-[220px]">
+                            <ComprobanteThumb url={detalleModal.comprobante_pago} scope="admin" variant="preview" />
+                          </div>
                         )}
                       </div>
                     </div>

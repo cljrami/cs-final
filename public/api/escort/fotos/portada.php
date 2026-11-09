@@ -27,7 +27,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || ($tokenData['exp'] ?? 0) < time()) {
         http_response_code(401);
@@ -72,7 +72,7 @@ try {
     }
 
     // Determinar qué URL usar como foto_principal
-    // Video → usar GIF si existe; Imagen → usar URL directa
+    // Video → usar GIF del request (recien generado) como prioridad; fallback a BD; Imagen → URL directa
     $colCheck = $pdo->query(
         "SELECT COUNT(*) FROM information_schema.COLUMNS "
         . "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'escort_fotos' AND COLUMN_NAME = 'gif_url'"
@@ -86,13 +86,15 @@ try {
 
     if ($foto && !empty($foto['url'])) {
         $mainUrl = $foto['url'];
-        // Si es video y tiene gif_url → usar el GIF animado como portada
+        // Si es video → priorizar gifUrl del request (recién subido), luego BD
         if (isset($foto['tipo']) && $foto['tipo'] === 'video') {
-            $gifUrlStored = $hasGifColumn ? ($foto['gif_url'] ?? null) : null;
-            if (!empty($gifUrlStored)) {
-                $mainUrl = $gifUrlStored;
-            } elseif (!empty($gifUrl)) {
-                $mainUrl = $gifUrl; // fallback: usar el gifUrl del request
+            if (!empty($gifUrl)) {
+                $mainUrl = $gifUrl; // prioridad: GIF recién generado del request
+            } elseif ($hasGifColumn) {
+                $gifUrlStored = $foto['gif_url'] ?? null;
+                if (!empty($gifUrlStored)) {
+                    $mainUrl = $gifUrlStored;
+                }
             }
         }
         $pdo->prepare("UPDATE escorts SET foto_principal = ? WHERE id = ?")->execute([$mainUrl, $escortId]);

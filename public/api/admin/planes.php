@@ -79,6 +79,9 @@ try {
                 p.max_pausas_permitidas,
                 p.permite_vip,
                 p.permite_destacado,
+                p.permite_historias,
+                p.permite_verificacion,
+                p.permite_audio,
                 p.uso_unico,
                 p.badge,
                 p.color_badge,
@@ -134,6 +137,9 @@ try {
         $max_pausas_permitidas = isset($input['max_pausas_permitidas']) ? intval($input['max_pausas_permitidas']) : 3;
         $permite_vip = isset($input['permite_vip']) ? (int)$input['permite_vip'] : 0;
         $permite_destacado = isset($input['permite_destacado']) ? (int)$input['permite_destacado'] : 0;
+        $permite_historias = isset($input['permite_historias']) ? (int)$input['permite_historias'] : 0;
+        $permite_verificacion = isset($input['permite_verificacion']) ? (int)$input['permite_verificacion'] : 0;
+        $permite_audio = isset($input['permite_audio']) ? (int)$input['permite_audio'] : 0;
         $uso_unico = isset($input['uso_unico']) ? (int)$input['uso_unico'] : 0;
         $badge = isset($input['badge']) ? trim($input['badge']) : '';
         $color_badge = isset($input['color_badge']) ? trim($input['color_badge']) : '#6b7280';
@@ -145,9 +151,9 @@ try {
         if (empty($nombre)) {
             $fieldErrors['nombre'] = 'El nombre es obligatorio';
         } elseif (strlen($nombre) < 2) {
-            $fieldErrors['nombre'] = 'MíƒÂ­nimo 2 caracteres';
+            $fieldErrors['nombre'] = 'M?nimo 2 caracteres';
         } elseif (strlen($nombre) > 100) {
-            $fieldErrors['nombre'] = 'MíƒÂ¡ximo 100 caracteres';
+            $fieldErrors['nombre'] = 'M?ximo 100 caracteres';
         }
 
         if (empty($slug)) {
@@ -158,7 +164,7 @@ try {
         if (empty($slug)) {
             $fieldErrors['slug'] = 'El slug es obligatorio';
         } elseif (strlen($slug) > 100) {
-            $fieldErrors['slug'] = 'MíƒÂ¡ximo 100 caracteres';
+            $fieldErrors['slug'] = 'M?ximo 100 caracteres';
         }
 
         if (empty($fieldErrors['nombre'])) {
@@ -200,9 +206,9 @@ try {
             INSERT INTO planes 
             (nombre, slug, descripcion, tipo, duracion_dias, precio, moneda, 
              max_fotos, max_videos, max_pausas_permitidas,
-             permite_vip, permite_destacado, 
-             uso_unico, badge, color_badge, orden, activo) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             permite_vip, permite_destacado, permite_historias, permite_verificacion,
+             permite_audio, uso_unico, badge, color_badge, orden, activo)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
             $nombre,
@@ -217,6 +223,9 @@ try {
             $max_pausas_permitidas,
             $permite_vip,
             $permite_destacado,
+            $permite_historias,
+            $permite_verificacion,
+            $permite_audio,
             $uso_unico,
             $badge,
             $color_badge,
@@ -242,7 +251,10 @@ try {
                 'max_pausas_permitidas' => $max_pausas_permitidas,
                 'permite_vip' => $permite_vip,
                 'permite_destacado' => $permite_destacado,
-                'uso_unico' => $uso_unico,
+            'permite_historias' => $permite_historias,
+            'permite_verificacion' => $permite_verificacion,
+            'permite_audio' => $permite_audio,
+            'uso_unico' => $uso_unico,
                 'badge' => $badge,
                 'color_badge' => $color_badge,
                 'orden' => $orden,
@@ -260,7 +272,7 @@ try {
 
         if ($id <= 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID no víƒÂ¡lido']);
+            echo json_encode(['success' => false, 'error' => 'ID no v?lido']);
             exit;
         }
 
@@ -279,11 +291,11 @@ try {
         if (isset($input['nombre'])) {
             $nombre = trim($input['nombre']);
             if (empty($nombre)) {
-                $fieldErrors['nombre'] = 'El nombre no puede estar vacíƒÂ­o';
+                $fieldErrors['nombre'] = 'El nombre no puede estar vac?o';
             } elseif (strlen($nombre) < 2) {
-                $fieldErrors['nombre'] = 'MíƒÂ­nimo 2 caracteres';
+                $fieldErrors['nombre'] = 'M?nimo 2 caracteres';
             } elseif (strlen($nombre) > 100) {
-                $fieldErrors['nombre'] = 'MíƒÂ¡ximo 100 caracteres';
+                $fieldErrors['nombre'] = 'M?ximo 100 caracteres';
             } else {
                 $dupStmt = $pdo->prepare("SELECT id FROM planes WHERE LOWER(nombre) = LOWER(?) AND id != ?");
                 $dupStmt->execute([$nombre, $id]);
@@ -299,9 +311,9 @@ try {
         if (isset($input['slug'])) {
             $slug = strtolower(trim(preg_replace('/[^a-zA-Z0-9-]+/', '-', trim($input['slug'])), '-'));
             if (empty($slug)) {
-                $fieldErrors['slug'] = 'Slug vacíƒÂ­o';
+                $fieldErrors['slug'] = 'Slug vac?o';
             } elseif (strlen($slug) > 100) {
-                $fieldErrors['slug'] = 'MíƒÂ¡ximo 100 caracteres';
+                $fieldErrors['slug'] = 'M?ximo 100 caracteres';
             } else {
                 $dupSlugStmt = $pdo->prepare("SELECT id FROM planes WHERE slug = ? AND id != ?");
                 $dupSlugStmt->execute([$slug, $id]);
@@ -350,7 +362,7 @@ try {
             }
         }
 
-        $boolFields = ['permite_vip', 'permite_destacado', 'uso_unico', 'activo'];
+        $boolFields = ['permite_vip', 'permite_destacado', 'permite_historias', 'permite_verificacion', 'permite_audio', 'uso_unico', 'activo'];
         foreach ($boolFields as $field) {
             if (isset($input[$field])) {
                 $updates[] = "$field = ?";
@@ -402,7 +414,7 @@ try {
 
         if ($id <= 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID no víƒÂ¡lido']);
+            echo json_encode(['success' => false, 'error' => 'ID no v?lido']);
             exit;
         }
 
@@ -424,7 +436,7 @@ try {
             http_response_code(409);
             echo json_encode([
                 'success' => false,
-                'error' => ($susCount === 1 ? "Tiene $susCount suscripciíƒÂ³n activa" : "Tiene $susCount suscripciones activas")
+                'error' => ($susCount === 1 ? "Tiene $susCount suscripci?n activa" : "Tiene $susCount suscripciones activas")
             ]);
             exit;
         }

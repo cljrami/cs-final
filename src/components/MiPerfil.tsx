@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { authFetch, requireAuth } from '../lib/usuarioAuth';
+import { authFetch, requireAuth, setUsuarioToken } from '../lib/usuarioAuth';
+import { Skeleton } from './ui/Skeleton';
+import { showToast } from './ui/Toast';
 
 export default function MiPerfil() {
   const [nombre, setNombre] = useState('');
@@ -8,10 +10,12 @@ export default function MiPerfil() {
   const [ciudad, setCiudad] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
+  const [passwordActual, setPasswordActual] = useState('');
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
-  const [exito, setExito] = useState('');
+  const [exito] = useState('');
+  const setExito = (m: string) => showToast(m);
 
   useEffect(() => {
     requireAuth();
@@ -41,6 +45,7 @@ export default function MiPerfil() {
     if (password) {
       body.password = password;
       body.password_confirm = passwordConfirm;
+      body.password_actual = passwordActual;
     }
 
     const res = await authFetch('/api/usuarios/perfil.php', {
@@ -53,8 +58,14 @@ export default function MiPerfil() {
       if (data.usuario) {
         localStorage.setItem('usuario_data', JSON.stringify(data.usuario));
       }
+      // Al cambiar la contraseña el servidor revoca las demás sesiones y
+      // devuelve un token nuevo para que esta siga activa.
+      if (data.nuevo_token) {
+        setUsuarioToken(data.nuevo_token);
+      }
       setPassword('');
       setPasswordConfirm('');
+      setPasswordActual('');
       setExito(password ? 'Perfil y contraseña actualizados correctamente' : 'Perfil actualizado correctamente');
     } else if (data.fieldErrors) {
       const msgs = Object.values(data.fieldErrors).join('. ');
@@ -67,8 +78,15 @@ export default function MiPerfil() {
 
   if (cargando) {
     return (
-      <div className="flex justify-center items-center py-24">
-        <div className="animate-spin w-10 h-10 border-4 border-red-500 border-t-transparent rounded-full"></div>
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <div className="mb-8">
+          <Skeleton width={200} height={28} />
+        </div>
+        <div className="space-y-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-11 w-full" />
+          ))}
+        </div>
       </div>
     );
   }
@@ -133,17 +151,24 @@ export default function MiPerfil() {
           </h3>
 
           <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1.5">Contraseña actual *</label>
+            <input type="password" value={passwordActual} onChange={e => setPasswordActual(e.target.value)}
+              className="w-full px-4 py-2.5 bg-[#252538] border border-white/10 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-red-500/50 transition-colors"
+              placeholder="Tu contraseña de hoy (por seguridad)" autoComplete="current-password" />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-gray-400 mb-1.5">Nueva contraseña</label>
             <input type="password" value={password} onChange={e => setPassword(e.target.value)}
               className="w-full px-4 py-2.5 bg-[#252538] border border-white/10 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-red-500/50 transition-colors"
-              placeholder="Mínimo 8 caracteres" minLength={8} />
+              placeholder="Mínimo 8 caracteres" minLength={8} autoComplete="new-password" />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1.5">Confirmar contraseña</label>
             <input type="password" value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)}
               className="w-full px-4 py-2.5 bg-[#252538] border border-white/10 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-red-500/50 transition-colors"
-              placeholder="Repite la nueva contraseña" />
+              placeholder="Repite la nueva contraseña" autoComplete="new-password" />
           </div>
         </div>
 

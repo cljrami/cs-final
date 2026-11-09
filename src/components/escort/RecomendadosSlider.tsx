@@ -42,19 +42,19 @@ export default function RecomendadosSlider({ escortId }: Props) {
       </div>
 
       <div className="relative">
-        {loading ? (
-          <div className="flex gap-2 pb-2 overflow-hidden">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="flex-1 min-w-0 bg-surface rounded-xl overflow-hidden border border-white/5 animate-pulse">
-                <Skeleton className="aspect-[3/4] w-full !rounded-none" />
-                <div className="p-3 space-y-2">
-                  <Skeleton className="w-2/3 h-3 !rounded-md" />
-                  <Skeleton className="w-1/2 h-2.5 !rounded-md" />
-                  <Skeleton className="w-1/3 h-2.5 !rounded-md" />
-                </div>
+            {loading ? (
+              <div className="flex gap-2 pb-2 overflow-hidden">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="flex-1 min-w-0 bg-surface rounded-xl overflow-hidden border border-white/5">
+                    <Skeleton className="aspect-[3/4] w-full !rounded-none" />
+                    <div className="p-3 space-y-2">
+                      <Skeleton className="w-2/3 h-3 !rounded-md" />
+                      <Skeleton className="w-1/2 h-2.5 !rounded-md" />
+                      <Skeleton className="w-1/3 h-2.5 !rounded-md" />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
         ) : (
           <Swiper
             modules={[FreeMode, Navigation]}

@@ -1,8 +1,11 @@
 ---
 import "@fortawesome/fontawesome-free/css/fontawesome.min.css";
 import "../styles/fa-fontfaces.css";
+import '@fancyapps/ui/dist/fancybox/fancybox.css';
 import Sidebar from "../components/admin/Sidebar";
 import NotificationBell from "../components/admin/NotificationBell";
+import ToastHost from "../components/ui/Toast";
+import AdminFancyboxInit from "../components/admin/AdminFancyboxInit";
 
 interface Props {
   title: string;
@@ -17,7 +20,14 @@ const { title, activePage = "dashboard" } = Astro.props;
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{title} | Kimi Admin</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#0a0a0f" />
+    <title>{title} | ConsexVIP Admin</title>
+    <meta name="robots" content="noindex, follow" />
     <link
       rel="preload"
       href="/fonts/inter-latin-variable.woff2"
@@ -27,6 +37,7 @@ const { title, activePage = "dashboard" } = Astro.props;
     />
   </head>
   <body class="bg-admin-bg text-admin-text antialiased overflow-x-hidden">
+    <AdminFancyboxInit client:load />
     <!-- Sidebar: siempre visible, hidratado como React -->
     <Sidebar client:load activePage={activePage} />
 
@@ -60,6 +71,7 @@ const { title, activePage = "dashboard" } = Astro.props;
         <slot />
       </div>
     </main>
+    <ToastHost client:load />
   </body>
 </html>
 
@@ -122,4 +134,10 @@ const { title, activePage = "dashboard" } = Astro.props;
   .animate-pulse {
     animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
+  @keyframes toast-enter-kf {
+    from { opacity: 0; transform: translateX(18px) scale(0.97); }
+    to { opacity: 1; transform: translateX(0) scale(1); }
+  }
+  .toast-enter { animation: toast-enter-kf 0.22s cubic-bezier(0.21, 1.02, 0.73, 1) both; }
+  @media (prefers-reduced-motion: reduce) { .toast-enter { animation: none; } }
 </style>

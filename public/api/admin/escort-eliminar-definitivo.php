@@ -109,11 +109,12 @@ try {
 }
 
 // Borrar archivos del servidor (fuera de la transaccion: no debe revertirse si el disco falla)
-$uploadBase = __DIR__ . '/../../uploads';
+    $uploadBase = __DIR__ . '/../../uploads';
 $carpetas = [
     $uploadBase . '/escorts/fotos/' . $id,
     $uploadBase . '/escorts/historias/' . $id,
     $uploadBase . '/comprobantes/' . $id,
+    $uploadBase . '/verificaciones/' . $id,
 ];
 foreach ($carpetas as $carpeta) {
     eliminarDirectorioRecursivo($carpeta);

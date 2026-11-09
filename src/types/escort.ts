@@ -28,13 +28,20 @@ export interface Escort {
   gira_fecha_inicio?: string | null;
   gira_fecha_fin?: string | null;
   ciudad_base?: string;
-   descripcion_corta?: string;
-   audio_preview?: string | null;
-   created_at?: string;
-   fecha_aprobacion?: string;
+  descripcion_corta?: string;
+  audio_preview?: string | null;
+  created_at?: string;
+  fecha_aprobacion?: string;
   sticky?: number;
   sticky_orden?: number;
   disponible_ahora?: number;
+  // Estados efectivos (consideran plan vencido)
+  verificado_vigente?: number;
+  vip_vigente?: number;
+  destacado_vigente?: number;
+  sticky_vigente?: number;
+  activa_vigente?: number;
+  plan_vencido?: boolean;
 }
 
 export interface EscortCardProps {

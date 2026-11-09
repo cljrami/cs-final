@@ -13,6 +13,7 @@ if (!function_exists('str_starts_with')) {
 try {
     require_once __DIR__ . '/../bootstrap.php';
     require_once __DIR__ . '/../lib/plan_pausas.php';
+    require_once __DIR__ . '/../lib/escort_status.php';
     $pdo = getDBConnection();
 
     $tokenData = requireEscortAuth();
@@ -133,6 +134,7 @@ try {
     $historiasCount = (int) $historiasStmt->fetchColumn();
 
     $planVencido = false;
+    $planSinPlan = false;
     $planNombre = null;
     $planBadge = null;
     $planColor = null;
@@ -140,34 +142,53 @@ try {
     $planVigente = false;
     $planPendiente = false;
 
-    $sus = $pdo->prepare("
+    // ─── PLAN BASE EFECTIVO: manda la ÚLTIMA suscripción base creada ───
+    // (mismo criterio que el admin). Una fila vieja aún marcada 'activa' nunca
+    // reabre el panel si la escort ya contrató otro plan después.
+    $ultBaseStmt = $pdo->prepare("
         SELECT s.*, p.nombre as plan_nombre, p.badge, p.color_badge, p.duracion_dias, p.max_pausas_permitidas
         FROM suscripciones s
         LEFT JOIN planes p ON s.plan_id = p.id
-        WHERE s.escort_id = ? AND (s.estado = 'activa' OR s.estado = 'pausada')
-        ORDER BY s.fecha_fin DESC LIMIT 1
+        WHERE s.escort_id = ? AND (p.tipo = 'base' OR p.tipo IS NULL)
+        ORDER BY s.creado_en DESC, s.id DESC LIMIT 1
     ");
-    $sus->execute([$escortId]);
-    $suscripcion = $sus->fetch(PDO::FETCH_ASSOC);
+    $ultBaseStmt->execute([$escortId]);
+    $ultimaBase = $ultBaseStmt->fetch(PDO::FETCH_ASSOC);
 
-    // Si no hay activa/pausada, buscar si hay alguna pendiente
-    if (!$suscripcion) {
-        $susPend = $pdo->prepare("
-            SELECT s.*, p.nombre as plan_nombre, p.badge, p.color_badge
+    // Solo se opera con la última si está activa o pausada.
+    $suscripcion = ($ultimaBase && in_array($ultimaBase['estado'], ['activa', 'pausada'], true))
+        ? $ultimaBase
+        : null;
+
+    // Última es un plan nuevo aún no aprobado: pendiente. Si además queda un
+    // plan anterior todavía vigente (contrató el siguiente antes de vencer),
+    // se sigue operando con ese hasta que se apruebe el nuevo.
+    if (!$suscripcion && $ultimaBase && $ultimaBase['estado'] === 'pendiente_aprobacion') {
+        $planPendiente = true;
+        $planNombre = $ultimaBase['plan_nombre'];
+        $planBadge = $ultimaBase['badge'];
+        $planColor = $ultimaBase['color_badge'];
+        $vigentePrevia = $pdo->prepare("
+            SELECT s.*, p.nombre as plan_nombre, p.badge, p.color_badge, p.duracion_dias, p.max_pausas_permitidas
             FROM suscripciones s
             LEFT JOIN planes p ON s.plan_id = p.id
-            WHERE s.escort_id = ? AND s.estado = 'pendiente_aprobacion'
-            ORDER BY s.creado_en DESC LIMIT 1
+            WHERE s.escort_id = ? AND s.estado = 'activa' AND s.fecha_fin >= CURDATE()
+            ORDER BY s.fecha_fin DESC LIMIT 1
         ");
-        $susPend->execute([$escortId]);
-        $pendiente = $susPend->fetch(PDO::FETCH_ASSOC);
-        if ($pendiente) {
-            $planPendiente = true;
-            $planNombre = $pendiente['plan_nombre'];
-            $planBadge = $pendiente['badge'];
-            $planColor = $pendiente['color_badge'];
+        $vigentePrevia->execute([$escortId]);
+        if ($rowPrevia = $vigentePrevia->fetch(PDO::FETCH_ASSOC)) {
+            $suscripcion = $rowPrevia;
         }
     }
+
+    // Última base terminada (expirada/cancelada/rechazada): motivo "vencido".
+    if (!$suscripcion && !$planPendiente && $ultimaBase
+        && in_array($ultimaBase['estado'], ['expirada', 'cancelada', 'rechazada'], true)) {
+        $planVencido = true;
+    }
+
+    // Cuenta activa/aprobada sin ningún plan base (ni vigente, ni pausado, ni pendiente) → sin plan
+    $planSinPlan = !$suscripcion && !$planPendiente && ($cuentaAprobada || $escort['activa'] == 1);
 
     // Si está pausada, marcar planVigente=false pero mantener la info del plan
     $planPausado = $suscripcion && $suscripcion['estado'] === 'pausada';
@@ -184,7 +205,8 @@ try {
             $planDiasRestantes = max(0, (int)(new DateTime($suscripcion['fecha_fin']))->diff(new DateTime($suscripcion['fecha_pausa']))->days);
         } elseif (!empty($suscripcion['fecha_fin'])) {
             $fechaFin = new DateTime($suscripcion['fecha_fin']);
-            $planDiasRestantes = max(0, (int)$ahora->diff($fechaFin)->days);
+            // Si la fecha de fin ya pasó, días restantes = 0 (no negativo)
+            $planDiasRestantes = $fechaFin < $ahora ? 0 : (int)$ahora->diff($fechaFin)->days;
         } elseif (!empty($suscripcion['duracion_dias'])) {
             $fechaBase = new DateTime($suscripcion['creado_en']);
             $fechaEsperada = clone $fechaBase;
@@ -193,7 +215,7 @@ try {
             if ($diasPausados > 0) {
                 $fechaEsperada->modify("+{$diasPausados} days");
             }
-            $planDiasRestantes = max(0, (int)$ahora->diff($fechaEsperada)->days);
+            $planDiasRestantes = max(0, (int)$ahora->diff($fechaEsperada)->format('%r%a'));
         } else {
             $planDiasRestantes = 0;
         }
@@ -312,7 +334,7 @@ try {
     $extraStmt->execute([$escortId]);
     $extraNombre = $extraStmt->fetchColumn() ?: null;
 
-    $campos = ['nombreArtistico', 'usuario', 'email', 'telefono', 'edad', 'altura', 'peso', 'medidas', 'ciudad', 'descripcion_corta', 'descripcion_larga'];
+    $campos = ['nombreArtistico', 'telefono', 'edad', 'altura', 'peso', 'medidas', 'ciudad', 'descripcion_corta', 'descripcion_larga'];
     $llenos = 0;
     foreach ($campos as $c) {
         if (!empty($escort[$c]) && $escort[$c] !== '0' && $escort[$c] !== '') {
@@ -337,13 +359,22 @@ try {
         'descripcionCorta' => $escort['descripcion_corta'],
         'descripcionLarga' => $escort['descripcion_larga'],
         'estado' => $escort['estado'],
+        // Valores CRUDOS (para admin/auditoría)
         'verificado' => (int) $escort['verificado'],
         'vip' => (int) $escort['vip'],
         'destacado' => (int) $escort['destacado'],
         'sticky' => (int) $escort['sticky'],
         'activa' => (int) $escort['activa'],
+        // Valores EFECTIVOS (consideran plan vencido)
+        'verificado_vigente' => $planVencido ? 0 : (int) $escort['verificado'],
+        'vip_vigente' => $planVencido ? 0 : (int) $escort['vip'],
+        'destacado_vigente' => $planVencido ? 0 : (int) $escort['destacado'],
+        'sticky_vigente' => $planVencido ? 0 : (int) $escort['sticky'],
+        'activa_vigente' => $planVencido ? 0 : (int) $escort['activa'],
+        'plan_vencido' => $planVencido,
         'disponibleAhora' => (int) ($escort['disponible_ahora'] ?? 0),
         'planVencido' => $planVencido,
+        'planSinPlan' => $planSinPlan,
         'planPausado' => $planPausado ?? false,
         'planPendiente' => $planPendiente,
         'planNombre' => $planNombre,

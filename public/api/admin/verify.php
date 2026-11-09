@@ -29,13 +29,21 @@ try {
         exit;
     }
 
+    // Solo tokens con rol administrativo.
+    $rol = $payload['rol'] ?? $payload['role'] ?? '';
+    if (!in_array($rol, ['admin', 'superadmin', 'moderador'], true)) {
+        http_response_code(403);
+        echo json_encode(['valid' => false, 'error' => 'Sin rol administrativo']);
+        exit;
+    }
+
     echo json_encode([
         'valid' => true,
         'admin' => [
             'id' => $payload['id'],
             'nombre' => $payload['nombre'],
             'email' => $payload['email'],
-            'rol' => $payload['rol']
+            'rol' => $rol
         ]
     ]);
 } catch (Throwable $e) {

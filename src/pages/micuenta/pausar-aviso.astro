@@ -4,14 +4,17 @@ import EscortSidebar from '../../components/escort/EscortSidebar';
 import EscortAuthGuard from '../../components/escort/EscortAuthGuard';
 import PausarAviso from '../../components/escort/PausarAviso';
 import AprobacionRequerida from '../../components/escort/AprobacionRequerida';
+import PlanRequerido from '../../components/escort/PlanRequerido';
 ---
 
 <EscortLayout title="Pausar Aviso - CS Panel" activePage="pausar-aviso">
   <EscortSidebar slot="sidebar" activePage="pausar-aviso" client:load />
   <EscortAuthGuard client:load>
     <div class="w-full max-w-full">
-      <AprobacionRequerida client:load>
-        <PausarAviso client:load />
+      <AprobacionRequerida client:only="react">
+        <PlanRequerido client:only="react">
+          <PausarAviso client:only="react" />
+        </PlanRequerido>
       </AprobacionRequerida>
     </div>
   </EscortAuthGuard>

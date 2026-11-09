@@ -14,7 +14,7 @@ try {
 
     if (!isset($_FILES['comprobante']) || $_FILES['comprobante']['error'] !== UPLOAD_ERR_OK) {
         http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'No se recibiíƒÂ³ el archivo o hubo un error']);
+        echo json_encode(['success' => false, 'error' => 'No se recibi? el archivo o hubo un error']);
         exit;
     }
 
@@ -22,7 +22,7 @@ try {
     $tiposPermitidos = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
     if (!validarMIME($file['tmp_name'], $tiposPermitidos)) {
         http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'Solo se permiten imíƒÂ¡genes (JPG, PNG, WebP) o PDF']);
+        echo json_encode(['success' => false, 'error' => 'Solo se permiten im?genes (JPG, PNG, WebP) o PDF']);
         exit;
     }
 

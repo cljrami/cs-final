@@ -1,6 +1,7 @@
 // src/components/admin/EscortsData.tsx
 import { useState, useEffect, useRef } from 'react';
 import { getAdminRol, esAdminOSuperior } from '../../lib/adminRole';
+import { Skeleton } from '../ui/Skeleton';
 import StatCard from '../ui/StatCard';
 import DataTable from '../ui/DataTable';
 import type { Column, ActionItem } from '../ui/DataTable';
@@ -16,6 +17,7 @@ interface Stats {
   verificadas: number;
   vip: number;
   vencen_hoy: number;
+  expiradas: number;
   papelera: number;
 }
 
@@ -87,7 +89,7 @@ const planEstadoConfig: Record<string, { bg: string; text: string; icon: string;
 
 export default function EscortsData() {
   const [items, setItems] = useState<Escort[]>([]);
-  const [stats, setStats] = useState<Stats>({ total: 0, activas: 0, pendientes: 0, rechazadas: 0, pausadas: 0, verificadas: 0, vip: 0, vencen_hoy: 0, papelera: 0 });
+  const [stats, setStats] = useState<Stats>({ total: 0, activas: 0, pendientes: 0, rechazadas: 0, pausadas: 0, verificadas: 0, vip: 0, vencen_hoy: 0, expiradas: 0, papelera: 0 });
   const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 50, total: 0, pages: 1, hasMore: false });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -100,6 +102,9 @@ export default function EscortsData() {
   const [restoreConfirm, setRestoreConfirm] = useState<Escort | null>(null);
   const [restoring, setRestoring] = useState(false);
   const [permanentDeleteConfirm, setPermanentDeleteConfirm] = useState<Escort | null>(null);
+  const [selected, setSelected] = useState<Set<string | number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState<{ ids: (string | number)[]; message: string; isPermanent?: boolean } | null>(null);
   const [permanentDeleting, setPermanentDeleting] = useState(false);
   const [approveConfirm, setApproveConfirm] = useState<Escort | null>(null);
   const [rejectConfirm, setRejectConfirm] = useState<Escort | null>(null);
@@ -118,7 +123,7 @@ export default function EscortsData() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Error al cargar');
       setItems(data.escorts || []);
-      setStats(data.stats || { total: 0, activas: 0, pendientes: 0, rechazadas: 0, pausadas: 0, verificadas: 0, vip: 0, vencen_hoy: 0, papelera: 0 });
+      setStats(data.stats || { total: 0, activas: 0, pendientes: 0, rechazadas: 0, pausadas: 0, verificadas: 0, vip: 0, vencen_hoy: 0, expiradas: 0, papelera: 0 });
       if (data.pagination) {
         setPagination(data.pagination);
       }
@@ -184,6 +189,48 @@ export default function EscortsData() {
 
   const handleReject = (item: Escort) =>
     callApi('escort-rechazar', { id: item.id }, (prev) => prev.map(e => e.id === item.id ? { ...e, activa: -1 } : e), 'Escort rechazada correctamente');
+
+  const handleBulkDelete = (sel: Set<string | number>) => {
+    if (sel.size === 0) return;
+    const isTrash = filter === 'papelera';
+    setBulkConfirm({
+      ids: Array.from(sel),
+      message: isTrash
+        ? `Estás a punto de ELIMINAR DEFINITIVAMENTE ${sel.size} escort(s) de la papelera. Esta acción no se puede deshacer y se borrarán fotos, datos e historial.`
+        : `Estás a punto de enviar ${sel.size} escort(s) seleccionado(s) a la papelera. Podrán restaurarse después.`,
+      isPermanent: isTrash,
+    });
+  };
+
+  const confirmBulkDelete = async () => {
+    if (!bulkConfirm) return;
+    const ids = bulkConfirm.ids;
+    const isPermanent = bulkConfirm.isPermanent;
+    setBulkConfirm(null);
+    setBulkDeleting(true);
+    try {
+      if (isPermanent) {
+        const res = await fetch('/api/admin/escorts-eliminar-definitivos', {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ ids: ids.map(Number) }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Error al eliminar definitivamente');
+        showNotification(`Se eliminaron definitivamente ${data.deleted ?? ids.length} escorts`);
+      } else {
+        for (const id of ids) {
+          const res = await fetch('/api/admin/escort-eliminar', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ id: Number(id) }) });
+          const data = await res.json();
+          if (!data.success) throw new Error(data.error || 'Error al eliminar');
+        }
+        showNotification(`Se enviaron ${ids.length} escorts a la papelera`);
+      }
+      setSelected(new Set());
+      refetch(); window.dispatchEvent(new Event('counts-refresh'));
+    } catch (err: any) { setError(err.message); }
+    finally { setBulkDeleting(false); }
+  };
 
   const handleDelete = async () => {
     if (!deleteConfirm) return;
@@ -442,6 +489,7 @@ export default function EscortsData() {
     { label: 'Pendientes', value: stats.pendientes, icon: 'fa-clock', color: '#fbbf24' },
     { label: 'Pausadas', value: stats.pausadas, icon: 'fa-pause-circle', color: '#3b82f6' },
     { label: 'Vencen hoy', value: stats.vencen_hoy, icon: 'fa-hourglass-half', color: '#f97316' },
+    { label: 'Expiradas', value: stats.expiradas, icon: 'fa-hourglass-end', color: '#ef4444' },
     { label: 'Verificadas', value: stats.verificadas, icon: 'fa-check-double', color: '#8b5cf6' },
     { label: 'VIP', value: stats.vip, icon: 'fa-crown', color: '#eab308' },
     { label: 'Rechazadas', value: stats.rechazadas, icon: 'fa-times-circle', color: '#ef4444' },
@@ -488,6 +536,7 @@ export default function EscortsData() {
           { key: 'pendientes', label: 'Pendientes' },
           { key: 'pausadas', label: 'Pausadas' },
           { key: 'vencen_hoy', label: 'Vencen hoy' },
+          { key: 'expiradas', label: 'Expiradas' },
           { key: 'rechazadas', label: 'Rechazadas' },
           { key: 'papelera', label: 'Papelera' },
         ]}
@@ -496,9 +545,10 @@ export default function EscortsData() {
       />
 
       {isLoading ? (
-        <div className="bg-admin-card border border-admin-border rounded-2xl p-8 text-center">
-          <i className="fas fa-circle-notch fa-spin text-yellow-400 text-3xl mb-3"></i>
-          <p className="text-gray-400">Cargando escorts...</p>
+        <div className="space-y-3">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-4 w-full" />
+          ))}
         </div>
       ) : items.length === 0 ? (
         <div className="bg-admin-card border border-admin-border rounded-2xl p-8 text-center">
@@ -514,9 +564,26 @@ export default function EscortsData() {
           emptyMessage={search ? 'No se encontraron escorts' : 'No hay escorts registradas'}
           emptyIcon="fa-user-shield"
           getRowKey={(item) => item.id}
+          selectable
+          selected={selected}
+          onSelectionChange={setSelected}
+          onBulkDelete={handleBulkDelete}
           getActions={getActions}
+          bulkDeleteLabel={filter === 'papelera' ? 'Eliminar definitivamente' : 'Eliminar seleccionados'}
         />
       )}
+
+      <ConfirmModal
+        isOpen={bulkConfirm !== null}
+        title={bulkConfirm?.isPermanent ? 'Eliminar definitivamente' : 'Eliminar seleccionados'}
+        message={bulkConfirm?.message || ''}
+        confirmText={bulkDeleting ? 'Eliminando...' : (bulkConfirm?.isPermanent ? 'Eliminar definitivamente' : 'Eliminar')}
+        cancelText="Cancelar"
+        variant="danger"
+        confirmDisabled={bulkDeleting}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkConfirm(null)}
+      />
 
       {pagination.pages > 1 && (
         <div className="bg-admin-card border border-admin-border rounded-xl px-6 py-4 flex items-center justify-between">

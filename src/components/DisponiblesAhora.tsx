@@ -20,19 +20,19 @@ export default function DisponiblesAhora() {
 
   if (!loading && escorts.length === 0) return null;
 
-  const titulo = texts.seccion_disponibles_titulo || 'Disponibles ahora';
+  const titulo = texts?.seccion_disponibles_titulo || 'Disponibles ahora';
 
   return (
     <section className="py-8">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h2 className="text-ink font-bold text-lg flex items-center gap-2">
-          <i className="fas fa-fire text-red-500"></i> {titulo}
+          <i className="fas fa-fire text-red-500"></i> {texts ? titulo : <Skeleton width={130} height={18} inline />}
         </h2>
-        {!loading && <span className="text-muted text-sm">{escorts.length} disponibles</span>}
+        {!loading && <span className="text-muted text-sm">{(texts?.contador_disponibles || '{cantidad} disponibles').replace('{cantidad}', String(escorts.length))}</span>}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
         {loading ? (
-          Array.from({ length: 6 }).map((_, i) => (
+          Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="bg-surface rounded-xl overflow-hidden border border-white/5 animate-pulse">
               <Skeleton className="aspect-[3/4] w-full !rounded-none" />
               <div className="p-2.5 space-y-2">

@@ -15,7 +15,7 @@ try {
     $adminId = intval($tokenData['id'] ?? 0);
     if ($adminId <= 0) {
         http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Token invíƒÂ¡lido']);
+        echo json_encode(['success' => false, 'error' => 'Token inv?lido']);
         exit;
     }
 
@@ -55,7 +55,7 @@ try {
 
         $errors = [];
         if (strlen($nombre) < 2) $errors['nombre'] = 'Nombre muy corto';
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors['email'] = 'Email invíƒÂ¡lido';
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors['email'] = 'Email inv?lido';
 
         if (!empty($errors)) {
             http_response_code(422);
@@ -68,7 +68,7 @@ try {
         $check->execute([$email, $adminId]);
         if ($check->fetch()) {
             http_response_code(409);
-            echo json_encode(['success' => false, 'fieldErrors' => ['email' => 'Este email ya estíƒÂ¡ en uso']]);
+            echo json_encode(['success' => false, 'fieldErrors' => ['email' => 'Este email ya est? en uso']]);
             exit;
         }
 
@@ -85,7 +85,7 @@ try {
     }
 
     http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'MíƒÂ©todo no permitido']);
+    echo json_encode(['success' => false, 'error' => 'M?todo no permitido']);
 
 } catch (Throwable $e) {
     error_log("Error admin/datos/perfil.php: " . $e->getMessage());

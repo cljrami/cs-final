@@ -5,6 +5,9 @@ public_html/
 # deploy cache
 .deploy-cache.json
 
+# clave FTP local (nunca versionar)
+.ftp-pass
+
 # secret / keys
 key
 
@@ -38,7 +41,7 @@ pnpm-debug.log*
 key
 
 # ============================================
-# Datos reales / scripts de depuración local
+# Datos reales / scripts de depuraciÃ³n local
 # (nunca versionar; contienen datos o tokens)
 # ============================================
 kimi_app.sql
@@ -51,7 +54,7 @@ migrate_sticky_posiciones.sql
 # config local del agente (opencode)
 .opencode/
 
-# scripts de depuración y utilidades locales
+# scripts de depuraciÃ³n y utilidades locales
 test_token.php
 check_fk.php
 check_schema.php
@@ -65,3 +68,4 @@ _ftp-download.js
 deploy.sh
 build_log.txt
 deploy_log.txt
+.indexnow-key

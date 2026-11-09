@@ -30,7 +30,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || ($tokenData['exp'] ?? 0) < time()) {
         http_response_code(401);
@@ -48,7 +48,7 @@ try {
     require_once __DIR__ . '/../bootstrap.php';
 
     $pdo = getDBConnection();
-    // â”€â”€â”€ DATOS BÁSICOS DE LA ESCORT â”€â”€â”€
+    // --- DATOS BÁSICOS DE LA ESCORT ---
     // ¿Existe la columna aprobada? (por si la migración aún no se ejecuta)
     $colStmt = $pdo->prepare("
         SELECT COUNT(*) FROM information_schema.COLUMNS
@@ -113,7 +113,7 @@ try {
         }
     }
 
-    // â”€â”€â”€ ESTADO DE LA SUSCRIPCIÓN â”€â”€â”€
+    // --- ESTADO DE LA SUSCRIPCIÓN ---
     $suscripcion = null;
     $estadoPublicacion = 'pendiente_perfil';
     $mensajeEstado = 'Completa tu perfil y selecciona un plan para activar tu publicación.';
@@ -191,12 +191,12 @@ try {
         $colorEstado = 'gray';
     }
 
-    // â”€â”€â”€ INFO DEL PLAN â”€â”€â”€
+    // --- INFO DEL PLAN ---
     $planInfo = null;
     if ($escort['plan_id']) {
         $planStmt = $pdo->prepare("
             SELECT nombre, slug, tipo, duracion_dias, precio, moneda, 
-                   max_fotos, max_videos, permite_vip, permite_destacado, badge, color_badge
+                   max_fotos, max_videos, permite_vip, permite_destacado, uso_unico, badge, color_badge
             FROM planes 
             WHERE id = ?
         ");
@@ -215,13 +215,14 @@ try {
                 'max_videos' => (int)$plan['max_videos'],
                 'permite_vip' => (bool)$plan['permite_vip'],
                 'permite_destacado' => (bool)$plan['permite_destacado'],
+                'uso_unico' => (bool)$plan['uso_unico'],
                 'badge' => $plan['badge'],
                 'color_badge' => $plan['color_badge']
             ];
         }
     }
 
-    // â”€â”€â”€ NOTIFICACIONES NO LEÍDAS â”€â”€â”€
+    // --- NOTIFICACIONES NO LEÍDAS ---
     $notifStmt = $pdo->prepare("
         SELECT COUNT(*) FROM notificaciones 
         WHERE escort_id = ? AND leida = 0
@@ -229,14 +230,14 @@ try {
     $notifStmt->execute([$escortId]);
     $notificacionesPendientes = (int)$notifStmt->fetchColumn();
 
-    // â”€â”€â”€ VERIFICACIÓN â”€â”€â”€
+    // --- VERIFICACIÓN ---
     $verifStmt = $pdo->prepare("
         SELECT estado FROM verificaciones WHERE escort_id = ?
     ");
     $verifStmt->execute([$escortId]);
     $verificacion = $verifStmt->fetch(PDO::FETCH_ASSOC);
 
-    // â”€â”€â”€ RESPUESTA â”€â”€â”€
+    // --- RESPUESTA ---
     echo json_encode([
         'success' => true,
         'escort' => [
@@ -265,7 +266,7 @@ try {
             'fecha_fin' => $suscripcion['fecha_fin'],
             'estado' => $suscripcion['estado'],
             'precio_pagado' => (float)$suscripcion['precio_pagado'],
-            'comprobante' => $suscripcion['comprobante_pago']
+            'comprobante' => comprobante_url($suscripcion['comprobante_pago'])
         ] : null,
         'stats' => [
             'visitas_perfil' => (int)$escort['visitas_perfil'],
@@ -283,7 +284,7 @@ try {
             'puede_subir_videos' => $planVigente && $planInfo && $planInfo['max_videos'] > 0,
             'puede_solicitar_vip' => $planVigente && $planInfo && $planInfo['permite_vip'] && !$escort['vip'],
             'puede_solicitar_destacado' => $planVigente && $planInfo && $planInfo['permite_destacado'] && !$escort['destacado'],
-            'puede_pausar' => $estadoPublicacion === 'activa',
+            'puede_pausar' => ($estadoPublicacion === 'activa' && !($planInfo['uso_unico'] ?? false)),
             'puede_reactivar' => $estadoPublicacion === 'pausada'
         ]
     ]);

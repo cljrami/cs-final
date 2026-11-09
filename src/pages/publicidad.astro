@@ -1,0 +1,64 @@
+---
+import Layout from "../layouts/Layout.astro";
+import AnunciateForm from "../components/AnunciateForm";
+---
+
+<Layout title="Publica tu banner" description="Envía tu banner y publícalo en los espacios más vistos del sitio." showNavFooter={true}>
+  <main class="min-h-screen bg-page">
+    <div class="max-w-6xl mx-auto px-4 py-12 md:py-20">
+      <div class="text-center max-w-3xl mx-auto mb-12">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-300 text-xs font-medium mb-5">
+          <i class="fas fa-ad" /> Publicidad Premium
+        </div>
+        <h1 class="text-4xl md:text-6xl font-extrabold text-white tracking-tight leading-tight">
+          Publica tu banner y <span class="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-orange-400">crece</span>
+        </h1>
+        <p class="mt-5 text-lg text-gray-300">
+          Night clubs, discotecas, sex shops, bares, saunas y negocios del rubro: muestra tu aviso en los espacios más vistos del sitio y recibe visitas directas de usuarios calificados.
+        </p>
+      </div>
+
+      <div class="grid md:grid-cols-3 gap-6 mb-12">
+        <div class="rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-6">
+          <div class="text-2xl text-red-400 mb-3"><i class="fas fa-bullseye" /></div>
+          <h3 class="text-white font-semibold mb-1">Audiencia segmentada</h3>
+          <p class="text-sm text-gray-400">Llega a usuarios interesados en Night clubs, Discotecas, Sex shops y más.</p>
+        </div>
+        <div class="rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-6">
+          <div class="text-2xl text-red-400 mb-3"><i class="fas fa-eye" /></div>
+          <h3 class="text-white font-semibold mb-1">Alta visibilidad</h3>
+          <p class="text-sm text-gray-400">Espacios destacados en home, ciudades y perfiles.</p>
+        </div>
+        <div class="rounded-3xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-6">
+          <div class="text-2xl text-red-400 mb-3"><i class="fas fa-clock" /></div>
+          <h3 class="text-white font-semibold mb-1">Aprobación rápida</h3>
+          <p class="text-sm text-gray-400">Envía tu banner y lo revisamos para publicarlo en 24h.</p>
+        </div>
+      </div>
+
+      <div class="grid lg:grid-cols-5 gap-8 items-start">
+        <div class="lg:col-span-3">
+          <div class="rounded-[2rem] border border-white/10 bg-[#0c0c12]/80 backdrop-blur p-8 md:p-10">
+            <h2 class="text-2xl font-bold text-white mb-2">Solicita tu espacio</h2>
+            <p class="text-gray-400 mb-6">Completa el formulario y adjunta tu banner. Te contactaremos para confirmar.</p>
+            <AnunciateForm client:load />
+          </div>
+        </div>
+        <div class="lg:col-span-2">
+          <div class="rounded-[2rem] border border-white/10 bg-gradient-to-b from-[#12121a] to-[#0f0f15] p-8">
+            <h3 class="text-white font-semibold text-lg mb-4">¿Qué incluye?</h3>
+            <ul class="space-y-3 text-sm text-gray-300">
+              <li class="flex gap-3"><i class="fas fa-check text-red-400 mt-0.5" /> Posicionamiento en footer y secciones clave</li>
+              <li class="flex gap-3"><i class="fas fa-check text-red-400 mt-0.5" /> Enlace directo a tu sitio o redes</li>
+              <li class="flex gap-3"><i class="fas fa-check text-red-400 mt-0.5" /> Reporte mensual de impresiones</li>
+              <li class="flex gap-3"><i class="fas fa-check text-red-400 mt-0.5" /> Soporte dedicado</li>
+            </ul>
+            <div class="mt-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-200 text-sm">
+              <i class="fas fa-info-circle mr-2" /> Las solicitudes se moderan. Solo se publican avisos del rubro.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</Layout>

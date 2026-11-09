@@ -79,6 +79,7 @@ try {
             p.nombre,
             p.color,
             p.permite_vip,
+            p.uso_unico,
             DATEDIFF(s.fecha_fin, CURDATE()) as dias_restantes
         FROM suscripciones s
         JOIN planes p ON p.id = s.plan_id
@@ -162,7 +163,7 @@ try {
         $motivoNoSolicitar = 'Tu plan base está pausado. Reactívalo antes de solicitar VIP.';
     } elseif ($planBase['fecha_fin'] < date('Y-m-d')) {
         $motivoNoSolicitar = 'Tu plan base ha expirado. Renueva tu plan para solicitar VIP.';
-    } elseif ($planBase['plan_id'] == 1) {
+    } elseif (!empty($planBase['uso_unico'])) {
         $motivoNoSolicitar = 'El plan gratuito no incluye VIP. Actualiza a un plan de pago.';
     } elseif (!$planBase['permite_vip']) {
         $motivoNoSolicitar = 'Tu plan actual no permite solicitar VIP.';
@@ -189,7 +190,7 @@ try {
         'solicitud' => $solicitud ? [
             'id' => (int)$solicitud['id'],
             'estado' => $solicitud['estado'],
-            'comprobante_pago' => $solicitud['comprobante_pago'],
+            'comprobante_pago' => comprobante_url($solicitud['comprobante_pago']),
             'admin_notas' => $solicitud['admin_notas'],
             'fecha_respuesta' => $solicitud['fecha_respuesta'],
             'created_at' => $solicitud['created_at']
@@ -197,7 +198,7 @@ try {
         'solicitud_aprobada' => $solicitudAprobada ? [
             'id' => (int)$solicitudAprobada['id'],
             'estado' => $solicitudAprobada['estado'],
-            'comprobante_pago' => $solicitudAprobada['comprobante_pago'],
+            'comprobante_pago' => comprobante_url($solicitudAprobada['comprobante_pago']),
             'fecha_respuesta' => $solicitudAprobada['fecha_respuesta']
         ] : null,
         'config' => $config,

@@ -1,0 +1,1 @@
+ALTER TABLE `planes` ADD `es_gratis` BOOLEAN NOT NULL DEFAULT false AFTER `color_badge`;

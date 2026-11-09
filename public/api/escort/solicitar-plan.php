@@ -33,7 +33,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || !isset($tokenData['exp']) || $tokenData['exp'] < time()) {
         http_response_code(401);
@@ -75,7 +75,7 @@ try {
     $input = json_decode(file_get_contents('php://input'), true);
     $planId = isset($input['plan_id']) ? intval($input['plan_id']) : 0;
     $metodoPago = isset($input['metodo_pago']) ? $input['metodo_pago'] : 'transferencia';
-    $comprobanteUrl = isset($input['comprobante_pago']) ? trim($input['comprobante_pago']) : '';
+    $comprobanteUrl = comprobante_path(isset($input['comprobante_pago']) ? trim($input['comprobante_pago']) : '');
     $notas = isset($input['notas']) ? trim($input['notas']) : '';
     $esExtra = isset($input['es_extra']) ? (bool)$input['es_extra'] : false;
 
@@ -112,6 +112,7 @@ try {
             s.fecha_aprobacion,
             p.duracion_dias,
             p.nombre as plan_nombre,
+            p.permite_destacado,
             DATEDIFF(s.fecha_fin, CURDATE()) as dias_restantes
         FROM suscripciones s
         JOIN planes p ON p.id = s.plan_id
@@ -181,7 +182,7 @@ try {
                 SELECT 1 FROM suscripciones s
                 JOIN planes p ON p.id = s.plan_id
                 JOIN escorts e ON e.id = s.escort_id
-                WHERE e.email = ? AND p.id = ? AND p.uso_unico = 1 AND s.fecha_aprobacion IS NOT NULL
+                WHERE e.email = ? AND p.id = ? AND p.uso_unico = 1 AND (s.fecha_aprobacion IS NOT NULL OR s.estado = 'pendiente_aprobacion')
                 LIMIT 1
             ");
             $stmtUsado->execute([$escortEmail, $plan['id'], $escortEmail, $plan['id']]);
@@ -215,6 +216,16 @@ try {
             exit;
         }
 
+        // Bloquear extra "Destacado"/"Fijo" (sticky) si el plan base no lo incluye (permite_destacado = 0).
+        $extraTipoSolicitud = (string)$plan['extra_tipo'];
+        if ($plan['tipo'] === 'extra' && in_array($extraTipoSolicitud, ['destacado', 'sticky'], true) && (int)($planBase['permite_destacado'] ?? 0) !== 1) {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Tu plan base no incluye el extra de Destacado. Actualiza tu plan base para poder contratarlo.'
+            ]);
+            exit;
+        }
+
         // Verificar que no tenga ya un extra pendiente, pausado o activo.
         // Solo podrá solicitar otro extra una vez que el vigente venza.
         $stmtExtraActivo = $pdo->prepare("
@@ -244,19 +255,25 @@ try {
 
     $pdo->beginTransaction();
 
+    $esPlanGratis = (float)$plan['precio'] === 0.0;
+
+    // Para planes gratuitos no se requiere comprobante y se crean como pendientes de aprobación
+    $comprobanteParaInsertar = $esPlanGratis ? '' : $comprobanteUrl;
+
     $stmtInsert = $pdo->prepare("
         INSERT INTO suscripciones (
-            escort_id, 
-            plan_id, 
-            fecha_inicio, 
-            fecha_fin, 
-            precio_pagado, 
-            moneda, 
-            estado, 
+            escort_id,
+            plan_id,
+            fecha_inicio,
+            fecha_fin,
+            precio_pagado,
+            moneda,
+            estado,
             comprobante_pago,
             creado_en
         ) VALUES (?, ?, ?, ?, ?, ?, 'pendiente_aprobacion', ?, NOW())
     ");
+
     $stmtInsert->execute([
         $escortId,
         $planId,
@@ -264,53 +281,39 @@ try {
         $fechaFin,
         $plan['precio'],
         $plan['moneda'],
-        $comprobanteUrl
+        $comprobanteParaInsertar
     ]);
 
     $suscripcionId = $pdo->lastInsertId();
 
     // Crear pago para cualquier tipo de plan (base o extra)
-    $concepto = $plan['tipo'] === 'extra' ? 'destacado' : 'plan';
-    $pagoCheck = $pdo->prepare("SELECT id FROM pagos WHERE escort_id = ? AND concepto = ? AND suscripcion_id = ? LIMIT 1");
-    $pagoCheck->execute([$escortId, $concepto, $suscripcionId]);
-    $pagoExistente = $pagoCheck->fetch(PDO::FETCH_ASSOC);
+    if (!$esPlanGratis) {
+        $concepto = $plan['tipo'] === 'extra' ? 'destacado' : 'plan';
+        $pagoCheck = $pdo->prepare("SELECT id FROM pagos WHERE escort_id = ? AND concepto = ? AND suscripcion_id = ? LIMIT 1");
+        $pagoCheck->execute([$escortId, $concepto, $suscripcionId]);
+        $pagoExistente = $pagoCheck->fetch(PDO::FETCH_ASSOC);
 
-    if ($pagoExistente) {
-        $pdo->prepare("UPDATE pagos SET plan_id = ?, monto = ?, suscripcion_id = ? WHERE id = ?")
-            ->execute([$planId, $plan['precio'], $suscripcionId, $pagoExistente['id']]);
-    } else {
-        $pdo->prepare("
-            INSERT INTO pagos (escort_id, plan_id, suscripcion_id, concepto, monto, moneda, metodo_pago, estado_pago, comprobante_url, notas, creado_en)
-            VALUES (?, ?, ?, ?, ?, ?, 'transferencia', 'pendiente', ?, ?, NOW())
-        ")->execute([
-            $escortId, $planId, $suscripcionId, $concepto,
-            $plan['precio'], $plan['moneda'],
-            $comprobanteUrl,
-            'Pendiente por solicitud de ' . ($plan['tipo'] === 'extra' ? 'extra' : 'plan')
-        ]);
+        if ($pagoExistente) {
+            $pdo->prepare("UPDATE pagos SET plan_id = ?, monto = ?, suscripcion_id = ? WHERE id = ?")
+                ->execute([$planId, $plan['precio'], $suscripcionId, $pagoExistente['id']]);
+        } else {
+            $pdo->prepare("
+                INSERT INTO pagos (escort_id, plan_id, suscripcion_id, concepto, monto, moneda, metodo_pago, estado_pago, comprobante_url, notas, creado_en)
+                VALUES (?, ?, ?, ?, ?, ?, 'transferencia', 'pendiente', ?, ?, NOW())
+            ")->execute([
+                $escortId, $planId, $suscripcionId, $concepto,
+                $plan['precio'], $plan['moneda'],
+                $comprobanteUrl,
+                'Pendiente por solicitud de ' . ($plan['tipo'] === 'extra' ? 'extra' : 'plan')
+            ]);
+        }
     }
 
-    // Crear notificación
+// Notificación única (visible en feed admin por usuario_id NULL y en feed escort por escort_id)
     $notifTitulo = 'Nueva solicitud de ' . ($plan['tipo'] === 'extra' ? 'extra' : 'plan');
     $notifMensaje = $escortNombre . ' solicitó ' . $plan['nombre'] . ' ($' . number_format($plan['precio'], 0) . ' ' . $plan['moneda'] . ')';
 
-    $stmtNotif = $pdo->prepare("
-        INSERT INTO notificaciones (
-            escort_id, 
-            tipo, 
-            titulo, 
-            mensaje, 
-            url
-        ) VALUES (?, 'sistema', ?, ?, ?)
-    ");
-    $stmtNotif->execute([
-        $escortId,
-        $notifTitulo,
-        $notifMensaje,
-        '/admin/suscripciones'
-    ]);
-
-    // Notificación global para admins con foto de la escort
+    // Con foto de la escort
     $af = $pdo->prepare("SELECT foto_principal, nombre FROM escorts WHERE id = ?");
     $af->execute([$escortId]);
     $actor = $af->fetch(PDO::FETCH_ASSOC);

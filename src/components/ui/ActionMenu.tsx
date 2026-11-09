@@ -18,6 +18,8 @@ export default function ActionMenu({ actions }: ActionMenuProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  if (actions.length === 0) return null;
+
   const updatePosition = useCallback(() => {
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();

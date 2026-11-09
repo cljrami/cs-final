@@ -3,7 +3,7 @@ import Layout from "../../layouts/Layout.astro";
 import RegistroWizard from "../../components/escort/RegistroWizard";
 ---
 
-<Layout title="Registro - CS Panel">
+<Layout title="Registro - CS Panel" robots="noindex, nofollow">
   <div
     class="min-h-screen bg-page flex items-center justify-center py-12 px-4"
   >
@@ -20,7 +20,7 @@ import RegistroWizard from "../../components/escort/RegistroWizard";
         </p>
       </div>
 
-      <RegistroWizard client:load />
+      <RegistroWizard client:only="react" />
     </div>
   </div>
 </Layout>

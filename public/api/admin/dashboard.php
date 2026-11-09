@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'MíƒÂ©todo no permitido']);
+    echo json_encode(['success' => false, 'error' => 'M?todo no permitido']);
     exit;
 }
 
@@ -165,7 +165,7 @@ $stmt = $pdo->query("
     }
     unset($up);
 
-    // Ingresos diarios (íƒÂºltimos 12 díƒÂ­as) desde suscripciones aprobadas
+    // Ingresos diarios (?ltimos 12 d?as) desde suscripciones aprobadas
     $ingresos = $pdo->query("
         SELECT
             DATE(s.fecha_aprobacion) as fecha,
@@ -177,7 +177,7 @@ $stmt = $pdo->query("
         ORDER BY fecha ASC
     ")->fetchAll(PDO::FETCH_ASSOC);
 
-    // Rellenar díƒÂ­as sin ingresos con 0
+    // Rellenar d?as sin ingresos con 0
     $ingresosCompletos = [];
     for ($i = 11; $i >= 0; $i--) {
         $ts = strtotime("-$i days");
@@ -208,7 +208,7 @@ $stmt = $pdo->query("
         LIMIT 5
     ")->fetchAll(PDO::FETCH_ASSOC);
 
-    // Top 5 escorts míƒÂ¡s visitadas
+    // Top 5 escorts m?s visitadas
     $topEscorts = $pdo->query("
         SELECT id, nombre, slug, ciudad, visitas_perfil, foto_principal
         FROM escorts
@@ -217,7 +217,7 @@ $stmt = $pdo->query("
         LIMIT 5
     ")->fetchAll(PDO::FETCH_ASSOC);
 
-    // Suscripciones por vencer (príƒÂ³ximos 7 díƒÂ­as, solo planes base)
+    // Suscripciones por vencer (pr?ximos 7 d?as, solo planes base)
     $porVencer = $pdo->query("
         SELECT s.id, s.fecha_fin, e.nombre as escort_nombre, e.id as escort_id,
                p.nombre as plan_nombre, DATEDIFF(s.fecha_fin, CURDATE()) as dias_restantes

@@ -2,7 +2,7 @@
 import Layout from "../../layouts/Layout.astro";
 ---
 
-<Layout title="Cuenta Eliminada - CS Panel">
+<Layout title="Cuenta Eliminada - CS Panel" robots="noindex, nofollow">
   <div class="min-h-screen bg-page flex items-center justify-center py-12 px-4">
     <div class="w-full max-w-lg">
       <div class="bg-admin-card rounded-2xl p-8 md:p-10 border border-admin-border">
@@ -74,7 +74,8 @@ import Layout from "../../layouts/Layout.astro";
     const email = params.get("email");
     const el = document.getElementById("cuentaEmail");
     if (el && email) {
-      el.innerHTML = '<i class="fas fa-envelope mr-2 text-muted"></i>' + document.createTextNode(email).nodeValue;
+      el.innerHTML = '<i class="fas fa-envelope mr-2 text-muted"></i>';
+      el.appendChild(document.createTextNode(email));
     }
   })();
 </script>

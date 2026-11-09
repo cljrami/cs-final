@@ -68,6 +68,9 @@ export default function CategoriasData() {
 
   const [deleteConfirm, setDeleteConfirm] = useState<Categoria | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [selected, setSelected] = useState<Set<string | number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState<{ ids: (string | number)[]; message: string } | null>(null);
 
   const initialLoadRef = useRef(false);
 
@@ -166,6 +169,40 @@ export default function CategoriasData() {
     } catch (err: any) { setError(err.message); }
     finally { setDeleting(false); }
   };
+
+  const handleBulkDelete = (sel: Set<string | number>) => {
+    if (sel.size === 0) return;
+    const seleccionados = items.filter((it) => sel.has(it.id));
+    const bloqueados = seleccionados.filter((it) => (total_escorts ?? 0) > 0);
+    const eliminables = seleccionados.filter((it) => (total_escorts ?? 0) === 0);
+    if (eliminables.length === 0) {
+      setError('No se puede eliminar: los registros seleccionados tienen escorts asociadas. Reasigna o elimina esas escorts primero.');
+      return;
+    }
+    const aviso = bloqueados.length > 0
+      ? ` ${bloqueados.length} registro(s) tienen escorts asociadas y no se eliminaran.`
+      : '';
+    setBulkConfirm({
+      ids: eliminables.map((it) => it.id),
+      message: `Estas a punto de eliminar ${eliminables.length} categoria(s) seleccionada(s).${aviso} Esta accion no se puede deshacer.`,
+    });
+  };
+
+  const confirmBulkDelete = async () => {
+    if (!bulkConfirm) return;
+    const ids = bulkConfirm.ids;
+    setBulkConfirm(null);
+    setBulkDeleting(true);
+    try {
+      for (const id of ids) {
+        await fetch(`${API_URL}?id=${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+      }
+      setSelected(new Set());
+      fetchItems(); window.dispatchEvent(new Event('counts-refresh'));
+    } catch (err: any) { setError(err.message); }
+    finally { setBulkDeleting(false); }
+  };
+
 
   const toggleActiva = async (item: Categoria) => {
     try {
@@ -286,7 +323,23 @@ export default function CategoriasData() {
         emptyMessage={search ? 'No se encontraron categorías' : 'No hay categorías registradas'}
         emptyIcon="fa-tags"
         getRowKey={(item) => item.id}
+        selectable
+        selected={selected}
+        onSelectionChange={setSelected}
+        onBulkDelete={handleBulkDelete}
         getActions={getActions}
+      />
+
+      <ConfirmModal
+        isOpen={bulkConfirm !== null}
+        title="Eliminar seleccionados"
+        message={bulkConfirm?.message || ''}
+        confirmText={bulkDeleting ? 'Eliminando...' : 'Eliminar'}
+        cancelText="Cancelar"
+        variant="danger"
+        confirmDisabled={bulkDeleting}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkConfirm(null)}
       />
 
       {pagination.pages > 1 && (

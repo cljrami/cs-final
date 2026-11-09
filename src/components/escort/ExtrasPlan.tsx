@@ -1,6 +1,9 @@
 // src/components/escort/ExtrasPlan.tsx
 
 import React, { useState, useEffect, useRef } from 'react';
+import { Skeleton } from '../ui/Skeleton';
+import { showToast } from '../ui/Toast';
+import ComprobanteThumb from '../ui/ComprobanteThumb';
 
 import EscortStatCard from '../ui/EscortStatCard';
 
@@ -37,6 +40,7 @@ interface PlanBaseActivo {
   estado: 'activa' | 'pausada' | 'pendiente' | 'expirada';
   dias_restantes: number;
   fecha_fin: string | null;
+  permite_destacado: boolean;
 }
 
 interface EscortInfo {
@@ -61,7 +65,8 @@ export default function ExtrasPlan() {
   const [selectedExtra, setSelectedExtra] = useState<number | null>(null);
   const [solicitando, setSolicitando] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [success] = useState('');
+  const setSuccess = (m: string) => showToast(m);
   
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -158,7 +163,8 @@ export default function ExtrasPlan() {
           nombre: data.plan.nombre,
           estado: data.estado.codigo,
           dias_restantes: data.estado.dias_restantes,
-          fecha_fin: data.fechas.fin
+          fecha_fin: data.fechas.fin,
+          permite_destacado: Boolean(data.plan.permite_destacado)
         });
       } else {
         setPlanBase(null);
@@ -200,6 +206,9 @@ export default function ExtrasPlan() {
 
   // NUEVO: Puede pedir otro extra solo si no tiene uno vigente
   const puedePedirOtroExtra = puedeSolicitarExtras() && !tieneExtraVigente;
+
+  // NUEVO: El plan base no incluye extras (permite_destacado = 0) -> mostrar aviso tipo Historias
+  const planNoIncluyeExtras = !!planBase && planBase.permite_destacado === false;
 
   // NUEVO: Extra que bloquea (para mostrar fecha de vencimiento)
   const extraBloqueante = extrasVigentes.find(e => e.estado !== 'expirado') || null;
@@ -243,6 +252,14 @@ export default function ExtrasPlan() {
     }
     if (planBase.estado !== 'activa') {
       return { valido: false, motivo: `Tu plan está ${planBase.estado}` };
+    }
+    if ((plan.tipo as string) === 'destacado' || (plan.tipo as string) === 'sticky') {
+      if (!planBase.permite_destacado) {
+        return {
+          valido: false,
+          motivo: 'Este plan no incluye el extra de Destacado/Fijo. Actualiza tu plan base para contratarlo.'
+        };
+      }
     }
     if (plan.duracion_dias > planBase.dias_restantes) {
       return { 
@@ -330,6 +347,7 @@ export default function ExtrasPlan() {
         setShowSuccessModal(true);
         setSelectedExtra(null);
         fetchExtrasActivos();
+        window.dispatchEvent(new Event('sidebar-refresh'));
       } else {
         setError(data.error || 'Error al solicitar extra');
       }
@@ -424,6 +442,36 @@ export default function ExtrasPlan() {
     return null;
   };
 
+  // NUEVO: Render aviso cuando el plan base no incluye extras (estilo Historias)
+  const renderNoIncluyeExtras = () => {
+    return (
+      <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-2xl p-6 mb-6">
+        <div className="flex items-center gap-4 mb-6">
+          <div className="w-14 h-14 rounded-2xl bg-gray-800/60 flex items-center justify-center">
+            <i className="fas fa-ban text-gray-500 text-3xl"></i>
+          </div>
+          <div className="flex-1">
+            <h2 className="text-white font-bold text-xl mb-1">Tu plan no incluye Extras</h2>
+            <p className="text-gray-400 text-sm">Tu plan actual no permite contratar extras al plan.</p>
+          </div>
+        </div>
+        <div className="bg-[#232335] rounded-xl p-4">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center shrink-0">
+              <i className="fas fa-info-circle text-gray-500"></i>
+            </div>
+            <div className="flex-1">
+              <div className="text-white font-semibold mb-1">Información</div>
+              <div className="text-gray-400 text-sm leading-relaxed">
+                Los extras son un beneficio de planes superiores. Con tu plan actual no está disponible esta función.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
       <div className="space-y-8">
         {/* Header estilo "Mi Plan" */}
@@ -475,8 +523,8 @@ export default function ExtrasPlan() {
           </div>
         )}
 
-        {/* EXTRAS ACTIVOS - solo si no está cargando y hay datos */}
-        {!loading && extrasVigentes.length > 0 && (
+        {/* EXTRAS ACTIVOS - solo con plan base activo (el extra antiguo no se muestra sin plan) */}
+        {!loading && puedeSolicitarExtras() && extrasVigentes.length > 0 && (
           <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-6">
             <div className="flex items-center gap-3 mb-4">
               <i className="fas fa-star text-purple-400 text-xl"></i>
@@ -500,6 +548,9 @@ export default function ExtrasPlan() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
+                    {extra.comprobante_pago && (
+                      <ComprobanteThumb url={extra.comprobante_pago} scope="escort" />
+                    )}
                     {extra.pendiente_aprobacion && (
                       <span className="text-amber-400 text-xs">Pendiente pago</span>
                     )}
@@ -532,8 +583,11 @@ export default function ExtrasPlan() {
             ═══════════════════════════════════════════ */}
         {!loading && puedeSolicitarExtras() && renderBloqueoPorExtraVigente()}
 
-        {/* Info extra activo */}
-        {!loading && extrasVigentes.length > 0 && (
+        {/* NUEVO: Plan activo pero sin extras incluidos (estilo Historias) */}
+        {!loading && puedeSolicitarExtras() && planNoIncluyeExtras && renderNoIncluyeExtras()}
+
+        {/* Info extra activo - solo con plan base activo */}
+        {!loading && puedeSolicitarExtras() && extrasVigentes.length > 0 && (
           <div className="bg-[#1a1a2e] border border-[#2d2d44] rounded-xl p-4 mb-6">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
@@ -566,17 +620,17 @@ export default function ExtrasPlan() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[1, 2, 3].map((i) => (
                 <div key={i} className="bg-[#13131a] border border-gray-800 rounded-2xl p-6">
-                  <div className="animate-pulse bg-gray-800 rounded-full h-6 w-20 mb-4" />
-                  <div className="animate-pulse bg-gray-800 rounded h-7 w-36 mb-1" />
-                  <div className="animate-pulse bg-gray-800 rounded h-8 w-24 mb-4" />
-                  <div className="animate-pulse bg-gray-800 rounded h-8 w-32 mb-4" />
-                  <div className="animate-pulse bg-gray-800 rounded h-4 w-48 mb-2" />
-                  <div className="animate-pulse bg-gray-800 rounded h-4 w-40" />
+                  <Skeleton height={24} width={80} borderRadius="9999px" />
+                  <Skeleton height={28} width={144} borderRadius="0.25rem" />
+                  <Skeleton height={32} width={96} borderRadius="0.25rem" />
+                  <Skeleton height={32} width={128} borderRadius="0.25rem" />
+                  <Skeleton height={16} width={192} borderRadius="0.25rem" />
+                  <Skeleton height={16} width={160} borderRadius="0.25rem" />
                 </div>
               ))}
             </div>
           </div>
-        ) : puedePedirOtroExtra && (
+        ) : puedePedirOtroExtra && !planNoIncluyeExtras && (
           <div>
             <div className="flex items-center gap-3 mb-6">
               <i className="fas fa-plus-circle text-purple-400 text-xl"></i>

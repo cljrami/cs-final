@@ -36,6 +36,7 @@ export default function RegistroWizard() {
       const data = await res.json();
 
       if (data.success) {
+        localStorage.removeItem('escort_data'); // limpiar datos antiguos al reactivar
         localStorage.setItem('escort_token', data.token);
         localStorage.setItem('escort_data', JSON.stringify(data.escort || {}));
         window.location.href = '/micuenta/onboarding'; '/micuenta/resumen';

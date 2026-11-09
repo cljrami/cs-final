@@ -13,13 +13,42 @@ try {
         $id = isset($input['id']) ? intval($input['id']) : 0;
         if ($id <= 0) { http_response_code(400); echo json_encode(['success' => false, 'error' => 'ID requerido']); exit; }
 
-        $check = $pdo->prepare("SELECT c.id FROM comentarios c JOIN escorts e ON e.id = c.escort_id WHERE c.id = ? AND (c.usuario_id = ? OR e.id = (SELECT id FROM escorts WHERE usuario_id = ?))");
-        $usuarioId = (int)$auth['id'];
-        $check->execute([$id, $usuarioId, $usuarioId]);
-        if (!$check->fetch()) { http_response_code(404); echo json_encode(['success' => false, 'error' => 'Comentario no encontrado o no tiene permiso']); exit; }
+        // Alcance estricto por rol (sin OR cruzado: evita IDOR por colisión de IDs).
+        $tipo = $auth['tipo'] ?? '';
+        $ownerId = (int)$auth['id'];
+        if ($tipo === 'escort') {
+            $check = $pdo->prepare("SELECT c.id, c.escort_id FROM comentarios c WHERE c.id = ? AND c.escort_id = ?");
+            $check->execute([$id, $ownerId]);
+        } elseif ($tipo === 'usuario') {
+            $check = $pdo->prepare("SELECT c.id, c.escort_id FROM comentarios c WHERE c.id = ? AND c.usuario_id = ?");
+            $check->execute([$id, $ownerId]);
+        } elseif (in_array($tipo, ['admin', 'superadmin', 'moderador'], true)) {
+            $check = $pdo->prepare("SELECT c.id, c.escort_id FROM comentarios c WHERE c.id = ?");
+            $check->execute([$id]);
+        } else {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Sin permiso']);
+            exit;
+        }
+        $comentario = $check->fetch(PDO::FETCH_ASSOC);
+        if (!$comentario) { http_response_code(404); echo json_encode(['success' => false, 'error' => 'Comentario no encontrado o no tiene permiso']); exit; }
+        $escortId = intval($comentario['escort_id']);
 
         $stmt = $pdo->prepare("DELETE FROM comentarios WHERE id = ?");
         $stmt->execute([$id]);
+
+        // Recalcular rating y total_valoraciones de la escort
+        try {
+            $statsStmt = $pdo->prepare("SELECT COUNT(*) as total, COALESCE(AVG(puntuacion), 0) as promedio FROM comentarios WHERE escort_id = ? AND aprobado = 1");
+            $statsStmt->execute([$escortId]);
+            $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
+            $totalVal = (int)($stats['total'] ?? 0);
+            $promedioVal = (float)($stats['promedio'] ?? 0);
+            $pdo->prepare("UPDATE escorts SET rating = ?, total_valoraciones = ? WHERE id = ?")->execute([$promedioVal, $totalVal, $escortId]);
+        } catch (Throwable $e) {
+            error_log("Error recalcular rating tras borrar comentario (mis-comentarios.php): " . $e->getMessage());
+        }
+
         echo json_encode(['success' => true, 'message' => 'Comentario eliminado']);
         exit;
     }

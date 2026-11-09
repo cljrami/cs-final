@@ -3,12 +3,15 @@
 import EscortLayout from '../../layouts/EscortLayout.astro';
 import VerificacionPanel from '../../components/escort/VerificacionPanel';
 import AprobacionRequerida from '../../components/escort/AprobacionRequerida';
+import PlanRequerido from '../../components/escort/PlanRequerido';
 
 const activePage = 'verificacion';
 ---
 
 <EscortLayout title="Verificación" activePage={activePage}>
-  <AprobacionRequerida client:load>
-    <VerificacionPanel client:load />
+  <AprobacionRequerida client:only="react">
+    <PlanRequerido client:only="react">
+      <VerificacionPanel client:only="react" />
+    </PlanRequerido>
   </AprobacionRequerida>
 </EscortLayout>

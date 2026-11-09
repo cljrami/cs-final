@@ -5,6 +5,26 @@
  */
 date_default_timezone_set('UTC');
 
+// CORS handling - whitelist de orígenes permitidos
+$allowedOrigins = [
+    'https://www.consexvip.cl',
+    'https://consexvip.cl',
+    'http://localhost:4321',
+];
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (in_array($origin, $allowedOrigins, true)) {
+    header("Access-Control-Allow-Origin: $origin");
+    header('Access-Control-Allow-Credentials: true');
+    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization');
+    header('Access-Control-Expose-Headers: X-RateLimit-Limit, X-RateLimit-Remaining');
+    header('Vary: Origin');
+}
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
+
 // Polyfills para compatibilidad
 if (!function_exists('str_starts_with')) {
     function str_starts_with(string $haystack, string $needle): bool {
@@ -63,8 +83,8 @@ function env($key, $default = null)
 
 // Constantes de base de datos
 define('DB_HOST', env('DB_HOST', 'localhost'));
-define('DB_NAME', env('DB_NAME', 'kimi_app'));
-define('DB_USER', env('DB_USER', 'kimi_app'));
+define('DB_NAME', env('DB_NAME', 'consexvip_app'));
+define('DB_USER', env('DB_USER', 'consexvip_app'));
 define('DB_PASS', env('DB_PASS', ''));
 define('DB_CHARSET', env('DB_CHARSET', 'utf8mb4'));
 
@@ -80,10 +100,11 @@ function getDBConnection(): PDO
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES   => false,
-            PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES " . DB_CHARSET . "; SET time_zone = '+00:00'"
         ];
         try {
             $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+            $pdo->exec("SET NAMES " . DB_CHARSET);
+            // $pdo->exec("SET time_zone = '+00:00'");
         } catch (PDOException $e) {
             throw new PDOException($e->getMessage(), (int)$e->getCode());
         }
@@ -204,7 +225,7 @@ function requireAuth(): array
         jsonError('Token inválido o expirado', 401);
     }
 
-    // Admin actuando como escort
+    // Admin actuando como escort (solo lectura del id; se audita y NO hereda rol)
     if (in_array($payload['tipo'] ?? '', ['admin', 'superadmin', 'moderador'])) {
         $actingAs = (int)($_GET['acting_as'] ?? $_POST['acting_as'] ?? 0);
         if ($actingAs > 0) {
@@ -213,11 +234,22 @@ function requireAuth(): array
                 $stmt = $pdo->prepare("SELECT id, eliminada FROM escorts WHERE id = ?");
                 $stmt->execute([$actingAs]);
                 $escort = $stmt->fetch(PDO::FETCH_ASSOC);
-                if ($escort) {
+                if ($escort && (int)$escort['eliminada'] !== 1) {
+                    $adminId = (int)($payload['id'] ?? 0);
                     $payload['id'] = (int)$escort['id'];
                     $payload['tipo'] = 'escort';
                     $payload['email'] = '';
-                    $payload['admin_acting'] = true;
+                    unset($payload['rol'], $payload['role']);
+                    $payload['admin_acting'] = $adminId;
+                    // Auditoría en mutaciones (GET de lectura no se registra)
+                    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') {
+                        try {
+                            $pdo->prepare("INSERT INTO logs_auditoria (usuario_id, escort_id, accion, tabla_afectada, registro_id, datos_nuevos, ip_address) VALUES (?, ?, 'acting_as', 'escorts', ?, ?, ?)")
+                                ->execute([$adminId, (int)$escort['id'], (int)$escort['id'], json_encode(['uri' => $_SERVER['REQUEST_URI'] ?? '']), $_SERVER['REMOTE_ADDR'] ?? null]);
+                        } catch (Throwable $auditErr) {
+                            error_log('acting_as audit error: ' . $auditErr->getMessage());
+                        }
+                    }
                 }
             } catch (Throwable $e) {
                 error_log("requireAuth acting_as error: " . $e->getMessage());
@@ -225,12 +257,29 @@ function requireAuth(): array
         }
     }
 
+    // Revocación: el token debe coincidir con la versión vigente de la cuenta
+    // (logout la incrementa). Sin tv en el payload se acepta (compatibilidad).
+    if (isset($payload['tv'])) {
+        try {
+            $tipo = $payload['tipo'] ?? '';
+            $rol = $payload['rol'] ?? $payload['role'] ?? '';
+            $tvTabla = $tipo === 'usuario' ? 'usuarios'
+                : ($tipo === 'escort' ? 'escorts'
+                : (in_array($rol, ['admin', 'superadmin', 'moderador'], true) ? 'admins' : null));
+            if ($tvTabla !== null) {
+                $pdo = getDBConnection();
+                $vigente = getTokenVersion($pdo, $tvTabla, (int)($payload['id'] ?? 0));
+                if ($vigente !== null && $vigente !== (int)$payload['tv']) {
+                    jsonError('Sesión revocada', 401);
+                }
+            }
+        } catch (Throwable $e) {
+            error_log('token version check: ' . $e->getMessage());
+        }
+    }
+
     return $payload;
 }
-
-/**
- * Requiere autenticación de administrador.
- */
 function requireAdminAuth(): array
 {
     $payload = requireAuth();
@@ -289,6 +338,12 @@ function requireEscortAuth(): array
 {
     $payload = requireAuth();
 
+    // El token debe ser de escort (acting_as ya reescribe tipo a 'escort').
+    // Evita confusión cross-role por colisión numérica de IDs.
+    if (($payload['tipo'] ?? '') !== 'escort') {
+        jsonError('Se requiere autenticación de escort', 401);
+    }
+
     try {
         $pdo = getDBConnection();
         $stmt = $pdo->prepare("SELECT eliminada FROM escorts WHERE id = ?");
@@ -306,6 +361,57 @@ function requireEscortAuth(): array
     return $payload;
 }
 
+/**
+ * Verificación estricta de un token de escort, para endpoints que autentican
+ * con `verifyToken()` en lugar de `requireAuth()`.
+ *
+ * Añade las comprobaciones que faltaban:
+ *  - el token debe ser de tipo 'escort' (evita el cross-role por colisión de IDs:
+ *    un token de usuario/admin con el mismo id numérico no puede entrar aquí);
+ *  - revocación por token_version (igual que requireAuth), para que un logout
+ *    invalide el token;
+ *  - la cuenta no puede estar eliminada.
+ *
+ * Devuelve el payload o null (el llamante ya gestiona el 401).
+ */
+function verifyEscortToken(string $token): ?array
+{
+    $payload = verifyToken($token);
+    if (!$payload) return null;
+
+    if (($payload['tipo'] ?? '') !== 'escort') {
+        return null;
+    }
+
+    $escortId = (int)($payload['id'] ?? 0);
+    if ($escortId <= 0) return null;
+
+    try {
+        $pdo = getDBConnection();
+
+        // Revocación (token_version) si el token la trae
+        if (isset($payload['tv'])) {
+            $vigente = getTokenVersion($pdo, 'escorts', $escortId);
+            if ($vigente !== null && $vigente !== (int)$payload['tv']) {
+                return null;
+            }
+        }
+
+        // Cuenta eliminada o inexistente
+        $stmt = $pdo->prepare("SELECT eliminada FROM escorts WHERE id = ?");
+        $stmt->execute([$escortId]);
+        $fila = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$fila || (int)$fila['eliminada'] === 1) {
+            return null;
+        }
+    } catch (Throwable $e) {
+        error_log('verifyEscortToken error: ' . $e->getMessage());
+        return null;
+    }
+
+    return $payload;
+}
+
 function validarMIME(string $ruta, array $permitidos): bool {
     if (!file_exists($ruta) || !is_file($ruta)) return false;
     $finfo = finfo_open(FILEINFO_MIME_TYPE);
@@ -316,14 +422,70 @@ function validarMIME(string $ruta, array $permitidos): bool {
 }
 
 /**
+ * Compatibilidad progresiva: asegura que la columna permite_audio exista en planes.
+ * - Idempotentente (verifica INFORMATION_SCHEMA antes de ALTER).
+ * - Fail-safe: nunca debe romper una request por error de DDL.
+ * Permite desplegar código que referencia p.permite_audio sin downtime mientras
+ * la migración SQL se aplica manualmente.
+ */
+function compatEnsurePlanAudioColumn(): void {
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $pdo = getDBConnection();
+        $chk = $pdo->query(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS " .
+            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'planes' AND COLUMN_NAME = 'permite_audio'"
+        );
+        if ((int)(is_array($row = $chk->fetch(PDO::FETCH_NUM)) ? $row[0] : 0) === 0) {
+            $pdo->exec("ALTER TABLE planes ADD COLUMN permite_audio TINYINT(1) NOT NULL DEFAULT 0 AFTER permite_verificacion");
+        }
+    } catch (Throwable $e) {
+        error_log("compatEnsurePlanAudioColumn: " . $e->getMessage());
+    }
+}
+
+/**
+ * Compatibilidad: asegura columna token_version en escorts/usuarios/admins.
+ * Permite revocar sesiones (logout) invalidando tokens anteriores.
+ */
+function compatEnsureTokenVersion(): void
+{
+    static $done = false;
+    if ($done) return;
+    $done = true;
+    try {
+        $pdo = getDBConnection();
+        foreach (['escorts', 'usuarios', 'admins'] as $tabla) {
+            $chk = $pdo->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'token_version'");
+            $chk->execute([$tabla]);
+            if ((int)$chk->fetchColumn() === 0) {
+                $pdo->exec("ALTER TABLE `$tabla` ADD COLUMN token_version INT NOT NULL DEFAULT 0");
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('compatEnsureTokenVersion: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Lee la versión vigente de tokens de una cuenta (0 si no existe columna aún).
+ */
+function getTokenVersion(PDO $pdo, string $tabla, int $id): ?int
+{
+    try {
+        $st = $pdo->prepare("SELECT token_version FROM `$tabla` WHERE id = ?");
+        $st->execute([$id]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return null;
+        return (int)$row['token_version'];
+    } catch (Throwable $e) {
+        return null; // columna aún no migrada: no bloquear
+    }
+}
+/**
  * Rate limiting reutilizable (tabla `rate_limits`).
- * Registra el intento y devuelve ['blocked' => bool, 'remaining' => int].
- * Si el rate limit falla internamente, hace fail-open (nunca bloquea).
- *
- * @param string $endpoint      Identificador único del flujo (ej: 'login_admin')
- * @param int    $max           Máximo de intentos en la ventana
- * @param int    $windowMinutes Duración de la ventana en minutos
- * @param string $extraKey      Clave secundaria opcional (ej: email en minúsculas)
  */
 function rateLimitCheck(string $endpoint, int $max, int $windowMinutes, string $extraKey = ''): array
 {
@@ -362,7 +524,8 @@ function rateLimitCheck(string $endpoint, int $max, int $windowMinutes, string $
 
         return ['blocked' => false, 'remaining' => $max - 1];
     } catch (Throwable $e) {
-        return ['blocked' => false, 'remaining' => $max]; // fail-open
+        error_log('rateLimitCheck error (fail-closed): ' . $e->getMessage());
+        return ['blocked' => true, 'remaining' => 0]; // fail-closed
     }
 }
 
@@ -400,3 +563,9 @@ function rateLimitLogin(string $endpoint, int $max, int $windowMinutes, string $
     }
     return false;
 }
+
+// Helpers SEO (IndexNow, verificación de buscadores)
+require_once __DIR__ . '/lib/seo.php';
+require_once __DIR__ . '/lib/comprobantes.php';
+
+compatEnsurePlanAudioColumn();

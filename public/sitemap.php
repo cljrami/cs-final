@@ -9,7 +9,7 @@ require_once __DIR__ . '/api/bootstrap.php';
 
 // Valores por defecto
 $defaults = [
-    'seo_url'                   => 'https://kimi.zona8.cl',
+    'seo_url'                   => 'https://www.consexvip.cl',
     'sitemap_habilitado'        => '1',
     'sitemap_incluir_escorts'   => '1',
     'sitemap_incluir_ciudades'  => '1',
@@ -63,14 +63,19 @@ try {
 
     $base = rtrim($cfg['seo_url'], '/');
     if ($base === '') {
-        $base = 'https://kimi.zona8.cl';
+        $base = 'https://www.consexvip.cl';
     }
 
     // Conteo de escorts por página estática
     $incluirEscorts  = $cfg['sitemap_incluir_escorts'] === '1';
     $incluirCiudades = $cfg['sitemap_incluir_ciudades'] === '1';
     $incluirPaginas  = $cfg['sitemap_incluir_paginas'] === '1';
+    $incluirArticulos = ($cfg['sitemap_incluir_articulos'] ?? '1') === '1';
     $maxEscorts      = max(0, (int)$cfg['sitemap_max_escorts']);
+
+    // Fecha del sitemap: las páginas estáticas se regeneran en cada build,
+    // así que "ahora" es su fecha real de modificación.
+    $buildDate = date('Y-m-d');
 
     $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
     $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
@@ -78,19 +83,51 @@ try {
     // Home
     $xml .= "  <url>\n";
     $xml .= "    <loc>{$base}/</loc>\n";
+    $xml .= "    <lastmod>{$buildDate}</lastmod>\n";
     $xml .= "    <changefreq>{$cfg['sitemap_freq_home']}</changefreq>\n";
     $xml .= "    <priority>{$cfg['sitemap_priority_home']}</priority>\n";
     $xml .= "  </url>\n";
 
-    // Páginas estáticas
+    // Páginas estáticas indexables (login/registro NO se indexan: van con noindex)
+    // Solo /ciudades y /negocios. /anunciate NO se indexa (landing de banners, no
+    // es lo "estrictamente necesario"). /negocios se emite abajo, condicional a
+    // que existan negocios, para evitar URLs duplicadas y páginas vacías.
     if ($incluirPaginas) {
-        $paginas = ['/login', '/ingresar', '/unirse'];
+        $paginas = ['/ciudades'];
         foreach ($paginas as $p) {
             $xml .= "  <url>\n";
             $xml .= "    <loc>{$base}{$p}</loc>\n";
+            $xml .= "    <lastmod>{$buildDate}</lastmod>\n";
             $xml .= "    <changefreq>{$cfg['sitemap_freq_pagina']}</changefreq>\n";
             $xml .= "    <priority>{$cfg['sitemap_priority_pagina']}</priority>\n";
             $xml .= "  </url>\n";
+        }
+    }
+
+    // Artículos de blog publicados
+    if ($incluirArticulos) {
+        try {
+            $stmtArt = $pdo->query("
+                SELECT slug, published_at, updated_at FROM articulos
+                WHERE estado = 'publicado' AND (published_at IS NULL OR published_at <= NOW())
+                  AND (robots IS NULL OR robots <> 'noindex')
+                ORDER BY published_at DESC LIMIT 500
+            ");
+            foreach ($stmtArt->fetchAll() as $a) {
+                $slug = trim((string)($a['slug'] ?? ''));
+                if ($slug === '') continue;
+                $lastmod = !empty($a['updated_at'])
+                    ? date('Y-m-d', strtotime($a['updated_at']))
+                    : (!empty($a['published_at']) ? date('Y-m-d', strtotime($a['published_at'])) : $buildDate);
+                $xml .= "  <url>\n";
+                $xml .= "    <loc>{$base}/blog/" . rawurlencode($slug) . "</loc>\n";
+                $xml .= "    <lastmod>{$lastmod}</lastmod>\n";
+                $xml .= "    <changefreq>weekly</changefreq>\n";
+                $xml .= "    <priority>0.7</priority>\n";
+                $xml .= "  </url>\n";
+            }
+        } catch (Throwable $e) {
+            // sin artículos: se omite el bloque
         }
     }
 
@@ -100,7 +137,10 @@ try {
         foreach ($stmtCiudades->fetchAll() as $c) {
             $slug = entradaSlug($c['slug'] ?? '', $c['nombre'] ?? '');
             if ($slug === '') continue;
-            $lastmod = isset($c['updated_at']) && $c['updated_at'] ? date('Y-m-d', strtotime($c['updated_at'])) : date('Y-m-d');
+            // Las páginas de ciudad son estáticas y se regeneran en cada build:
+            // la fecha real de modificación es la del build (updated_at de la BD
+            // no cambia cuando se edita un texto SEO).
+            $lastmod = $buildDate;
             $xml .= "  <url>\n";
             $xml .= "    <loc>{$base}/escorts-{$slug}</loc>\n";
             $xml .= "    <lastmod>{$lastmod}</lastmod>\n";
@@ -108,6 +148,30 @@ try {
             $xml .= "    <priority>{$cfg['sitemap_priority_ciudad']}</priority>\n";
             $xml .= "  </url>\n";
         }
+    }
+
+    // Directorio de negocios (listado + fichas)
+    try {
+        $stmtNeg = $pdo->query("SELECT slug, actualizado_en FROM negocios WHERE activo = 1 ORDER BY destacado DESC, nombre ASC");
+        $negocios = $stmtNeg->fetchAll();
+        if ($negocios) {
+            $xml .= "  <url>\n";
+            $xml .= "    <loc>{$base}/negocios</loc>\n";
+            $xml .= "    <changefreq>weekly</changefreq>\n";
+            $xml .= "    <priority>0.7</priority>\n";
+            $xml .= "  </url>\n";
+            foreach ($negocios as $neg) {
+                $lastmod = !empty($neg['actualizado_en']) ? date('Y-m-d', strtotime($neg['actualizado_en'])) : date('Y-m-d');
+                $xml .= "  <url>\n";
+                $xml .= "    <loc>{$base}/negocios/" . $neg['slug'] . "</loc>\n";
+                $xml .= "    <lastmod>{$lastmod}</lastmod>\n";
+                $xml .= "    <changefreq>monthly</changefreq>\n";
+                $xml .= "    <priority>0.6</priority>\n";
+                $xml .= "  </url>\n";
+            }
+        }
+    } catch (Throwable $e) {
+        // sin negocios: se omite el bloque
     }
 
     // Escorts
@@ -129,6 +193,13 @@ try {
             SELECT $selectEsc
             FROM escorts
             WHERE activa = 1 AND estado = 'aprobada'
+              AND EXISTS (
+                  SELECT 1 FROM suscripciones s
+                  JOIN planes p ON p.id = s.plan_id AND p.extra_tipo IS NULL
+                  WHERE s.escort_id = escorts.id
+                    AND s.fecha_aprobacion IS NOT NULL
+                    AND s.estado = 'activa' AND s.fecha_fin >= CURDATE()
+              )
             ORDER BY visitas_perfil DESC
             $limitSql
         ");

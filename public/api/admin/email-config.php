@@ -39,7 +39,7 @@ try {
                 if ($row['clave'] === 'email_from_name' && !empty($row['valor'])) $fromName = $row['valor'];
             }
 
-            $body = mailHeader('Correo de prueba - Kimi');
+            $body = mailHeader('Correo de prueba - ConsexVIP');
             $body .= '<p>Hola,</p>';
             $body .= '<p>Este es un correo de prueba para verificar que el envío de emails del sitio funciona correctamente.</p>';
             $body .= '<p>Si recibes este mensaje, el sistema de correo está operativo.</p>';
@@ -47,7 +47,7 @@ try {
             $body .= '<p class="warning">Enviado el ' . date('d/m/Y H:i:s') . '</p>';
             $body .= mailFooter();
 
-            $sent = sendMail($to, 'Correo de prueba - Kimi', $body);
+            $sent = sendMail($to, 'Correo de prueba - ConsexVIP', $body);
             if ($sent) {
                 echo json_encode(['success' => true, 'message' => 'Correo de prueba enviado a ' . $to]);
             } else {
@@ -98,12 +98,12 @@ try {
             exit;
         }
 
-        echo json_encode(['success' => true, 'message' => 'ConfiguraciíƒÂ³n actualizada']);
+        echo json_encode(['success' => true, 'message' => 'Configuraci?n actualizada']);
         exit;
     }
 
     http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'MíƒÂ©todo no permitido']);
+    echo json_encode(['success' => false, 'error' => 'M?todo no permitido']);
 } catch (PDOException $e) {
     error_log("Error email-config.php: " . $e->getMessage());
     http_response_code(500);

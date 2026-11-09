@@ -3,7 +3,6 @@ import EscortLayout from "../../layouts/EscortLayout.astro";
 import EscortSidebar from "../../components/escort/EscortSidebar";
 import EscortAuthGuard from "../../components/escort/EscortAuthGuard";
 import PerfilForm from "../../components/escort/PerfilForm";
-import AprobacionRequerida from "../../components/escort/AprobacionRequerida";
 ---
 
 <EscortLayout title="Editar Perfil - CS Panel" activePage="perfil">
@@ -11,9 +10,7 @@ import AprobacionRequerida from "../../components/escort/AprobacionRequerida";
 
   <EscortAuthGuard client:load>
     <div class="w-full max-w-full">
-      <AprobacionRequerida client:load>
-        <PerfilForm client:load />
-      </AprobacionRequerida>
+          <PerfilForm client:only="react" />
     </div>
   </EscortAuthGuard>
 </EscortLayout>

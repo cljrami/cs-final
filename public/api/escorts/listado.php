@@ -87,6 +87,8 @@ try {
         COALESCE(NULLIF(e.foto_principal, ''), pf.url) as foto_principal,
     e.vip, e.verificado, e.destacado, e.sticky, e.estado,
     e.disponible_ahora,
+    e.verificado AS verificado_vigente,
+    CASE WHEN e.vip = 1 AND (e.fecha_vip_expira IS NULL OR e.fecha_vip_expira >= NOW()) THEN 1 ELSE 0 END AS vip_vigente,
     e.audio_preview,
     e.visitas_perfil, e.rating, e.total_valoraciones, e.created_at,
         (SELECT MIN(s2.fecha_aprobacion) FROM suscripciones s2 JOIN planes p2 ON p2.id = s2.plan_id WHERE s2.escort_id = e.id AND p2.tipo = 'base' AND s2.fecha_aprobacion IS NOT NULL) as fecha_aprobacion,

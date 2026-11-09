@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import ConfirmModal from '../ui/ConfirmModal';
+import { showToast } from '../ui/Toast';
+import { Skeleton } from '../ui/Skeleton';
 
 interface Historia {
   id: number;
@@ -53,9 +55,11 @@ export default function HistoriasManager() {
   const [loading, setLoading] = useState(true);
   const [uploads, setUploads] = useState<UploadItem[]>([]);
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+  const [successMsg] = useState('');
+  const setSuccessMsg = (m: string) => showToast(m);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [maxVideos, setMaxVideos] = useState(0);
+  const [permiteHistorias, setPermiteHistorias] = useState<boolean | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fotoPrincipal, setFotoPrincipal] = useState('');
 
@@ -71,6 +75,7 @@ export default function HistoriasManager() {
       if (!data.success) throw new Error(data.error || 'Error');
       setHistorias(data.historias || []);
       if (data.maxVideos !== undefined) setMaxVideos(data.maxVideos);
+      if (data.permiteHistorias !== undefined) setPermiteHistorias(!!data.permiteHistorias);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -164,7 +169,7 @@ export default function HistoriasManager() {
 
   const handleFiles = (files: FileList) => {
     if (maxVideos <= 0) {
-      setError('Tu plan no incluye historias. Actualiza tu plan para subir contenido.');
+      setError('Tu plan no incluye Historias 24h. Contrata un plan para subir contenido.');
       return;
     }
     const espacioLibre = maxVideos - historias.length;
@@ -237,11 +242,47 @@ export default function HistoriasManager() {
         </div>
       )}
 
+      {permiteHistorias === false && (
+        <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-2xl p-6 mb-6">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-14 h-14 rounded-2xl bg-gray-800/60 flex items-center justify-center">
+              <i className="fas fa-ban text-gray-500 text-3xl"></i>
+            </div>
+            <div className="flex-1">
+              <h2 className="text-white font-bold text-xl mb-1">Tu plan no incluye Historias 24h</h2>
+              <p className="text-gray-400 text-sm">Tu plan actual no permite publicar historias.</p>
+            </div>
+          </div>
+          <div className="bg-[#232335] rounded-xl p-4">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center shrink-0">
+                <i className="fas fa-arrow-up text-gray-500"></i>
+              </div>
+              <div className="flex-1">
+                <div className="text-white font-semibold mb-1">Contrata plan</div>
+                <div className="text-gray-400 text-sm mb-4 leading-relaxed">
+                  Los planes superiores incluyen la opción de publicar historias. Contrata plan para acceder a esta función premium.
+                </div>
+                <a
+                  href="/micuenta/mi-plan"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-semibold transition-all"
+                >
+                  <i className="fas fa-arrow-right"></i>
+                  Ver planes disponibles
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {permiteHistorias !== false && (
+        <>
       <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl p-5">
-          <p className="text-gray-400 text-sm font-medium mb-4 flex items-center gap-2">
-            <i className="fas fa-eye text-blue-400"></i>
-            Así te verán tus clientes
-          </p>
+        <p className="text-gray-400 text-sm font-medium mb-4 flex items-center gap-2">
+          <i className="fas fa-eye text-blue-400"></i>
+          Así te verán tus clientes
+        </p>
           <div className="flex items-center gap-4 overflow-x-auto pb-2 scrollbar-thin">
             <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 p-0.5 cursor-pointer hover:scale-105 transition-transform">
@@ -332,7 +373,7 @@ export default function HistoriasManager() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {loading ? (
             Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="aspect-[9/16] rounded-2xl bg-gray-800 animate-pulse" />
+              <Skeleton key={i} borderRadius="1rem" />
             ))
           ) : historias.length === 0 && uploads.length === 0 ? (
             <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-500">
@@ -432,6 +473,8 @@ export default function HistoriasManager() {
           )}
         </div>
       </div>
+        </>
+      )}
 
       <ConfirmModal
         isOpen={deleteId !== null}

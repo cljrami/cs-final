@@ -28,7 +28,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || !isset($tokenData['exp']) || $tokenData['exp'] < time()) {
         http_response_code(401);
@@ -58,16 +58,26 @@ try {
             s.moneda,
             s.comprobante_pago,
             s.creado_en,
-            (SELECT id FROM pagos WHERE escort_id = s.escort_id AND concepto = 'plan' ORDER BY creado_en DESC LIMIT 1) AS pago_id,
+            (
+                SELECT p.id FROM pagos p
+                WHERE p.escort_id = s.escort_id AND p.suscripcion_id = s.id
+                ORDER BY p.creado_en DESC LIMIT 1
+            ) AS pago_id,
+            (
+                SELECT p.comprobante_url FROM pagos p
+                WHERE p.escort_id = s.escort_id AND p.suscripcion_id = s.id
+                ORDER BY p.creado_en DESC LIMIT 1
+            ) AS pago_comprobante,
             p.nombre as plan_nombre,
             p.slug as plan_slug,
             p.tipo as plan_tipo,
             p.duracion_dias as plan_duracion,
             p.max_fotos,
             p.max_videos,
-            p.permite_vip,
-            p.permite_destacado,
-            p.uso_unico,
+             p.permite_vip,
+             p.permite_destacado,
+             p.permite_audio,
+             p.uso_unico,
             p.badge as plan_badge,
             p.color_badge,
             p.max_pausas_permitidas,
@@ -153,6 +163,7 @@ try {
     $puedePausar = false;
     $puedeReactivar = false;
     $motivoNoPausar = '';
+    $esGratis = ((int)$suscripcion['uso_unico'] === 1) || ((float)$suscripcion['precio_pagado'] === 0.0);
 
     // Plazo para usar pausas (desde la primera pausa, calendario real)
     $plazoPausas = plan_plazo_pausas($pdo, (int)$suscripcion['suscripcion_id'], $diasTotales);
@@ -174,11 +185,16 @@ try {
             $puedePausar = false;
             $motivoNoPausar = 'Límite de ' . $suscripcion['max_pausas_permitidas'] . ' pausas alcanzado';
         }
-        if ($puedePausar && $plazoPausas['vencido']) {
-            $puedePausar = false;
-            $motivoNoPausar = 'Tu plazo para usar pausas venció el ' . date('d/m/Y', strtotime($plazoPausas['limite']));
-        }
-    } elseif ($estadoCalculado === 'expirada') {
+if ($puedePausar && $plazoPausas['vencido']) {
+             $puedePausar = false;
+             $motivoNoPausar = 'Tu plazo para usar pausas vencio el ' . date('d/m/Y', strtotime($plazoPausas['limite']));
+         }
+         // Free plan cannot pause
+         if ($esGratis) {
+             $puedePausar = false;
+             $motivoNoPausar = 'El plan gratuito no permite pausar';
+         }
+     } elseif ($estadoCalculado === 'expirada') {
         $porcentajeUsado = 100;
         $motivoNoPausar = 'Tu plan ha expirado';
     } elseif ($estadoCalculado === 'pendiente_aprobacion') {
@@ -215,6 +231,10 @@ try {
     $fechaFinFmt = $suscripcion['fecha_fin'] ? date('d/m/Y', strtotime($suscripcion['fecha_fin'])) : null;
     $fechaPausaFmt = !empty($suscripcion['fecha_pausa']) ? date('d/m/Y', strtotime($suscripcion['fecha_pausa'])) : null;
     $finProyectadaFmt = $fechaFinProyectada ? date('d/m/Y', strtotime($fechaFinProyectada)) : null;
+    $comprobantePago = comprobante_url($suscripcion['pago_comprobante'] ?? null);
+    if (!$comprobantePago) {
+        $comprobantePago = comprobante_url($suscripcion['comprobante_pago'] ?? null);
+    }
 
     $escortCheck = $pdo->prepare("SELECT email FROM escorts WHERE id = ?");
     $escortCheck->execute(array($escortId));
@@ -251,6 +271,7 @@ try {
             'max_videos' => (int)$suscripcion['max_videos'],
             'permite_vip' => (bool)$suscripcion['permite_vip'],
             'permite_destacado' => (bool)$suscripcion['permite_destacado'],
+            'permite_audio' => (bool)$suscripcion['permite_audio'],
             'uso_unico' => (bool)$suscripcion['uso_unico'],
         ),
         'estado' => array(
@@ -283,7 +304,7 @@ try {
             'id' => (int)$suscripcion['pago_id'],
             'precio' => (float)$suscripcion['precio_pagado'],
             'moneda' => $suscripcion['moneda'],
-            'comprobante' => $suscripcion['comprobante_pago'],
+            'comprobante' => $comprobantePago,
         ),
         'ya_uso_gratis' => $yaUsoGratis,
         'puede_comprar' => $puedeComprar,

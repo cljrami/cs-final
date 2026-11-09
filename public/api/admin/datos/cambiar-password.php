@@ -1,5 +1,5 @@
 <?php
-// POST: cambiar contraseíƒÂ±a del admin autenticado
+// POST: cambiar contrase?a del admin autenticado
 
 header('Content-Type: application/json');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
@@ -14,7 +14,7 @@ try {
     $adminId = intval($tokenData['id'] ?? 0);
     if ($adminId <= 0) {
         http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Token invíƒÂ¡lido']);
+        echo json_encode(['success' => false, 'error' => 'Token inv?lido']);
         exit;
     }
 
@@ -27,16 +27,16 @@ try {
     $errors = [];
 
     if (strlen($nueva) < 8) {
-        $errors['passNueva'] = 'MíƒÂ­nimo 8 caracteres';
+        $errors['passNueva'] = 'M?nimo 8 caracteres';
     }
 
-    // Verificar contraseíƒÂ±a actual
+    // Verificar contrase?a actual
     $stmt = $pdo->prepare("SELECT password_hash FROM admins WHERE id = ?");
     $stmt->execute([$adminId]);
     $admin = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$admin || !password_verify($actual, $admin['password_hash'])) {
-        $errors['passActual'] = 'ContraseíƒÂ±a actual incorrecta';
+        $errors['passActual'] = 'Contrase?a actual incorrecta';
     }
 
     if (!empty($errors)) {
@@ -49,7 +49,7 @@ try {
     $update = $pdo->prepare("UPDATE admins SET password_hash = ? WHERE id = ?");
     $update->execute([$hashed, $adminId]);
 
-    echo json_encode(['success' => true, 'message' => 'ContraseíƒÂ±a cambiada']);
+    echo json_encode(['success' => true, 'message' => 'Contrase?a cambiada']);
 } catch (Throwable $e) {
     error_log("Error admin/datos/cambiar-password.php: " . $e->getMessage());
     http_response_code(500);

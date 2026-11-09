@@ -1,6 +1,15 @@
 User-agent: *
 Allow: /
-Disallow: /admin/
+# API JSON: no es contenido indexable
 Disallow: /api/
-Disallow: /micuenta/
-Sitemap: https://kimi.zona8.cl/sitemap.xml
+# Panel administrador: no es contenido indexable
+Disallow: /admin/
+# Comprobantes y verificaciones subidos (archivos protegidos)
+Disallow: /uploads/comprobantes/
+Disallow: /uploads/verificaciones/
+# Páginas privadas (paneles de cuenta, login, registro, perfil, pausado,
+# anuncio, ciudad legado, 404): se PERMITE el rastreo para que Google vea
+# su etiqueta meta noindex y las retire del índice. No están en el sitemap.
+# Allow: /micuenta/login
+# Allow: /micuenta/registro
+Sitemap: https://www.consexvip.cl/sitemap.xml

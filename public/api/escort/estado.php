@@ -24,7 +24,7 @@ if (empty($token)) {
 // Decodificar token (mismo formato que en escortAuth.ts)
 $escort_id = null;
 try {
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
     if (!$tokenData || !isset($tokenData['id']) || !isset($tokenData['exp'])) {
         throw new Exception('Token inválido');
     }

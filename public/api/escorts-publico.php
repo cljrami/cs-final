@@ -20,9 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 try {
     require_once __DIR__ . '/bootstrap.php';
+    require_once __DIR__ . '/lib/escort_status.php';
 
     $pdo = getDBConnection();
-    // â”€â”€â”€ IDENTIFICADOR DE LA ESCORT â”€â”€â”€
+    // --- IDENTIFICADOR DE LA ESCORT ---
     $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
     $slug = isset($_GET['slug']) ? trim($_GET['slug']) : '';
 
@@ -32,7 +33,7 @@ try {
         exit;
     }
 
-    // â”€â”€â”€ CONDICIONES DE VISIBILIDAD â”€â”€â”€
+    // --- CONDICIONES DE VISIBILIDAD ---
     // La escort debe estar activa y tener suscripción aprobada
     $whereId = $id > 0 ? 'e.id = :id' : 'e.slug = :slug';
     $params = $id > 0 ? [':id' => $id] : [':slug' => $slug];
@@ -115,12 +116,44 @@ try {
         exit;
     }
 
-    // â”€â”€â”€ INCREMENTAR VISITAS â”€â”€â”€
-    $updVisitas = $pdo->prepare("UPDATE escorts SET visitas_perfil = visitas_perfil + 1 WHERE id = ?");
-    $updVisitas->execute([$escort['id']]);
-    $escort['visitas_perfil']++;
+    // --- INCREMENTAR VISITAS ---
+    $countVisit = true;
+    $ua = strtolower($_SERVER['HTTP_USER_AGENT'] ?? '');
+    $botPatterns = ['bot', 'crawler', 'spider', 'curl', 'wget', 'python-requests', 'postman', 'httpclient', 'scrapy', 'phantomjs', 'headless'];
+    foreach ($botPatterns as $bp) {
+        if (strpos($ua, $bp) !== false) {
+            $countVisit = false;
+            break;
+        }
+    }
+    if ($countVisit) {
+        $headers = getallheaders();
+        $authHeader = $headers['Authorization'] ?? '';
+        if (str_starts_with($authHeader, 'Bearer ')) {
+            $tokenStr = substr($authHeader, 7);
+            try {
+                $tokenPayload = verifyToken($tokenStr);
+                if ($tokenPayload && is_array($tokenPayload)) {
+                    $tipo = $tokenPayload['tipo'] ?? ($tokenPayload['role'] ?? '');
+                    $tokenId = intval($tokenPayload['id'] ?? 0);
+                    if (in_array($tipo, ['admin','superadmin','moderador']) || in_array(($tokenPayload['rol'] ?? ''), ['admin','superadmin','moderador'])) {
+                        $countVisit = false;
+                    } elseif ($tipo === 'escort' && $tokenId === (int)$escort['id']) {
+                        $countVisit = false;
+                    }
+                }
+            } catch (Throwable $e) {
+                // ignorar errores de token; contar como visita normal
+            }
+        }
+    }
+    if ($countVisit) {
+        $updVisitas = $pdo->prepare("UPDATE escorts SET visitas_perfil = visitas_perfil + 1 WHERE id = ?");
+        $updVisitas->execute([$escort['id']]);
+        $escort['visitas_perfil'] = (int)($escort['visitas_perfil'] ?? 0) + 1;
+    }
 
-    // â”€â”€â”€ SERVICIOS (solo incluidos, sin precios) â”€â”€â”€
+    // --- SERVICIOS (solo incluidos, sin precios) ---
     $servStmt = $pdo->prepare("
         SELECT 
             s.id,
@@ -160,17 +193,17 @@ try {
     }
     $serviciosAgrupados = array_values($serviciosAgrupados);
 
-    // â”€â”€â”€ GALERÍA DE FOTOS â”€â”€â”€
+    // --- GALERÍA DE FOTOS ---
     $fotosStmt = $pdo->prepare("
         SELECT id, url, tipo, es_portada, orden
         FROM escort_fotos
         WHERE escort_id = ? AND tipo = 'publica'
-        ORDER BY es_portada DESC, orden ASC
+        ORDER BY orden ASC, id ASC
     ");
     $fotosStmt->execute([$escort['id']]);
     $fotos = $fotosStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // â”€â”€â”€ HISTORIAS (solo si no expiraron) â”€â”€â”€
+    // --- HISTORIAS (solo si no expiraron) ---
     $histStmt = $pdo->prepare("
         SELECT id, url, tipo, expira_en, vistas
         FROM escort_historias
@@ -180,7 +213,7 @@ try {
     $histStmt->execute([$escort['id']]);
     $historias = $histStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // â”€â”€â”€ HORARIOS â”€â”€â”€
+    // --- HORARIOS ---
     $horStmt = $pdo->prepare("
         SELECT dia_semana, hora_inicio, hora_fin, disponible
         FROM escort_horarios
@@ -200,7 +233,18 @@ try {
         ];
     }
 
-    // â”€â”€â”€ VALORACIONES (aprobadas) â”€â”€â”€
+    // Calcular plan_vencido y estados efectivos
+    $suscripcionBase = null;
+    if (!empty($escort['plan_vence'])) {
+        $suscripcionBase = [
+            'estado' => 'activa',
+            'fecha_fin' => $escort['plan_vence']
+        ];
+    }
+    $planVencido = getPlanVencidoFromSubscription($suscripcionBase);
+    $efectivo = getEscortEffectiveStatus($escort, $planVencido, true);
+
+    // --- VALORACIONES (aprobadas) ---
     $valStmt = $pdo->prepare("
         SELECT 
             v.id,
@@ -218,22 +262,22 @@ try {
     $valStmt->execute([$escort['id']]);
     $valoraciones = $valStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // â”€â”€â”€ BADGES â”€â”€â”€
+    // --- BADGES (usar estados efectivos) ---
     $badges = [];
-    if ($escort['verificado']) {
+    if ($efectivo['verificado_vigente']) {
         $badges[] = ['tipo' => 'verificado', 'texto' => 'Verificada', 'icono' => 'check-circle', 'color' => '#10b981'];
     }
-    if ($escort['vip']) {
+    if ($efectivo['vip_vigente']) {
         $badges[] = ['tipo' => 'vip', 'texto' => 'VIP', 'icono' => 'crown', 'color' => '#f59e0b'];
     }
-    if ($escort['destacado']) {
+    if ($efectivo['destacado_vigente']) {
         $badges[] = ['tipo' => 'destacado', 'texto' => 'Destacada', 'icono' => 'star', 'color' => '#6366f1'];
     }
     if ($escort['video_presentacion']) {
         $badges[] = ['tipo' => 'video', 'texto' => 'Video', 'icono' => 'video', 'color' => '#ec4899'];
     }
 
-    // â”€â”€â”€ CONSTRUIR RESPUESTA â”€â”€â”€
+    // --- CONSTRUIR RESPUESTA ---
     $perfil = [
         'id' => (int)$escort['id'],
         'nombre' => $escort['nombre'],
@@ -270,6 +314,13 @@ try {
             'total_fotos' => count($fotos)
         ],
         'estado' => $escort['estado'],
+        // Estados efectivos (consideran plan vencido)
+        'verificado_vigente' => $efectivo['verificado_vigente'],
+        'vip_vigente' => $efectivo['vip_vigente'],
+        'destacado_vigente' => $efectivo['destacado_vigente'],
+        'sticky_vigente' => $efectivo['sticky_vigente'],
+        'activa_vigente' => $efectivo['activa_vigente'],
+        'plan_vencido' => $efectivo['plan_vencido'],
         'badges' => $badges,
         'stats' => [
             'rating' => (float)$escort['rating'],

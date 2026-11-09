@@ -155,7 +155,7 @@ try {
                 }
                 $body .= '</table>';
                 $body .= '<p style="text-align:center;margin-top:24px"><a class="btn" href="' . SITE_URL . '/admin/reportes">Revisar reporte</a></p>';
-                sendAdminNotification('reportes', 'Nuevo reporte en Kimi', $body);
+                sendAdminNotification('reportes', 'Nuevo reporte en ConsexVIP', $body);
             } catch (\Throwable $e2) {
                 error_log("reportes.php notify error: " . $e2->getMessage());
             }

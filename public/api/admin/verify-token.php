@@ -37,6 +37,19 @@ try {
         exit;
     }
 
+    // Solo tokens con rol administrativo (antes validaba cualquier token
+    // y hasta asumía rol='admin' por defecto).
+    $rol = $payload['rol'] ?? $payload['role'] ?? '';
+    if (!in_array($rol, ['admin', 'superadmin', 'moderador'], true)) {
+        http_response_code(403);
+        echo json_encode([
+            'success' => false,
+            'valid' => false,
+            'error' => 'Sin rol administrativo'
+        ]);
+        exit;
+    }
+
     echo json_encode([
         'success' => true,
         'valid' => true,
@@ -44,7 +57,7 @@ try {
             'id' => $payload['id'] ?? null,
             'email' => $payload['email'] ?? null,
             'nombre' => $payload['nombre'] ?? null,
-            'rol' => $payload['rol'] ?? $payload['role'] ?? 'admin',
+            'rol' => $rol,
             'exp' => $payload['exp']
         ]
     ]);

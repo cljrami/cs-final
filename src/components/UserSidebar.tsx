@@ -81,9 +81,17 @@ export default function UserSidebar({ activePage = 'dashboard' }: UserSidebarPro
         <div className="p-3 border-t border-escort-border">
           <button
             onClick={() => {
-              localStorage.removeItem('usuario_token');
-              localStorage.removeItem('usuario_data');
-              window.location.href = '/ingresar';
+              const token = localStorage.getItem('usuario_token');
+              const salir = () => {
+                localStorage.removeItem('usuario_token');
+                localStorage.removeItem('usuario_data');
+                window.location.href = '/ingresar';
+              };
+              if (!token) { salir(); return; }
+              fetch('/api/auth/logout.php', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token }
+              }).catch(() => {}).finally(salir);
             }}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-500 hover:text-red-400 hover:bg-red-500/5 w-full transition-all"
           >

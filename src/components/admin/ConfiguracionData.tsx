@@ -22,6 +22,17 @@ export default function ConfiguracionData() {
     precio_vip: '10000',
     moneda_vip: 'CLP',
     duracion_vip_dias: '30',
+    google_analytics_id: '',
+    banner_etiqueta_publicidad: 'Publicidad',
+    banner_tarifa_home_top: '15000',
+    banner_tarifa_perfil_top: '15000',
+    banner_tarifa_duracion_dias: '7',
+    banner_moneda: 'CLP',
+    share_site_name: 'Consexvip',
+    share_whatsapp_template: 'Te recomiendo el perfil de {nombre} en {site_name}',
+    share_twitter_template: 'Te recomiendo el perfil de {nombre} en {site_name}',
+    share_telegram_template: 'Te recomiendo el perfil de {nombre} en {site_name}',
+    chat_whatsapp_template: 'Hola, vi tu perfil en {site_name}. Me interesa conocer más sobre {nombre}.',
   });
 
   useEffect(() => {
@@ -40,6 +51,17 @@ export default function ConfiguracionData() {
             precio_vip: data.config.precio_vip?.valor || '10000',
             moneda_vip: data.config.moneda_vip?.valor || 'CLP',
             duracion_vip_dias: data.config.duracion_vip_dias?.valor || '30',
+            google_analytics_id: data.config.google_analytics_id?.valor || '',
+            banner_etiqueta_publicidad: data.config.banner_etiqueta_publicidad?.valor || 'Publicidad',
+            banner_tarifa_home_top: data.config.banner_tarifa_home_top?.valor || '15000',
+            banner_tarifa_perfil_top: data.config.banner_tarifa_perfil_top?.valor || '15000',
+            banner_tarifa_duracion_dias: data.config.banner_tarifa_duracion_dias?.valor || '7',
+            banner_moneda: data.config.banner_moneda?.valor || 'CLP',
+            share_site_name: data.config.share_site_name?.valor || 'Consexvip',
+            share_whatsapp_template: data.config.share_whatsapp_template?.valor || 'Te recomiendo el perfil de {nombre} en {site_name}',
+            share_twitter_template: data.config.share_twitter_template?.valor || 'Te recomiendo el perfil de {nombre} en {site_name}',
+            share_telegram_template: data.config.share_telegram_template?.valor || 'Te recomiendo el perfil de {nombre} en {site_name}',
+            chat_whatsapp_template: data.config.chat_whatsapp_template?.valor || 'Hola, vi tu perfil en {site_name}. Me interesa conocer más sobre {nombre}.',
           });
         } else {
           setError(data.error || 'Error');
@@ -154,6 +176,126 @@ export default function ConfiguracionData() {
                   />
                 )}
                 <p className="text-gray-500 text-xs mt-1">0 = Permanente (no expira)</p>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Google Analytics (gtag.js)</label>
+                <p className="text-xs text-gray-500 mb-2">
+                  {loading ? <Skeleton width={200} height={14} /> : config?.google_analytics_id?.descripcion}
+                </p>
+                {loading ? (
+                  <Skeleton height={42} className="w-full rounded-lg" />
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="G-XXXXXXXXXX"
+                    value={formData.google_analytics_id}
+                    onChange={(e) => setFormData({ ...formData, google_analytics_id: e.target.value })}
+                    className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                  />
+                )}
+                <p className="text-gray-500 text-xs mt-1">
+                  Pega el ID de medición de Google Analytics 4. Se activa en todo el sitio al guardar. Déjalo vacío para desactivar las analíticas.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Publicidad (banners)</label>
+                <p className="text-xs text-gray-500 mb-2">Tarifario referencial para cotizar los espacios publicitarios y etiqueta que se muestra bajo cada banner.</p>
+                <div className="space-y-3">
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Etiqueta bajo el banner</label>
+                      <input
+                        type="text"
+                        value={formData.banner_etiqueta_publicidad}
+                        onChange={(e) => setFormData({ ...formData, banner_etiqueta_publicidad: e.target.value })}
+                        className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Días por campaña</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.banner_tarifa_duracion_dias}
+                        onChange={(e) => setFormData({ ...formData, banner_tarifa_duracion_dias: e.target.value })}
+                        className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {([
+                      ['banner_tarifa_home_top', 'Home · banner superior'],
+                      ['banner_tarifa_perfil_top', 'Perfil · superior'],
+                    ] as const).map(([key, label]) => (
+                      <div key={key}>
+                        <label className="block text-xs text-gray-500 mb-1">{label}</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData[key]}
+                          onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
+                          className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Mensaje de chat WhatsApp</label>
+                <p className="text-xs text-gray-500 mb-2">Texto prellenado al abrir chat directo con la escort desde el perfil público. Usa {'{nombre}'} y {'{site_name}'}.</p>
+                <input
+                  type="text"
+                  value={formData.chat_whatsapp_template}
+                  onChange={(e) => setFormData({ ...formData, chat_whatsapp_template: e.target.value })}
+                  className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Mensajes de compartir</label>
+                <p className="text-xs text-gray-500 mb-2">Plantillas usadas en el modal de compartir del perfil público. Usa {'{nombre}'} y {'{site_name}'} como variables.</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Nombre del sitio</label>
+                    <input
+                      type="text"
+                      value={formData.share_site_name}
+                      onChange={(e) => setFormData({ ...formData, share_site_name: e.target.value })}
+                      className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">WhatsApp</label>
+                    <input
+                      type="text"
+                      value={formData.share_whatsapp_template}
+                      onChange={(e) => setFormData({ ...formData, share_whatsapp_template: e.target.value })}
+                      className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">X / Twitter</label>
+                    <input
+                      type="text"
+                      value={formData.share_twitter_template}
+                      onChange={(e) => setFormData({ ...formData, share_twitter_template: e.target.value })}
+                      className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Telegram</label>
+                    <input
+                      type="text"
+                      value={formData.share_telegram_template}
+                      onChange={(e) => setFormData({ ...formData, share_telegram_template: e.target.value })}
+                      className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="pt-2">

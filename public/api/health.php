@@ -2,14 +2,15 @@
 header('Content-Type: application/json');
 header('Cache-Control: no-store, no-cache, must-revalidate');
 
-require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/bootstrap.php';
 
 try {
     $pdo = getDBConnection();
     $stmt = $pdo->query("SELECT 1");
     $dbStatus = $stmt ? 'connected' : 'error';
 } catch (Throwable $e) {
-    $dbStatus = 'error: ' . $e->getMessage();
+    error_log('health check db error: ' . $e->getMessage());
+    $dbStatus = 'error';
 }
 
 $status = ($dbStatus === 'connected') ? 'ok' : 'degraded';

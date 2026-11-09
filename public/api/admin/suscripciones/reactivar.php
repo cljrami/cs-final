@@ -30,7 +30,7 @@ try {
     $db = getDBConnection();
     $db->beginTransaction();
 
-    // Verificar suscripciíƒÂ³n pausada
+    // Verificar suscripci?n pausada
     $check = $db->prepare("
         SELECT s.*, e.nombre as escort_nombre, p.nombre as plan_nombre,
                p.duracion_dias, p.tipo as plan_tipo
@@ -108,7 +108,7 @@ try {
         $_SERVER['REMOTE_ADDR'] ?? null
     ]);
 
-    // Log auditoríƒÂ­a
+    // Log auditor?a
     $log = $db->prepare("
         INSERT INTO logs_auditoria 
         (usuario_id, escort_id, accion, tabla_afectada, registro_id, datos_nuevos, ip_address)
@@ -128,7 +128,7 @@ try {
         $_SERVER['REMOTE_ADDR'] ?? null
     ]);
 
-    // NotificaciíƒÂ³n
+    // Notificaci?n
     $notif = $db->prepare("
         INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url)
         VALUES (?, 'sistema', 'Plan reactivado', ?, '/panel/mi-plan')

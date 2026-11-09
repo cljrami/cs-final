@@ -25,21 +25,21 @@ export default function NuevasCiudad() {
 
   if (!loading && escorts.length === 0) return null;
 
-  const titulo = texts.seccion_nuevas_titulo || 'Nuevas en tu ciudad';
+  const titulo = texts?.seccion_nuevas_titulo || 'Nuevas en tu ciudad';
 
   return (
     <section className="py-8">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h2 className="text-ink font-bold text-lg flex items-center gap-2">
-          <i className="fas fa-bolt text-red-400"></i> {titulo}
+          <i className="fas fa-bolt text-red-400"></i> {texts ? titulo : <Skeleton width={140} height={18} inline />}
         </h2>
-        {!loading && <span className="text-muted text-sm">{escorts.length} nuevas</span>}
+        {!loading && <span className="text-muted text-sm">{(texts?.contador_nuevas || '{cantidad} nuevas').replace('{cantidad}', String(escorts.length))}</span>}
       </div>
 
       <div className="relative">
         {loading ? (
           <div className="flex gap-2 pb-2 overflow-hidden">
-            {Array.from({ length: 8 }).map((_, i) => (
+            {Array.from({ length: Math.ceil(AVISOS_CAROUSEL.slidesPerView) }).map((_, i) => (
               <div key={i} className="flex-1 min-w-0 bg-surface rounded-xl overflow-hidden border border-white/5 animate-pulse">
                 <Skeleton className="aspect-[3/4] w-full !rounded-none" />
                 <div className="p-3 space-y-2">

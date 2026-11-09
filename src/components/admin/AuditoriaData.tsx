@@ -68,6 +68,9 @@ export default function AuditoriaData() {
   const [filter, setFilter] = useState('todos');
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [selected, setSelected] = useState<Set<string | number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState<{ ids: (string | number)[]; message: string } | null>(null);
 
   const fetchItems = useCallback(async () => {
     setIsLoading(true);
@@ -96,6 +99,29 @@ export default function AuditoriaData() {
     const timer = setTimeout(() => fetchItems(), 300);
     return () => clearTimeout(timer);
   }, [search, filter, fetchItems]);
+
+  const handleBulkDelete = (sel: Set<string | number>) => {
+    if (sel.size === 0) return;
+    setBulkConfirm({
+      ids: Array.from(sel),
+      message: `Estas a punto de eliminar ${sel.size} registro(s) de auditoria seleccionado(s). Esta accion no se puede deshacer.`,
+    });
+  };
+
+  const confirmBulkDelete = async () => {
+    if (!bulkConfirm) return;
+    const ids = bulkConfirm.ids;
+    setBulkConfirm(null);
+    setBulkDeleting(true);
+    try {
+      for (const id of ids) {
+        await fetch(API_URL, { method: 'DELETE', headers: getAuthHeaders(), body: JSON.stringify({ id: Number(id) }) });
+      }
+      setSelected(new Set());
+      fetchItems(); window.dispatchEvent(new Event('counts-refresh'));
+    } catch (err: any) { setError(err.message); }
+    finally { setBulkDeleting(false); }
+  };
 
   const handleEliminar = async (id: number) => {
     setDeleting(true);
@@ -238,7 +264,23 @@ export default function AuditoriaData() {
         emptyMessage={search ? 'No se encontraron registros' : 'No hay registros de auditoría'}
         emptyIcon="fa-history"
         getRowKey={(item) => item.id}
+        selectable
+        selected={selected}
+        onSelectionChange={setSelected}
+        onBulkDelete={handleBulkDelete}
         getActions={getActions}
+      />
+
+      <ConfirmModal
+        isOpen={bulkConfirm !== null}
+        title="Eliminar seleccionados"
+        message={bulkConfirm?.message || ''}
+        confirmText={bulkDeleting ? 'Eliminando...' : 'Eliminar'}
+        cancelText="Cancelar"
+        variant="danger"
+        confirmDisabled={bulkDeleting}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkConfirm(null)}
       />
 
       <ConfirmModal

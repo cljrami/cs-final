@@ -30,6 +30,8 @@ try {
     // Rate limit: máx 8 intentos por IP cada 15 minutos
     rateLimitLogin('login_admin', 8, 15, strtolower($email));
 
+    compatEnsureTokenVersion();
+
     $stmt = $pdo->prepare("SELECT * FROM admins WHERE email = ? AND activo = 1 LIMIT 1");
     $stmt->execute([$email]);
     $admin = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -58,6 +60,7 @@ try {
         'email' => $admin['email'],
         'nombre' => $admin['nombre'],
         'rol' => $admin['rol'],
+        'tv' => (int)($admin['token_version'] ?? 0),
         'exp' => time() + (24 * 60 * 60),
         'rand' => bin2hex(random_bytes(16))
     ]);

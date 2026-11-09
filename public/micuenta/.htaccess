@@ -1,0 +1,5 @@
+#
+# Allow microphone only inside /micuenta/* pages (audio recording for AudioUploader)
+# while the rest of the site keeps microphone=().
+#
+Header always set Permissions-Policy "geolocation=(), microphone=(self), camera=()"

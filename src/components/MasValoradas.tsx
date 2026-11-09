@@ -2,20 +2,34 @@
 import { useState, useEffect } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { FreeMode, Navigation } from 'swiper/modules';
-import 'swiper/css';
-import 'swiper/css/navigation';
-import EscortCard from './EscortCard';
-import { Skeleton } from './ui/Skeleton';
+import swiperCssUrl from 'swiper/css?url';
+import swiperNavCssUrl from 'swiper/css/navigation?url';
+import EscortCircleCard from './EscortCircleCard';
 import { useSiteTexts } from '../hooks/useSiteTexts';
 import { AVISOS_CAROUSEL } from '../lib/carousel';
 import type { Escort } from '../types/escort';
 
-export default function MasValoradas() {
+interface Props {
+  initialTexts?: Record<string, string> | null;
+}
+
+export default function MasValoradas({ initialTexts = null }: Props) {
   const [escorts, setEscorts] = useState<Escort[]>([]);
   const [loading, setLoading] = useState(true);
-  const texts = useSiteTexts();
+  const texts = useSiteTexts(initialTexts);
 
   useEffect(() => {
+    // El CSS de Swiper no debe viajar en el <head> de la home: se inyecta
+    // cuando este island se hidrata (client:visible), fuera de la ruta crítica.
+    [swiperCssUrl, swiperNavCssUrl].forEach((href) => {
+      if (document.querySelector(`link[data-swiper-css="${href}"]`)) return;
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = href;
+      link.dataset.swiperCss = href;
+      document.head.appendChild(link);
+    });
+
     fetch('/api/escorts/listado.php?sort=rating&limit=12')
       .then(r => r.json())
       .then(d => { if (d.success) setEscorts(d.data || []); })
@@ -23,9 +37,12 @@ export default function MasValoradas() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (!loading && escorts.length === 0) return null;
+  // Sin datos no renderizamos un skeleton que luego desaparece: ese colapso
+  // era una de las fuentes de CLS. Si hay perfiles, la sección aparece al
+  // cargar; si no, la página no reserva espacio para un carrusel vacío.
+  if (loading || escorts.length === 0) return null;
 
-  const titulo = texts.seccion_valoradas_titulo || 'Más valoradas';
+  const titulo = texts?.seccion_valoradas_titulo || 'Más valoradas';
 
   return (
     <section className="py-8">
@@ -33,42 +50,26 @@ export default function MasValoradas() {
         <h2 className="text-ink font-bold text-lg flex items-center gap-2">
           <i className="fas fa-star text-amber-400"></i> {titulo}
         </h2>
-        {!loading && <span className="text-muted text-sm">{escorts.length} escorts</span>}
+        <span className="text-muted text-sm">{(texts?.contador_escorts || '{cantidad} escorts').replace('{cantidad}', String(escorts.length))}</span>
       </div>
 
       <div className="relative">
-        {loading ? (
-          <div className="flex gap-2 pb-2 overflow-hidden">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="flex-1 min-w-0 bg-surface rounded-xl overflow-hidden border border-white/5 animate-pulse">
-                <Skeleton className="aspect-[3/4] w-full !rounded-none" />
-                <div className="p-3">
-                  <div className="mb-1.5">
-                    <Skeleton className="w-2/3 h-5 !rounded-md" />
-                  </div>
-                  <Skeleton className="w-1/2 h-3.5 !rounded-md" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <Swiper
-            modules={[FreeMode, Navigation]}
-            freeMode={true}
-            slidesPerView={AVISOS_CAROUSEL.slidesPerView}
-            spaceBetween={8}
-            grabCursor={true}
-            navigation={true}
-            className="pb-2 mas-valoradas-swiper"
-            breakpoints={AVISOS_CAROUSEL.breakpoints}
-          >
-            {escorts.map((e) => (
-              <SwiperSlide key={e.id}>
-                <EscortCard escort={e} />
-              </SwiperSlide>
-            ))}
-          </Swiper>
-        )}
+        <Swiper
+          modules={[FreeMode, Navigation]}
+          freeMode={true}
+          slidesPerView={AVISOS_CAROUSEL.slidesPerView}
+          spaceBetween={8}
+          grabCursor={true}
+          navigation={true}
+          className="pb-2 mas-valoradas-swiper"
+          breakpoints={AVISOS_CAROUSEL.breakpoints}
+        >
+          {escorts.map((e) => (
+            <SwiperSlide key={e.id}>
+              <EscortCircleCard escort={e} />
+            </SwiperSlide>
+          ))}
+        </Swiper>
       </div>
 
       <style>{`

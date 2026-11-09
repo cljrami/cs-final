@@ -29,18 +29,19 @@ export function decodeHtml(input: string | null | undefined): string {
 const ALLOWED_TAGS = [
   'p', 'br', 'span', 'strong', 'b', 'em', 'i', 'u', 's', 'strike',
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'pre', 'code',
-  'ol', 'ul', 'li', 'a', 'img', 'video', 'iframe',
+  'ol', 'ul', 'li', 'a', 'img',
   'table', 'thead', 'tbody', 'tr', 'th', 'td', 'caption',
   'div'
 ];
 
 const ALLOWED_ATTR = [
   'href', 'src', 'alt', 'title', 'target', 'rel',
-  'class', 'style', 'width', 'height', 'align', 'colspan', 'rowspan',
-  'frameborder', 'allowfullscreen', 'type'
+  'class', 'width', 'height', 'align', 'colspan', 'rowspan',
+  'type'
 ];
 
-const URI_RE = new RegExp('^(https?:|mailto:|tel:|#|/|[^a-z]|[a-z+.-]+:)', 'i');
+// Solo esquemas seguros. Sin comodines que acepten javascript:/data:/vbscript:.
+const URI_RE = new RegExp('^(https?:|mailto:|tel:|#|/|[^a-zA-Z])', 'i');
 
 export function sanitizeHtml(dirty: string | null | undefined): string {
   if (!dirty) return '';

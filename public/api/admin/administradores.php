@@ -71,6 +71,21 @@ try {
             exit;
         }
 
+        // No-superadmin: solo su propio perfil (nombre/email/clave), nunca
+        // otros admins ni campos sensibles (rol/activo).
+        if (!$isSuperadmin) {
+            if ($id !== $adminId) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Solo puedes editar tu propio perfil']);
+                exit;
+            }
+            if (isset($input['activo'])) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Solo superadmin puede cambiar el estado']);
+                exit;
+            }
+        }
+
         $fields = [];
         $params = [];
         if (isset($input['nombre'])) { $fields[] = 'nombre = ?'; $params[] = trim($input['nombre']); }

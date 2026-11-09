@@ -4,6 +4,7 @@ import EscortSidebar from "../../components/escort/EscortSidebar";
 import EscortAuthGuard from "../../components/escort/EscortAuthGuard";
 import DatosSeguridad from "../../components/escort/DatosSeguridad";
 import AprobacionRequerida from "../../components/escort/AprobacionRequerida";
+import PlanRequerido from "../../components/escort/PlanRequerido";
 ---
 
 <EscortLayout title="Mis Datos - CS Panel" activePage="datos">
@@ -11,8 +12,10 @@ import AprobacionRequerida from "../../components/escort/AprobacionRequerida";
 
   <EscortAuthGuard client:load>
     <div class="w-full max-w-full">
-      <AprobacionRequerida client:load>
-        <DatosSeguridad client:load />
+      <AprobacionRequerida client:only="react">
+        <PlanRequerido client:only="react">
+          <DatosSeguridad client:only="react" />
+        </PlanRequerido>
       </AprobacionRequerida>
     </div>
   </EscortAuthGuard>

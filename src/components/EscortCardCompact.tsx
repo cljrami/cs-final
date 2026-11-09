@@ -41,7 +41,7 @@ export default function EscortCardCompact({ escort, skeleton = false, priority =
 
   return (
     <a
-      href={`/${escort.id}`}
+      href={`/cs${escort.id}`}
       className="group block bg-surface rounded-lg overflow-hidden border border-white/5 hover:border-red-500/20 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-red-500"
     >
       <div className="relative aspect-[1/1] bg-gradient-to-b from-raised to-surface overflow-hidden">
@@ -92,14 +92,24 @@ export default function EscortCardCompact({ escort, skeleton = false, priority =
       <div className="p-2">
         <div className="flex items-center gap-1 min-w-0">
           <h3 className="text-ink font-medium text-xs leading-tight truncate">{escort.nombre}</h3>
-          {escort.verificado === 1 && (
+          {escort.verificado_vigente === 1 && (
             <span className="w-3 h-3 rounded-full bg-blue-500 flex items-center justify-center shrink-0" title="Verificada">
-              <i className="fas fa-check text-[0.2rem] text-white"></i>
+              <i className="fas fa-check text-[0.4rem] text-white"></i>
             </span>
           )}
-          {escort.vip === 1 && (
+          {escort.verificado === 1 && escort.verificado_vigente === 0 && (
+            <span className="w-3 h-3 rounded-full bg-amber-500 flex items-center justify-center shrink-0" title="Verificada (expirada)">
+              <i className="fas fa-exclamation-triangle text-[0.4rem] text-white"></i>
+            </span>
+          )}
+          {escort.vip_vigente === 1 && (
             <span className="w-3 h-3 rounded-full bg-amber-400 flex items-center justify-center shrink-0" title="VIP">
-              <i className="fas fa-crown text-[0.2rem] text-black"></i>
+              <i className="fas fa-crown text-[0.4rem] text-black"></i>
+            </span>
+          )}
+          {escort.vip === 1 && escort.vip_vigente === 0 && (
+            <span className="w-3 h-3 rounded-full bg-amber-500 flex items-center justify-center shrink-0" title="VIP (expirado)">
+              <i className="fas fa-exclamation-triangle text-[0.4rem] text-white"></i>
             </span>
           )}
         </div>

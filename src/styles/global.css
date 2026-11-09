@@ -1,5 +1,76 @@
 @import "tailwindcss";
 
+html.fancybox-active,
+html.fancybox-active body {
+  overflow: hidden !important;
+}
+
+.fancybox__container,
+.fancybox-container {
+  overflow: hidden !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+}
+
+.fancybox__stage {
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.fancybox__content,
+.fancybox__slide {
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.fancybox__content img,
+.fancybox__slide img,
+.fancybox__image,
+.fancybox__content iframe,
+.fancybox__slide iframe {
+  max-height: 100vh !important;
+  max-width: 100vw !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  display: block !important;
+  margin: auto !important;
+}
+
+.fancybox__content img,
+.fancybox__slide img,
+.fancybox__content iframe,
+.fancybox__slide iframe {
+  max-height: 100vh !important;
+  max-width: 100vw !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+}
+
+.fancybox__content img,
+.fancybox__content iframe {
+  max-height: 100vh !important;
+  max-width: 100vw !important;
+  width: auto !important;
+  height: auto !important;
+  object-fit: contain !important;
+}
+
+html.fancybox-active,
+html.fancybox-active body,
+body:has(.fancybox__container) {
+  overflow: hidden !important;
+}
+
 @theme {
   /* Colores base que faltan en v4 */
   --color-black: #000000;
@@ -40,9 +111,14 @@
 
 :root {
   color-scheme: dark;
+  --skel-base: color-mix(in srgb, var(--color-ink) 16%, transparent);
+  --skel-highlight: color-mix(in srgb, var(--color-ink) 26%, transparent);
 }
 [data-theme="light"] {
   color-scheme: light;
+  /* Igual que el wrapper React (Skeleton.tsx): se ve igual en ambos temas */
+  --skel-base: color-mix(in srgb, var(--color-ink) 16%, transparent);
+  --skel-highlight: color-mix(in srgb, var(--color-ink) 26%, transparent);
 }
 
 body,
@@ -54,6 +130,204 @@ body * {
   font-family: 'Inter';
   font-style: normal;
   font-weight: 300 800;
-  font-display: swap;
+  font-display: optional;
   src: url('/fonts/inter-latin-variable.woff2') format('woff2');
+}
+
+/* ===== Skeleton: react-loading-skeleton (componentes React) =====
+   CSS auto-hosteado del paquete (el import del paquete no se emite con
+   React 19 / Astro — issue #244). Lee --base-color/--highlight-color que el
+   wrapper <Skeleton> inyecta inline (tema claro/oscuro vía color-mix runtime). */
+@keyframes react-loading-skeleton {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.react-loading-skeleton {
+  --animation-duration: 1.5s;
+  --animation-direction: normal;
+  --pseudo-element-display: block;
+
+  background-color: var(--base-color);
+
+  width: 100%;
+  border-radius: 0.25rem;
+  display: inline-flex;
+  line-height: 1;
+
+  position: relative;
+  user-select: none;
+  overflow: hidden;
+}
+.react-loading-skeleton::after {
+  content: ' ';
+  display: var(--pseudo-element-display);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-image: var(
+    --custom-highlight-background,
+    linear-gradient(
+      90deg,
+      var(--base-color) 0%,
+      var(--highlight-color) 50%,
+      var(--base-color) 100%
+    )
+  );
+  transform: translateX(-100%);
+
+  animation-name: react-loading-skeleton;
+  animation-direction: var(--animation-direction);
+  animation-duration: var(--animation-duration);
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+@media (prefers-reduced-motion) {
+.react-loading-skeleton {
+  --pseudo-element-display: none;
+}
+}
+
+/* Fancybox perfil público sin UI */
+.fancybox__toolbar,
+.fancybox__infobar,
+.fancybox__thumbs,
+.fancybox__carousel__thumbs {
+  display: none !important;
+}
+
+/* Imagen centrada vertical/horizontal */
+.fancybox__stage,
+.fancybox__content,
+.fancybox__slide {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+@keyframes toast-enter-kf {
+  from {
+    opacity: 0;
+    transform: translateX(18px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.toast-enter {
+  animation: toast-enter-kf 0.22s cubic-bezier(0.21, 1.02, 0.73, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-enter {
+    animation: none;
+  }
+}
+
+/* ===== Skeleton utilidad global (.skel) para páginas DOM/PHP ===== */
+.skel {
+  --animation-duration: 1.5s;
+  --animation-direction: normal;
+  --pseudo-element-display: block;
+
+  background-color: var(--skel-base);
+  width: 100%;
+  border-radius: 0.25rem;
+  display: inline-flex;
+  line-height: 1;
+  position: relative;
+  user-select: none;
+  overflow: hidden;
+}
+.skel::after {
+  content: ' ';
+  display: var(--pseudo-element-display);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-image: linear-gradient(
+    90deg,
+    var(--skel-base) 0%,
+    var(--skel-highlight) 50%,
+    var(--skel-base) 100%
+  );
+  transform: translateX(-100%);
+  animation: react-loading-skeleton var(--animation-duration) ease-in-out var(--animation-direction) infinite;
+}
+body.es-ready .skel::after {
+  animation: none;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+body.es-ready .skel {
+  background-color: transparent;
+}
+@media (prefers-reduced-motion) {
+  .skel {
+    --pseudo-element-display: none;
+  }
+}
+
+/* Skeleton shimmer (react-loading-skeleton). Estilos propios para no depender
+   del import del paquete (bug de CSS conocido en React 19/Astro). Los colores
+   llegan por --base-color/--highlight-color que inyecta <Skeleton>. */
+@keyframes react-loading-skeleton {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.react-loading-skeleton {
+  --animation-duration: 1.5s;
+  --animation-direction: normal;
+  --pseudo-element-display: block;
+
+  background-color: var(--base-color);
+
+  width: 100%;
+  border-radius: 0.25rem;
+  display: inline-flex;
+  line-height: 1;
+
+  position: relative;
+  user-select: none;
+  overflow: hidden;
+}
+.react-loading-skeleton::after {
+  content: ' ';
+  display: var(--pseudo-element-display);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100%;
+  background-repeat: no-repeat;
+  background-image: var(
+    --custom-highlight-background,
+    linear-gradient(
+      90deg,
+      var(--base-color) 0%,
+      var(--highlight-color) 50%,
+      var(--base-color) 100%
+    )
+  );
+  transform: translateX(-100%);
+
+  animation-name: react-loading-skeleton;
+  animation-direction: var(--animation-direction);
+  animation-duration: var(--animation-duration);
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+@media (prefers-reduced-motion) {
+  .react-loading-skeleton {
+    --pseudo-element-display: none;
+  }
 }

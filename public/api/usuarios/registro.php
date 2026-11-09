@@ -47,6 +47,9 @@ try {
         'id' => $newId,
         'email' => $email,
         'tipo' => 'usuario',
+        // 'tv' permite revocar el token (logout / cambio de contraseña).
+        // Sin él, el token era irrevocable durante 30 días.
+        'tv' => 0,
         'exp' => time() + (30 * 24 * 60 * 60)
     ];
     $token = signToken($tokenData);
@@ -56,7 +59,7 @@ try {
 
     require_once __DIR__ . '/../mail.php';
     sendWelcomeUsuario($nombre, $email);
-    notificarAccionUsuario('usuarios', $newId, 'Nuevo usuario registrado en Kimi');
+    notificarAccionUsuario('usuarios', $newId, 'Nuevo usuario registrado en ConsexVIP');
 
     echo json_encode([
         'success' => true,

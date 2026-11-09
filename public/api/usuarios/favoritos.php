@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../lib/escort_status.php';
 header('Content-Type: application/json');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 
@@ -52,6 +53,9 @@ try {
             'likes' => (int)$e['likes'],
         ];
     }, $favoritos);
+
+    // Badges vigentes (el favorito persiste aunque el plan venza)
+    attachVigenciaBadges($pdo, $resultado);
 
     echo json_encode(['success' => true, 'favoritos' => $resultado]);
 } catch (Throwable $e) {

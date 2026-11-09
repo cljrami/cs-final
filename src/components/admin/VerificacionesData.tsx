@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { esAdminOSuperior } from '../../lib/adminRole';
+import { adminFileUrl } from '../../lib/fileUrl';
 import StatCard from '../ui/StatCard';
 import DataTable from '../ui/DataTable';
 import type { Column, ActionItem } from '../ui/DataTable';
 import ConfirmModal from '../ui/ConfirmModal';
+import ComprobanteThumb from '../ui/ComprobanteThumb';
 import SearchFilters from './SearchFilters';
-import '@fancyapps/ui/dist/fancybox/fancybox.css';
 
 interface Stats {
   total: number;
@@ -53,6 +54,9 @@ export default function VerificacionesData() {
 
   const [deleteConfirm, setDeleteConfirm] = useState<Verificacion | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [selected, setSelected] = useState<Set<string | number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState<{ ids: (string | number)[]; message: string } | null>(null);
 
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
@@ -87,21 +91,6 @@ export default function VerificacionesData() {
 
   useEffect(() => { fetchItems(); }, [filter]);
   useEffect(() => { fetchItems(); }, []);
-
-  useEffect(() => {
-    let disposed = false;
-    import('@fancyapps/ui').then((mod) => {
-      if (disposed) return;
-      const F = mod.Fancybox;
-      F.bind('[data-fancybox]', {
-        compact: false,
-        idle: false,
-        Toolbar: { display: ['close'] },
-        Thumbs: false,
-      });
-    });
-    return () => { disposed = true; };
-  }, []);
 
   useEffect(() => {
     if (!search && filter === 'todos') return;
@@ -150,6 +139,7 @@ export default function VerificacionesData() {
       const data = await res.json();
       if (data.success) {
         showNotification(actionType === 'aprobar' ? 'Verificación aprobada' : 'Verificación rechazada');
+        window.dispatchEvent(new Event('sidebar-refresh'));
         setActionVerif(null);
         setActionType(null);
         setNotas('');
@@ -192,6 +182,34 @@ export default function VerificacionesData() {
     }
   };
 
+  const handleBulkDelete = (sel: Set<string | number>) => {
+    if (sel.size === 0) return;
+    setBulkConfirm({
+      ids: Array.from(sel),
+      message: `Estas a punto de eliminar ${sel.size} verificacion(es) seleccionado(s). Esta accion no se puede deshacer.`,
+    });
+  };
+
+  const confirmBulkDelete = async () => {
+    if (!bulkConfirm) return;
+    const ids = bulkConfirm.ids;
+    setBulkConfirm(null);
+    setBulkDeleting(true);
+    try {
+      for (const key of ids) {
+        const target = items.find((it) => `${it.id}-${it.escort_id}` === String(key));
+        if (!target) continue;
+        const payload = target.id === 0
+          ? { escort_id: target.escort_id }
+          : { id: target.id };
+        await fetch(API_URL, { method: 'DELETE', headers: getAuthHeaders(), body: JSON.stringify(payload) });
+      }
+      setSelected(new Set());
+      fetchItems(); window.dispatchEvent(new Event('counts-refresh'));
+    } catch (err: any) { setError(err.message); }
+    finally { setBulkDeleting(false); }
+  };
+
   const getActions = (item: Verificacion): ActionItem[] => [
     ...(item.estado === 'pendiente' ? [
       { label: 'Aprobar', icon: 'fa-check', onClick: () => { setActionVerif(item); setActionType('aprobar'); setNotas(''); } },
@@ -226,13 +244,8 @@ export default function VerificacionesData() {
     },
     {
       key: 'selfie', header: 'Selfie', width: '100', align: 'center',
-      render: (item) => item.foto_perfil_real ? (
-        <a href={item.foto_perfil_real} data-fancybox="verif-selfie">
-          <img src={item.foto_perfil_real} alt="Selfie"
-            className="w-10 h-10 rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity" />
-        </a>
-      ) : (
-        <span className="text-gray-600 text-xs">—</span>
+      render: (item) => (
+        <ComprobanteThumb url={item.foto_perfil_real} scope="admin" group="verif-selfie" alt="Selfie" />
       ),
     },
     {
@@ -299,7 +312,23 @@ export default function VerificacionesData() {
         emptyMessage={search ? 'No se encontraron verificaciones' : 'No hay solicitudes de verificación'}
         emptyIcon="fa-id-card"
         getRowKey={(item) => `${item.id}-${item.escort_id}`}
+        selectable={esAdminOSuperior()}
+        selected={selected}
+        onSelectionChange={setSelected}
+        onBulkDelete={handleBulkDelete}
         getActions={getActions}
+      />
+
+      <ConfirmModal
+        isOpen={bulkConfirm !== null}
+        title="Eliminar seleccionados"
+        message={bulkConfirm?.message || ''}
+        confirmText={bulkDeleting ? 'Eliminando...' : 'Eliminar'}
+        cancelText="Cancelar"
+        variant="danger"
+        confirmDisabled={bulkDeleting}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkConfirm(null)}
       />
 
       {/* Approve/Reject Modal */}
@@ -323,10 +352,7 @@ export default function VerificacionesData() {
               {actionVerif.foto_perfil_real && (
                 <div className="mb-4">
                   <label className="block text-sm text-gray-400 mb-1">Selfie enviada</label>
-                  <a href={actionVerif.foto_perfil_real} data-fancybox="verif-selfie">
-                    <img src={actionVerif.foto_perfil_real} alt="Selfie"
-                      className="rounded-lg w-full max-h-48 object-cover cursor-pointer hover:opacity-80 transition-opacity" />
-                  </a>
+                  <ComprobanteThumb url={actionVerif.foto_perfil_real} scope="admin" group="verif-selfie" alt="Selfie" variant="preview" />
                 </div>
               )}
 

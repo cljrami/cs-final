@@ -1,4 +1,5 @@
 // src/components/ui/StatsCards.tsx
+import { useRef, useEffect } from 'react';
 
 interface StatCardProps {
   icon: string;
@@ -9,6 +10,13 @@ interface StatCardProps {
 }
 
 export default function StatCard({ icon, value, label, color, loading }: StatCardProps) {
+  const hasRealValue = useRef(false);
+  useEffect(() => {
+    if (!loading) hasRealValue.current = true;
+  }, [loading]);
+
+  const showSkeleton = loading && !hasRealValue.current;
+
   return (
     <div 
       className="bg-admin-card border border-admin-border rounded-2xl p-5 md:p-6 flex items-center gap-4 transition-all duration-200 hover:-translate-y-0.5 cursor-default"
@@ -27,7 +35,7 @@ export default function StatCard({ icon, value, label, color, loading }: StatCar
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-xl md:text-2xl font-bold leading-none">
-          {loading ? <div className="animate-pulse bg-gray-800 rounded-lg" style={{ width: 50, height: 28 }} /> : value}
+          {showSkeleton ? <div className="animate-pulse bg-gray-800 rounded-lg" style={{ width: 50, height: 28 }} /> : value}
         </div>
         <div className="text-xs md:text-sm text-admin-muted mt-1 leading-snug">{label}</div>
       </div>

@@ -1,10 +1,12 @@
 ---
 // src/layouts/EscortLayout.astro
+import "../styles/global.css";
 import "@fortawesome/fontawesome-free/css/fontawesome.min.css";
 import "../styles/fa-fontfaces.css";
 import EscortSidebar from "../components/escort/EscortSidebar";
 import NotificationBell from "../components/escort/NotificationBell";
 import GuidedTour from "../components/escort/GuidedTour";
+import ToastHost from "../components/ui/Toast";
 
 interface Props {
   title: string;
@@ -22,7 +24,15 @@ const { title, activePage = "dashboard" } = Astro.props;
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
+    <meta http-equiv="Permissions-Policy" content="microphone=*" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#0a0a0f" />
     <title>{title} | Panel Escort</title>
+    <meta name="robots" content="noindex, follow" />
     <link
       rel="preload"
       href="/fonts/inter-latin-variable.woff2"
@@ -90,74 +100,53 @@ const { title, activePage = "dashboard" } = Astro.props;
 
   <script>
     (function() {
-      var params = new URLSearchParams(window.location.search);
-      var adminToken = params.get('admin_token');
-      var escortId = params.get('escort_id');
+      // Limpieza defensiva: nunca aceptar tokens por URL (quedaba en
+      // historial/logs/Referer). La suplantación usa token acuñado vía
+      // escort-login-as guardado en localStorage por el panel admin.
+      try {
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('admin_token') || params.get('escort_id') || params.get('acting_as')) {
+          params.delete('admin_token');
+          params.delete('escort_id');
+          params.delete('acting_as');
+          var qs = params.toString();
+          window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : '') + window.location.hash);
+        }
+      } catch (e) {}
 
-      if (adminToken && escortId) {
-        // Guardar token anterior para restaurar
-        var prev = localStorage.getItem('token');
-        if (prev) sessionStorage.setItem('prev_escort_token', prev);
+      // Banner "editando como admin" si el JWT de escort trae marca admin_acting
+      // (solo pista visual; la autorización real la valida el backend).
+      var actingId = null;
+      try {
+        var t = localStorage.getItem('escort_token');
+        if (t) {
+          var parts = t.split('.');
+          if (parts.length === 3) {
+            var b = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            while (b.length % 4) b += '=';
+            var bin = atob(b);
+            var bytes = new Uint8Array(bin.length);
+            for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            var p = JSON.parse(new TextDecoder().decode(bytes));
+            if (p && p.admin_acting) actingId = p.id || true;
+          }
+        }
+      } catch (e) {}
 
-        // Sobrescribir con token de admin
-        localStorage.setItem('token', adminToken);
-        sessionStorage.setItem('acting_as', escortId);
-
-        // Mostrar banner
+      if (actingId) {
         var banner = document.getElementById('admin-acting-banner');
         if (banner) {
-          (async function() {
-            try {
-              var r = await fetch('/api/admin/escorts.php?id=' + escortId, {
-                headers: { Authorization: 'Bearer ' + adminToken }
-              });
-              var d = await r.json();
-              var name = d.data && d.data.nombre ? d.data.nombre : ('#' + escortId);
-              document.getElementById('acting-escort-name').textContent = name;
-            } catch(e) {
-              document.getElementById('acting-escort-name').textContent = '#' + escortId;
-            }
-          })();
+          document.getElementById('acting-escort-name').textContent = '#' + (actingId === true ? '' : actingId);
           banner.classList.remove('hidden');
-          // Ajustar padding al body
           document.body.style.paddingTop = '40px';
         }
-
-        // Salir: restaurar token y recargar
         document.getElementById('acting-exit').addEventListener('click', function() {
-          var prev = sessionStorage.getItem('prev_escort_token');
-          if (prev) {
-            localStorage.setItem('token', prev);
-          } else {
-            localStorage.removeItem('token');
-          }
-          sessionStorage.removeItem('acting_as');
           window.location.href = '/admin/escorts';
-        });
-
-        // Override global fetch para añadir acting_as a todas las requests
-        var origFetch = window.fetch;
-        window.fetch = function(url, opts) {
-          var a = sessionStorage.getItem('acting_as');
-          if (a) {
-            var sep = url.indexOf('?') !== -1 ? '&' : '?';
-            url = url + sep + 'acting_as=' + a;
-          }
-          return origFetch.call(this, url, opts);
-        };
-
-        // Restaurar al cerrar/recargar
-        window.addEventListener('beforeunload', function() {
-          var prev = sessionStorage.getItem('prev_escort_token');
-          if (prev) {
-            localStorage.setItem('token', prev);
-          } else {
-            localStorage.removeItem('token');
-          }
         });
       }
     })();
   </script>
+  <ToastHost client:load />
 </body>
 </html>
 

@@ -27,7 +27,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || ($tokenData['exp'] ?? 0) < time()) {
         http_response_code(401);
@@ -59,11 +59,20 @@ try {
                     p.concepto,
                     p.metodo_pago,
                     p.estado_pago,
-                    p.comprobante_url,
+                    COALESCE(p.comprobante_url, s.comprobante_pago) AS comprobante_url,
                     p.creado_en,
                     p.pagado_en,
                     COALESCE(pl.nombre, '') as plan_nombre,
-                    s.fecha_fin as vencimiento
+                    COALESCE(
+                        s.fecha_fin,
+                        (SELECT s2.fecha_fin FROM suscripciones s2 WHERE s2.escort_id = p.escort_id
+                           AND s2.plan_id = p.plan_id ORDER BY s2.creado_en DESC LIMIT 1),
+                        DATE_ADD(COALESCE(
+                            (SELECT s3.fecha_aprobacion FROM suscripciones s3 WHERE s3.escort_id = p.escort_id
+                               AND s3.plan_id = p.plan_id ORDER BY s3.creado_en DESC LIMIT 1),
+                            p.pagado_en, p.creado_en),
+                            INTERVAL COALESCE(pl.duracion_dias, 0) DAY)
+                    ) as vencimiento
                 FROM pagos p
                 LEFT JOIN planes pl ON pl.id = p.plan_id
                 LEFT JOIN suscripciones s ON s.id = p.suscripcion_id
@@ -87,7 +96,10 @@ try {
                     s.creado_en,
                     s.fecha_aprobacion as pagado_en,
                     pl.nombre as plan_nombre,
-                    s.fecha_fin as vencimiento
+                    COALESCE(
+                        s.fecha_fin,
+                        DATE_ADD(COALESCE(s.fecha_aprobacion, s.creado_en), INTERVAL pl.duracion_dias DAY)
+                    ) as vencimiento
                 FROM suscripciones s
                 JOIN planes pl ON pl.id = s.plan_id
                 WHERE s.escort_id = ?
@@ -127,12 +139,7 @@ try {
 
         // Proxy comprobante URLs
         foreach ($pagos as &$p) {
-            $url = $p['comprobante_url'] ?? '';
-            if (empty($url) || preg_match('/^(pendiente|sin_comprobante|none|null|sistema_reparacion)$/i', trim($url))) {
-                $p['comprobante_url'] = null;
-            } elseif (!str_starts_with($url, '/api/serve-upload.php')) {
-                $p['comprobante_url'] = '/api/serve-upload.php?path=/' . ltrim($url, '/');
-            }
+            $p['comprobante_url'] = comprobante_url($p['comprobante_url'] ?? null);
         }
         unset($p);
 

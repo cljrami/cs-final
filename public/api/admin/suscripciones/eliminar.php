@@ -85,7 +85,7 @@ try {
         json_encode($suscripcion)
     ]);
 
-    // Log auditoríƒÂ­a
+    // Log auditor?a
     $log = $db->prepare("
         INSERT INTO logs_auditoria 
         (usuario_id, escort_id, accion, tabla_afectada, registro_id, datos_anteriores, ip_address)
@@ -117,15 +117,15 @@ try {
         $db->prepare("DELETE FROM sticky_posiciones WHERE escort_id = ?")->execute([$suscripcion['escort_id']]);
     }
 
-    // Eliminar suscripciíƒÂ³n (HARD DELETE)
+    // Eliminar suscripci?n (HARD DELETE)
     $delete = $db->prepare("DELETE FROM suscripciones WHERE id = ?");
     $delete->execute([$suscripcionId]);
 
-    // Limpiar planes_usados si existe (para planes de uso íƒÂºnico)
+    // Limpiar planes_usados si existe (para planes de uso ?nico)
     $cleanUsados = $db->prepare("DELETE FROM planes_usados WHERE plan_id = ? AND escort_id = ?");
     $cleanUsados->execute([$suscripcion['plan_id'], $suscripcion['escort_id']]);
 
-    // NotificaciíƒÂ³n
+    // Notificaci?n
     $notif = $db->prepare("
         INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url)
         VALUES (?, 'sistema', 'Plan cancelado', ?, '/panel/mi-plan')

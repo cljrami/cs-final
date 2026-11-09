@@ -1,6 +1,8 @@
 // src/components/escort/PlanesEscort.tsx
 
 import React, { useState, useEffect } from 'react';
+import { Skeleton } from '../ui/Skeleton';
+import { showToast } from '../ui/Toast';
 
 interface Plan {
   id: number;
@@ -22,8 +24,18 @@ interface Plan {
   motivo_no_disponible?: string;
 }
 
+interface PlanBaseActivo {
+  id: number;
+  plan_id: number;
+  estado: string;
+  estado_raw: string;
+  dias_restantes: number;
+  plan_nombre: string;
+}
+
 export default function PlanesEscort() {
   const [planesBase, setPlanesBase] = useState<Plan[]>([]);
+  const [planBaseActivo, setPlanBaseActivo] = useState<PlanBaseActivo | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPlan, setSelectedPlan] = useState<number | null>(null);
   const [metodoPago, setMetodoPago] = useState<'transferencia' | 'efectivo'>('transferencia');
@@ -31,7 +43,8 @@ export default function PlanesEscort() {
   const [notas, setNotas] = useState('');
   const [solicitando, setSolicitando] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [success] = useState('');
+  const setSuccess = (m: string) => showToast(m);
   const [showWarning, setShowWarning] = useState(false);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('escort_token') : '';
@@ -48,6 +61,7 @@ export default function PlanesEscort() {
       const data = await res.json();
       if (data.success) {
         setPlanesBase(data.planes.filter((p: Plan) => p.tipo === 'base'));
+        if (data.plan_base_activo) setPlanBaseActivo(data.plan_base_activo);
       }
     } catch (e) {
       setError('Error cargando planes');
@@ -82,8 +96,10 @@ export default function PlanesEscort() {
 
       const data = await res.json();
       if (data.success) {
-        setSuccess(data.message);
-        setShowWarning(true);
+        const planSel = planesBase.find(p => p.id === selectedPlan);
+        const esGratis = !!planSel && planSel.precio === 0;
+        setSuccess(esGratis ? '¡Plan gratis activado! Tu anuncio ya está publicado.' : data.message);
+        setShowWarning(!esGratis);
         setSelectedPlan(null);
         setComprobante('');
         setNotas('');
@@ -230,19 +246,37 @@ export default function PlanesEscort() {
     );
   };
 
-  const SolicitudForm = () => (
+  const SolicitudForm = () => {
+    const planSel = planesBase.find(p => p.id === selectedPlan);
+    const esGratis = !!planSel && planSel.precio === 0;
+
+    return (
     <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-6">
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 bg-red-500/10 rounded-xl flex items-center justify-center">
-          <i className="fas fa-paper-plane text-red-400"></i>
+          {esGratis ? <i className="fas fa-gift text-green-400"></i> : <i className="fas fa-paper-plane text-red-400"></i>}
         </div>
         <div>
-          <h2 className="text-white font-bold">Solicitar Plan</h2>
-          <p className="text-gray-500 text-xs">Completa los datos para tu solicitud</p>
+          <h2 className="text-white font-bold">{esGratis ? 'Activar Plan Gratis' : 'Solicitar Plan'}</h2>
+          <p className="text-gray-500 text-xs">
+            {esGratis ? 'Se activará de inmediato, sin pago' : 'Completa los datos para tu solicitud'}
+          </p>
         </div>
       </div>
 
+      {/* Info plan gratis */}
+      {esGratis && (
+        <div className="mb-5 p-3 bg-green-500/10 border border-green-500/30 rounded-xl flex items-start gap-2">
+          <i className="fas fa-rocket text-green-400 mt-0.5"></i>
+          <p className="text-green-300 text-sm">
+            Tu plan <strong className="text-white">{planSel?.nombre}</strong> ({planSel?.duracion_dias} días gratis) se
+            activará automáticamente al confirmar.
+          </p>
+        </div>
+      )}
+
       {/* Método de pago */}
+      {!esGratis && (
       <div className="mb-5">
         <label className="block text-gray-400 text-xs uppercase tracking-wider mb-3">Método de pago</label>
         <div className="flex gap-3">
@@ -274,8 +308,10 @@ export default function PlanesEscort() {
           </button>
         </div>
       </div>
+      )}
 
       {/* Comprobante */}
+      {!esGratis && (
       <div className="mb-5">
         <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">
           Comprobante de pago
@@ -292,6 +328,7 @@ export default function PlanesEscort() {
         </div>
         <p className="text-gray-600 text-xs mt-1.5">Ej: foto del depósito, número de transferencia...</p>
       </div>
+      )}
 
       {/* Notas */}
       <div className="mb-5">
@@ -308,12 +345,14 @@ export default function PlanesEscort() {
       {/* Botón solicitar */}
       <button
         onClick={handleSolicitar}
-        disabled={solicitando || !comprobante.trim()}
+        disabled={solicitando || (!esGratis && !comprobante.trim())}
         className={`
           w-full py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2
-          ${solicitando || !comprobante.trim()
+          ${solicitando || (!esGratis && !comprobante.trim())
             ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-            : 'bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/20'
+            : esGratis
+              ? 'bg-green-500 hover:bg-green-400 text-white shadow-lg shadow-green-500/20'
+              : 'bg-red-500 hover:bg-red-400 text-white shadow-lg shadow-red-500/20'
           }
         `}
       >
@@ -321,6 +360,11 @@ export default function PlanesEscort() {
           <>
             <i className="fas fa-circle-notch fa-spin" />
             Enviando solicitud...
+          </>
+        ) : esGratis ? (
+          <>
+            <i className="fas fa-gift" />
+            Activar plan gratis
           </>
         ) : (
           <>
@@ -330,7 +374,8 @@ export default function PlanesEscort() {
         )}
       </button>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-8">
@@ -345,6 +390,26 @@ export default function PlanesEscort() {
         <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl flex items-center gap-2">
           <i className="fas fa-exclamation-triangle"></i>
           {error}
+        </div>
+      )}
+
+      {/* SOLICITUD PENDIENTE: Bloquea seleccionar otro plan base */}
+      {planBaseActivo?.estado === 'pendiente_aprobacion' && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 flex items-start gap-4">
+          <div className="w-10 h-10 bg-amber-500/10 rounded-xl flex items-center justify-center flex-shrink-0">
+            <i className="fas fa-hourglass-half text-amber-400 text-lg"></i>
+          </div>
+          <div className="flex-1">
+            <h3 className="text-amber-400 font-bold">Solicitud pendiente de aprobación</h3>
+            <p className="text-gray-400 text-sm mt-1 leading-relaxed">
+              Ya tienes una solicitud de plan que aún está <strong className="text-white">pendiente de aprobación</strong>.
+              No puedes seleccionar otro plan base hasta que el administrador la revise.
+            </p>
+            <p className="text-amber-500/70 text-xs mt-2 flex items-center gap-1.5">
+              <i className="fas fa-info-circle"></i>
+              Puede tardar hasta 24 horas hábiles.
+            </p>
+          </div>
         </div>
       )}
 
@@ -384,21 +449,21 @@ export default function PlanesEscort() {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {loading ? (
-            [1, 2, 3, 4].map((i) => (
-              <div key={i} className="bg-[#13131a] border border-gray-800 rounded-2xl p-6">
-                <div className="w-16 h-5 bg-gray-800 rounded-full mb-4 animate-pulse" />
-                <div className="w-32 h-7 bg-gray-800 rounded mb-1 animate-pulse" />
-                <div className="w-24 h-8 bg-gray-800 rounded mb-4 animate-pulse" />
-                <div className="w-20 h-5 bg-gray-800 rounded mb-4 animate-pulse" />
-                <div className="space-y-3">
-                  <div className="w-36 h-4 bg-gray-800 rounded animate-pulse" />
-                  <div className="w-36 h-4 bg-gray-800 rounded animate-pulse" />
-                  <div className="w-40 h-4 bg-gray-800 rounded animate-pulse" />
-                </div>
-              </div>
-            ))
-          ) : (
+        {loading ? (
+             [1, 2, 3, 4].map((i) => (
+               <div key={i} className="bg-[#13131a] border border-gray-800 rounded-2xl p-6">
+                 <Skeleton height={20} width={64} borderRadius="9999px" />
+                 <Skeleton height={28} width={128} borderRadius="0.25rem" />
+                 <Skeleton height={32} width={96} borderRadius="0.25rem" />
+                 <Skeleton height={20} width={80} borderRadius="0.25rem" />
+                 <div className="space-y-3">
+                   <Skeleton height={16} width={144} borderRadius="0.25rem" />
+                   <Skeleton height={16} width={144} borderRadius="0.25rem" />
+                   <Skeleton height={16} width={160} borderRadius="0.25rem" />
+                 </div>
+               </div>
+             ))
+           ) : (
             planesBase.map((plan) => (
               <PlanCard
                 key={plan.id}

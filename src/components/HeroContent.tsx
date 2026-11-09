@@ -10,17 +10,17 @@ interface SiteConfig {
 }
 
 interface Props {
-  initialCfg?: Partial<SiteConfig> | null;
+  initialConfig?: Partial<SiteConfig> | null;
 }
 
-export default function HeroContent({ initialCfg = null }: Props) {
-  const [cfg, setCfg] = useState<SiteConfig | null>(initialCfg as SiteConfig | null);
+export default function HeroContent({ initialConfig = null }: Props) {
+  const [cfg, setCfg] = useState<Partial<SiteConfig> | null>(initialConfig);
 
   useEffect(() => {
     fetch('/api/config/site.php')
       .then(r => r.json())
-      .then(d => { if (d.success) setCfg(d.data); })
-      .catch(() => {});
+      .then(d => { setCfg(d && d.success ? d.data : {}); })
+      .catch(() => setCfg({}));
   }, []);
 
   const badge = cfg?.hero_badge || 'Perfiles verificados';
@@ -44,9 +44,11 @@ export default function HeroContent({ initialCfg = null }: Props) {
         {badge}
       </div>
       <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-ink mb-4 leading-tight">
-        {resto} <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-400 to-pink-400">{last}</span>
+        {resto} <span className="text-red-400">{last}</span>
       </h1>
-      <p className="text-muted text-sm md:text-base mb-4 max-w-xl mx-auto">{subtitulo}</p>
+      <p className="text-muted text-sm md:text-base mb-4 max-w-xl mx-auto">
+        {subtitulo}
+      </p>
       <div className="flex items-center justify-center gap-6 mt-2 text-xs text-muted">
         {confianza.map((c, i) => (
           <span key={i}><i className={`fas ${c.icono} ${c.color} mr-1`}></i>{c.texto}</span>

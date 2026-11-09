@@ -6,29 +6,24 @@
 import type { ReactNode } from 'react';
 import { useAprobacion } from '../../hooks/useAprobacion';
 import BloqueoAprobacion from './BloqueoAprobacion';
+import CargaSeccion from './CargaSeccion';
 
 interface Props {
   children: ReactNode;
 }
 
-export default function AprobacionRequerida({ children }: Props) {
-  const { aprobada, cargando } = useAprobacion();
+ export default function AprobacionRequerida({ children }: Props) {
+    const { aprobada, cargando } = useAprobacion();
 
-  if (cargando) {
-    return (
-      <div className="w-full max-w-full my-10">
-        <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-8">
-          <div className="w-16 h-16 mx-auto mb-5 bg-gray-800 rounded-2xl animate-pulse"></div>
-          <div className="w-48 h-6 mx-auto bg-gray-800 rounded mb-3 animate-pulse"></div>
-          <div className="w-72 max-w-full h-4 mx-auto bg-gray-800 rounded animate-pulse"></div>
-        </div>
-      </div>
-    );
-  }
+    // Mientras se consulta el estado real no se muestra ninguna tarjeta de
+    // bloqueo: evita el parpadeo de "en moderación" antes de saber si aplica.
+    if (cargando) {
+      return <CargaSeccion />;
+    }
 
-  if (!aprobada) {
-    return <BloqueoAprobacion />;
-  }
+    if (!aprobada) {
+     return <BloqueoAprobacion />;
+   }
 
-  return <>{children}</>;
-}
+   return <>{children}</>;
+ }

@@ -93,7 +93,7 @@ SELECT s.*, e.nombre as escort_nombre, p.nombre as plan_nombre,
     ");
     $update->execute([$suscripcionId]);
 
-    // Ocultar escort en listados píƒÂºblicos
+    // Ocultar escort en listados p?blicos
     $db->prepare("UPDATE escorts SET activa = 0 WHERE id = ?")->execute([$suscripcion['escort_id']]);
 
     $historial = $db->prepare("

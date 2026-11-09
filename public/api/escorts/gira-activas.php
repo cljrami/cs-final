@@ -31,6 +31,10 @@ try {
     $stmt->execute();
     $escorts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Badges vigentes para las tarjetas
+    require_once __DIR__ . '/../lib/escort_status.php';
+    attachVigenciaBadges($db, $escorts);
+
     $totalConGira = 0;
     $activaStatus = [];
     try {

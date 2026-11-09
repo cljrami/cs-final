@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { adminFileUrl } from '../../lib/fileUrl';
 
 interface Suscripcion {
   suscripcion_id: number;
@@ -361,7 +362,7 @@ export default function Suscripciones() {
                       <div className="text-gray-500 text-xs">{sub.suscripcion.moneda}</div>
                       {sub.suscripcion.comprobante_pago && (
                         <a
-                          href={sub.suscripcion.comprobante_pago}
+                          href={adminFileUrl(sub.suscripcion.comprobante_pago)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-blue-400 hover:text-blue-300 text-xs inline-flex items-center gap-1 mt-1"
@@ -474,7 +475,7 @@ export default function Suscripciones() {
                 <div className="bg-[#13131a] rounded-xl p-3">
                   <div className="text-gray-500 text-xs mb-2">Comprobante de pago</div>
                   <a
-                    href={selectedSuscripcion.suscripcion.comprobante_pago}
+                    href={adminFileUrl(selectedSuscripcion.suscripcion.comprobante_pago)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm"

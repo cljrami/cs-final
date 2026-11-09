@@ -30,6 +30,18 @@ try {
         exit;
     }
 
+    $jsonInput = [];
+    if (stripos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') !== false) {
+        $rawInput = file_get_contents('php://input');
+        $decodedInput = json_decode($rawInput, true);
+        if (!is_array($decodedInput)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'JSON invalido']);
+            exit;
+        }
+        $jsonInput = $decodedInput;
+    }
+
     $pdo = getDBConnection();
 
     // Obtener datos de la escort
@@ -116,8 +128,9 @@ try {
         exit;
     }
 
-    // Procesar comprobante
-    $planVip = isset($_POST['plan']) ? $_POST['plan'] : 'mensual';
+    // Procesar comprobante (patron de Mi Plan: el archivo ya fue subido por
+    // subir-comprobante.php y aqui solo se recibe su ruta en JSON).
+    $planVip = $jsonInput['plan'] ?? $_POST['plan'] ?? 'mensual';
     $planesValidos = ['mensual', 'trimestral', 'anual'];
     if (!in_array($planVip, $planesValidos)) {
         $planVip = 'mensual';
@@ -125,7 +138,26 @@ try {
 
     $comprobante = '';
 
-    if (isset($_FILES['comprobante']) && $_FILES['comprobante']['error'] === UPLOAD_ERR_OK) {
+    $comprobanteRaw = $jsonInput['comprobante_pago'] ?? null;
+    if (is_string($comprobanteRaw) && trim($comprobanteRaw) !== '') {
+        $rutaComprobante = comprobante_path($comprobanteRaw);
+        $prefijoComprobante = 'uploads/comprobantes/' . $escortId . '/';
+        $rutaComprobanteFs = $rutaComprobante ? __DIR__ . '/../../' . $rutaComprobante : '';
+        $tiposComprobante = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+
+        if (
+            !$rutaComprobante
+            || !str_starts_with($rutaComprobante, $prefijoComprobante)
+            || !is_file($rutaComprobanteFs)
+            || !validarMIME($rutaComprobanteFs, $tiposComprobante)
+        ) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'El comprobante adjunto no es valido']);
+            exit;
+        }
+
+        $comprobante = $rutaComprobante;
+    } elseif (isset($_FILES['comprobante']) && $_FILES['comprobante']['error'] === UPLOAD_ERR_OK) {
         $file = $_FILES['comprobante'];
         $tiposPermitidos = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
         $extPermitidas = ['jpg' => 'jpg', 'jpeg' => 'jpg', 'png' => 'png', 'gif' => 'gif', 'webp' => 'webp', 'pdf' => 'pdf'];
@@ -209,7 +241,7 @@ try {
         $body .= '</table>';
         $body .= '<p>Revisa el comprobante de pago y aprueba la solicitud.</p>';
         $body .= '<p style="text-align:center;margin-top:24px"><a class="btn" href="' . SITE_URL . '/admin/solicitudes-vip">Revisar solicitud</a></p>';
-        sendAdminNotification('pagos', 'Nueva solicitud VIP - Kimi', $body);
+        sendAdminNotification('pagos', 'Nueva solicitud VIP - ConsexVIP', $body);
     } catch (\Throwable $e2) {
         error_log("solicitar-vip notify error: " . $e2->getMessage());
     }

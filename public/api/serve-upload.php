@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
+
 $requestPath = parse_url($_GET['path'] ?? '', PHP_URL_PATH);
 $decodedPath = urldecode((string)$requestPath);
 
@@ -13,6 +15,45 @@ if ($requestPath === false || $decodedPath === ''
     header('X-Content-Type-Options: nosniff');
     echo json_encode(['error' => 'Ruta inválida']);
     exit;
+}
+
+// Archivos privados (comprobantes de pago, selfies de verificación):
+// solo la dueña (por /{escortId}/ en la ruta) o un rol admin. El token viaja
+// en ?token= porque las etiquetas <img> no pueden mandar headers.
+$lowerPath = strtolower($decodedPath);
+if (strpos($lowerPath, '/uploads/comprobantes/') === 0 || strpos($lowerPath, '/uploads/verificaciones/') === 0) {
+    $token = $_GET['token'] ?? '';
+    if (empty($token) && function_exists('getallheaders')) {
+        $headers = getallheaders();
+        $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+        if (strpos($authHeader, 'Bearer ') === 0) {
+            $token = substr($authHeader, 7);
+        }
+    }
+    $payload = verifyToken($token);
+    if (!$payload) {
+        http_response_code(401);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'No autorizado']);
+        exit;
+    }
+    $rol = $payload['rol'] ?? $payload['role'] ?? '';
+    $tipo = $payload['tipo'] ?? '';
+    $esAdmin = in_array($tipo, ['admin', 'superadmin', 'moderador'], true) || in_array($rol, ['admin', 'superadmin', 'moderador'], true);
+    if (!$esAdmin) {
+        if ($tipo !== 'escort') {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Sin permiso']);
+            exit;
+        }
+        if (!preg_match('#^/uploads/(?:comprobantes|verificaciones)/(\d+)/#', $decodedPath, $m) || (int)$m[1] !== (int)$payload['id']) {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Sin permiso']);
+            exit;
+        }
+    }
 }
 
 // New location: documents root /public_html/ or /public/
@@ -41,7 +82,8 @@ if (!$foundFile) {
 // Canonicalizar y verificar que el archivo resuelto esté realmente bajo /uploads/
 $realFile = realpath($foundFile);
 $realNorm = str_replace('\\', '/', (string)$realFile);
-$inUploads = $realFile !== false && stripos($realNorm, '/uploads/') !== false;
+$uploadsRoot = str_replace('\\', '/', (string)realpath($newBase . '/uploads'));
+$inUploads = $realFile !== false && $uploadsRoot !== '' && strpos($realNorm, $uploadsRoot . '/') === 0;
 if (!$inUploads) {
     http_response_code(403);
     header('Content-Type: application/json');

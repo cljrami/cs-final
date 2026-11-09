@@ -3,6 +3,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Skeleton } from '../ui/Skeleton';
+import { showToast } from '../ui/Toast';
+import ComprobanteThumb from '../ui/ComprobanteThumb';
 
 interface Plan {
   id: number;
@@ -17,6 +19,7 @@ interface Plan {
   max_videos: number;
   permite_vip: boolean;
   permite_destacado: boolean;
+  permite_audio?: boolean;
   uso_unico: boolean;
   badge: string;
   color_badge: string;
@@ -38,9 +41,10 @@ interface MiPlanData {
     duracion_dias: number;
     max_fotos: number;
     max_videos: number;
-    permite_vip: boolean;
-    permite_destacado: boolean;
-    uso_unico: boolean;
+     permite_vip: boolean;
+     permite_destacado: boolean;
+     permite_audio?: boolean;
+     uso_unico: boolean;
   };
   estado?: {
     codigo: string;
@@ -93,7 +97,8 @@ export default function MiPlan() {
   const [selectedPlan, setSelectedPlan] = useState<number | null>(null);
   const [solicitando, setSolicitando] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [success] = useState('');
+  const setSuccess = (m: string) => showToast(m);
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -237,13 +242,15 @@ export default function MiPlan() {
   };
 
   const handleReuploadComprobante = async () => {
-    if (!reuploadFile || !planData?.pago?.id) return;
+    const pagoId = planData?.pago?.id;
+    const suscripcionId = planData?.plan?.suscripcion_id;
+    if (!reuploadFile || (!pagoId && !suscripcionId)) return;
     setReuploadLoading(true);
     try {
       const formData = new FormData();
       formData.append('comprobante', reuploadFile);
-      formData.append('tipo', 'pago');
-      formData.append('id', String(planData.pago.id));
+      formData.append('tipo', pagoId ? 'pago' : 'suscripcion');
+      formData.append('id', String(pagoId || suscripcionId));
       const res = await fetch('/api/escort/subir-comprobante.php', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
@@ -297,6 +304,16 @@ export default function MiPlan() {
             >
               <i className="fas fa-arrow-left" /> Volver a mi plan actual
             </button>
+          )}
+
+          {renovando && (
+            <div className="bg-amber-500/10 border border-amber-500/30 text-amber-400 px-4 py-3 rounded-xl flex items-start gap-2">
+              <i className="fas fa-exclamation-triangle mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-medium">Importante: Al reactivar tu plan</p>
+                <p className="text-sm mt-1">Perderás tu <strong>verificación</strong> y <strong>VIP</strong>. Deberás solicitarlos de nuevo desde tu panel.</p>
+              </div>
+            </div>
           )}
 
           {/* Alerts */}
@@ -662,6 +679,40 @@ export default function MiPlan() {
             <p className="text-gray-500 mt-1">Gestiona tu plan de publicación</p>
           </div>
 
+          {/* Sin plan activo: el plan anterior venció / fue cancelado / rechazado.
+              Mismo mensaje que el resto de las secciones (BloqueoPlan). */}
+          {puedeRenovar && (
+            <div className="bg-red-500/5 border border-red-500/30 rounded-2xl p-6 text-center">
+              <div className="w-14 h-14 mx-auto mb-4 bg-red-500/10 rounded-2xl flex items-center justify-center">
+                <i className="fas fa-lock text-red-400 text-xl"></i>
+              </div>
+              <h3 className="text-white font-bold text-lg mb-1">
+                {estado.codigo === 'expirada' ? 'Tu plan está vencido' : 'Sin plan activo'}
+              </h3>
+              <p className="text-gray-400 text-sm mb-4">
+                {estado.codigo === 'expirada'
+                  ? 'No puedes modificar nada de tu panel mientras tu plan esté vencido. Contrata un nuevo plan para reactivar tu anuncio y volver a editar tus datos.'
+                  : 'Activa tu plan para poder editar tus datos.'}
+              </p>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <button
+                  onClick={() => setRenovando(true)}
+                  className="inline-flex items-center gap-2 px-6 py-2.5 bg-red-500 hover:bg-red-400 text-white rounded-xl font-medium transition-all"
+                >
+                  <i className="fas fa-credit-card"></i>
+                  {estado.codigo === 'expirada' ? 'Contratar un nuevo plan' : 'Activar mi plan'}
+                </button>
+                <a
+                  href="/micuenta/pagos"
+                  className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#2a2a3e] hover:bg-[#3d3d5c] text-white rounded-xl font-medium transition-colors text-sm"
+                >
+                  <i className="fas fa-receipt"></i>
+                  Ver mi historial de pagos
+                </a>
+              </div>
+            </div>
+          )}
+
           {/* Alerts */}
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl flex items-center gap-2">
@@ -675,6 +726,11 @@ export default function MiPlan() {
               {success}
             </div>
           )}
+
+          {/* Sin plan activo NO se muestra el detalle del plan anterior:
+              solo el aviso superior con el CTA para activar. */}
+          {!puedeRenovar && (
+          <>
 
           {/* Card principal del plan */}
           <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-6">
@@ -832,6 +888,12 @@ export default function MiPlan() {
                     <span>Permite Destacado</span>
                   </div>
                 )}
+                {plan.permite_audio && (
+                  <div className="flex items-center gap-2 text-sm text-sky-400">
+                    <i className="fas fa-microphone w-5" />
+                    <span>Permite audio de saludo</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -911,15 +973,7 @@ export default function MiPlan() {
               </div>
               {pago.comprobante ? (
                 <div className="flex items-center gap-2">
-                  <a
-                    href={`/uploads/comprobantes/${pago.comprobante}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 bg-[#2a2a3e] hover:bg-[#3d3d5c] text-white rounded-lg text-sm transition-colors flex items-center gap-2"
-                  >
-                    <i className="fas fa-file-image" />
-                    Ver comprobante
-                  </a>
+                  <ComprobanteThumb url={pago.comprobante} scope="escort" />
                   <button
                     onClick={() => setShowReuploadModal(true)}
                     className="px-4 py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-lg text-sm transition-colors flex items-center gap-2 border border-blue-500/20"
@@ -939,6 +993,9 @@ export default function MiPlan() {
               )}
             </div>
           </div>
+
+          </>
+          )}
 
           {/* Re-upload comprobante modal */}
           {showReuploadModal && (

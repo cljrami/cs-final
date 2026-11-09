@@ -4,7 +4,8 @@ import DataTable from '../ui/DataTable';
 import type { Column, ActionItem } from '../ui/DataTable';
 import ConfirmModal from '../ui/ConfirmModal';
 import SearchFilters from './SearchFilters';
-import '@fancyapps/ui/dist/fancybox/fancybox.css';
+import { adminFileUrl } from '../../lib/fileUrl';
+import ComprobanteThumb from '../ui/ComprobanteThumb';
 
 interface SolicitudVip {
   id: number;
@@ -93,24 +94,6 @@ export default function SolicitudesVip() {
 
   useEffect(() => { fetchItems(); }, [filter, page]);
   useEffect(() => { fetchItems(); }, []);
-
-  useEffect(() => {
-    import('@fancyapps/ui').then((mod) => {
-      const F = mod.Fancybox;
-      F.bind('[data-fancybox="vip-solicitud"]', {
-        compact: false,
-        idle: false,
-        Toolbar: { display: ['close'] },
-        Thumbs: false,
-      });
-      F.bind('[data-fancybox="vip-avatar"]', {
-        compact: false,
-        idle: false,
-        Toolbar: { display: ['close'] },
-        Thumbs: false,
-      });
-    });
-  }, []);
 
   useEffect(() => {
     if (!search && filter === 'pendientes') return;
@@ -271,29 +254,10 @@ export default function SolicitudesVip() {
       ),
     },
     {
-      key: 'comprobante', header: 'Pago', width: '80', align: 'center',
-      render: (item) => {
-        if (!item.comprobante_pago) return <span className="text-gray-600 text-xs">—</span>;
-        const src = item.comprobante_pago;
-        const isPdf = src.match(/\.pdf$/i);
-        if (isPdf) {
-          return (
-            <a href={src} target="_blank" rel="noopener noreferrer"
-              className="flex items-center justify-center w-10 h-10 mx-auto rounded-lg bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 transition-colors"
-              title="Ver comprobante PDF">
-              <i className="fas fa-file-pdf text-red-400 text-lg"></i>
-            </a>
-          );
-        }
-        return (
-          <a href={src} data-fancybox="vip-solicitud" className="block relative w-10 h-10 mx-auto">
-            <img src={src} alt="Comprobante"
-              className="w-10 h-10 rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity border border-green-500/30"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-            <i className="fas fa-file-image text-green-400 text-lg absolute inset-0 flex items-center justify-center pointer-events-none" />
-          </a>
-        );
-      },
+      key: 'comprobante', header: 'Comprobante', width: '80', align: 'center',
+      render: (item) => (
+        <ComprobanteThumb url={item.comprobante_pago} scope="admin" group="vip-solicitud" alt="Comprobante" />
+      ),
     },
     {
       key: 'estado', header: 'Estado', width: '130', align: 'center',
@@ -416,12 +380,10 @@ export default function SolicitudesVip() {
               {/* Comprobante link */}
               {actionItem.comprobante_pago && (
                 <div className="bg-[#13131a] border border-[#2a2a3e] rounded-lg p-3 mb-4">
-                  <div className="text-gray-500 text-xs mb-1">Comprobante de pago</div>
-                  <a href={actionItem.comprobante_pago} data-fancybox="vip-solicitud"
-                    className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm">
-                    <i className="fas fa-image"></i>
-                    Ver comprobante
-                  </a>
+                  <div className="text-gray-500 text-xs mb-2">Comprobante de pago</div>
+                  <div className="max-w-[220px]">
+                    <ComprobanteThumb url={actionItem.comprobante_pago} scope="admin" variant="preview" />
+                  </div>
                 </div>
               )}
 

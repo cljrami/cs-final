@@ -28,7 +28,7 @@ if (!$id) {
 try {
     $pdo = getDBConnection();
 
-    // Verificar si la columna aprobada existe (migraciíƒÂ³n pendiente)
+    // Verificar si la columna aprobada existe (migraci?n pendiente)
     $colCheck = $pdo->prepare("
         SELECT COUNT(*) FROM information_schema.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'escorts' AND COLUMN_NAME = 'aprobada'
@@ -61,8 +61,11 @@ try {
     // Enviar email de cuenta aprobada
     sendCuentaAprobada($id);
 
+    // IndexNow: perfil aprobado → ping inmediato a Google/Bing
+    indexnowPing(["https://www.consexvip.cl/{$id}"]);
+
     // Auto-crear pago para que aparezca en admin pagos
-    // Usa el plan que la escort seleccioníƒÂ³ (de su suscripciíƒÂ³n), o fallback al míƒÂ¡s barato
+    // Usa el plan que la escort seleccion? (de su suscripci?n), o fallback al m?s barato
     $planStmt = $pdo->prepare("
         SELECT pl.id, pl.nombre, pl.precio 
         FROM suscripciones s 
@@ -73,7 +76,7 @@ try {
     $planStmt->execute([$id]);
     $plan = $planStmt->fetch(PDO::FETCH_ASSOC);
 
-    // Fallback si no tiene suscripciíƒÂ³n: el plan base activo míƒÂ¡s barato
+    // Fallback si no tiene suscripci?n: el plan base activo m?s barato
     if (!$plan) {
         $planStmt = $pdo->prepare("SELECT id, nombre, precio FROM planes WHERE activo = 1 AND precio > 0 AND tipo = 'base' ORDER BY precio ASC LIMIT 1");
         $planStmt->execute();
@@ -85,7 +88,7 @@ try {
     if ((int)$pagoCheck->fetchColumn() === 0) {
         $pdo->prepare("
             INSERT INTO pagos (escort_id, plan_id, concepto, monto, moneda, metodo_pago, estado_pago, notas, creado_en, pagado_en)
-            VALUES (?, ?, 'plan', ?, 'CLP', 'transferencia', 'completado', 'AprobaciíƒÂ³n automíƒÂ¡tica por admin', NOW(), NOW())
+            VALUES (?, ?, 'plan', ?, 'CLP', 'transferencia', 'completado', 'Aprobaci?n autom?tica por admin', NOW(), NOW())
         ")->execute([
             $id,
             $plan ? $plan['id'] : null,

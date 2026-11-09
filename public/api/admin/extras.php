@@ -109,9 +109,9 @@ try {
         if (empty($nombre)) {
             $fieldErrors['nombre'] = 'El nombre es obligatorio';
         } elseif (strlen($nombre) < 2) {
-            $fieldErrors['nombre'] = 'MíƒÂ­nimo 2 caracteres';
+            $fieldErrors['nombre'] = 'M?nimo 2 caracteres';
         } elseif (strlen($nombre) > 100) {
-            $fieldErrors['nombre'] = 'MíƒÂ¡ximo 100 caracteres';
+            $fieldErrors['nombre'] = 'M?ximo 100 caracteres';
         }
 
         if (empty($slug)) {
@@ -122,7 +122,7 @@ try {
         if (empty($slug)) {
             $fieldErrors['slug'] = 'El slug es obligatorio';
         } elseif (strlen($slug) > 100) {
-            $fieldErrors['slug'] = 'MíƒÂ¡ximo 100 caracteres';
+            $fieldErrors['slug'] = 'M?ximo 100 caracteres';
         }
 
         if (empty($fieldErrors['nombre'])) {
@@ -162,7 +162,7 @@ try {
         $stmt->execute([$nombre, $slug, $descripcion, $extra_tipo, $duracion_dias, $precio, $moneda, $color_badge, $orden, $activo]);
         $newId = $pdo->lastInsertId();
 
-        // Log auditoríƒÂ­a
+        // Log auditor?a
         $log = $pdo->prepare("
             INSERT INTO logs_auditoria (usuario_id, accion, tabla_afectada, registro_id, datos_nuevos, ip_address)
             VALUES (?, 'crear_extra', 'planes', ?, ?, ?)
@@ -202,7 +202,7 @@ try {
 
         if ($id <= 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID no víƒÂ¡lido']);
+            echo json_encode(['success' => false, 'error' => 'ID no v?lido']);
             exit;
         }
 
@@ -221,11 +221,11 @@ try {
         if (isset($input['nombre'])) {
             $nombre = trim($input['nombre']);
             if (empty($nombre)) {
-                $fieldErrors['nombre'] = 'El nombre no puede estar vacíƒÂ­o';
+                $fieldErrors['nombre'] = 'El nombre no puede estar vac?o';
             } elseif (strlen($nombre) < 2) {
-                $fieldErrors['nombre'] = 'MíƒÂ­nimo 2 caracteres';
+                $fieldErrors['nombre'] = 'M?nimo 2 caracteres';
             } elseif (strlen($nombre) > 100) {
-                $fieldErrors['nombre'] = 'MíƒÂ¡ximo 100 caracteres';
+                $fieldErrors['nombre'] = 'M?ximo 100 caracteres';
             } else {
                 $dupStmt = $pdo->prepare("SELECT id FROM planes WHERE LOWER(nombre) = LOWER(?) AND id != ? AND tipo = 'extra'");
                 $dupStmt->execute([$nombre, $id]);
@@ -241,9 +241,9 @@ try {
         if (isset($input['slug'])) {
             $slug = strtolower(trim(preg_replace('/[^a-zA-Z0-9-]+/', '-', trim($input['slug'])), '-'));
             if (empty($slug)) {
-                $fieldErrors['slug'] = 'Slug vacíƒÂ­o';
+                $fieldErrors['slug'] = 'Slug vac?o';
             } elseif (strlen($slug) > 100) {
-                $fieldErrors['slug'] = 'MíƒÂ¡ximo 100 caracteres';
+                $fieldErrors['slug'] = 'M?ximo 100 caracteres';
             } else {
                 $dupSlugStmt = $pdo->prepare("SELECT id FROM planes WHERE slug = ? AND id != ? AND tipo = 'extra'");
                 $dupSlugStmt->execute([$slug, $id]);
@@ -323,7 +323,7 @@ try {
         $stmt = $pdo->prepare($sql);
         $stmt->execute($values);
 
-        // Log auditoríƒÂ­a
+        // Log auditor?a
         $log = $pdo->prepare("
             INSERT INTO logs_auditoria (usuario_id, accion, tabla_afectada, registro_id, datos_nuevos, ip_address)
             VALUES (?, 'actualizar_extra', 'planes', ?, ?, ?)
@@ -354,7 +354,7 @@ try {
 
         if ($id <= 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID no víƒÂ¡lido']);
+            echo json_encode(['success' => false, 'error' => 'ID no v?lido']);
             exit;
         }
 
@@ -374,11 +374,11 @@ try {
 
         if ($contrataciones > 0) {
             http_response_code(409);
-            echo json_encode(['success' => false, 'error' => "Tiene $contrataciones contrataciíƒÂ³n(es) activa(s)"]);
+            echo json_encode(['success' => false, 'error' => "Tiene $contrataciones contrataci?n(es) activa(s)"]);
             exit;
         }
 
-        // Log auditoríƒÂ­a
+        // Log auditor?a
         $log = $pdo->prepare("
             INSERT INTO logs_auditoria (usuario_id, accion, tabla_afectada, registro_id, datos_anteriores, ip_address)
             VALUES (?, 'eliminar_extra', 'planes', ?, ?, ?)
@@ -398,7 +398,7 @@ try {
     }
 
     http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'MíƒÂ©todo no permitido']);
+    echo json_encode(['success' => false, 'error' => 'M?todo no permitido']);
 } catch (PDOException $e) {
     error_log("Error extras.php PDO: " . $e->getMessage());
     http_response_code(500);

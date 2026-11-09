@@ -49,10 +49,15 @@ export function useAprobacion(): AprobacionState {
     // Re-consulta cada 30s para que el panel se desbloquee solo al aprobar
     const intervalo = setInterval(consultar, 30000);
     window.addEventListener('sidebar-refresh', consultar);
+    // Seguro: nunca quedarse cargando para siempre (el intervalo corrige al reintentar).
+    const tope = setTimeout(() => {
+      if (activo) setState((s) => (s.cargando ? { ...s, cargando: false } : s));
+    }, 12000);
 
     return () => {
       activo = false;
       clearInterval(intervalo);
+      clearTimeout(tope);
       window.removeEventListener('sidebar-refresh', consultar);
     };
   }, []);

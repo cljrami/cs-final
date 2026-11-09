@@ -45,7 +45,7 @@ try {
             $where[] = 'activa = 0';
         }
 
-        // FIX: ParíƒÂ¡metros íƒÂºnicos para cada LIKE (PDO no permite reutilizar :search)
+        // FIX: Par?metros ?nicos para cada LIKE (PDO no permite reutilizar :search)
         if ($search !== '') {
             $where[] = '(nombre LIKE :search1)';
             $params[':search1'] = '%' . $search . '%';
@@ -112,7 +112,7 @@ try {
         $orden = isset($input['orden']) ? intval($input['orden']) : 0;
         $activa = isset($input['activa']) ? (int)$input['activa'] : 1;
 
-        // === VALIDACIíƒâ€œN CON ERRORES POR CAMPO ===
+        // === VALIDACIÓN CON ERRORES POR CAMPO ===
         $fieldErrors = [];
 
         if (empty($nombre)) {
@@ -123,7 +123,7 @@ try {
             $fieldErrors['nombre'] = 'El nombre no puede exceder 100 caracteres';
         }
 
-        // Solo verificar duplicado si el nombre es víƒÂ¡lido
+        // Solo verificar duplicado si el nombre es v?lido
         if (empty($fieldErrors['nombre'])) {
             $checkStmt = $pdo->prepare("SELECT id, nombre FROM ciudades WHERE LOWER(nombre) = LOWER(?)");
             $checkStmt->execute([$nombre]);
@@ -171,7 +171,7 @@ try {
 
         if ($id <= 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID de ciudad no víƒÂ¡lido']);
+            echo json_encode(['success' => false, 'error' => 'ID de ciudad no v?lido']);
             exit;
         }
 
@@ -192,7 +192,7 @@ try {
             $nombre = trim($input['nombre']);
 
             if (empty($nombre)) {
-                $fieldErrors['nombre'] = 'El nombre no puede estar vacíƒÂ­o';
+                $fieldErrors['nombre'] = 'El nombre no puede estar vac?o';
             } elseif (strlen($nombre) < 2) {
                 $fieldErrors['nombre'] = 'El nombre debe tener al menos 2 caracteres';
             } elseif (strlen($nombre) > 100) {
@@ -221,7 +221,7 @@ try {
             $values[] = (int)$input['activa'];
         }
 
-        // Si hay errores de validaciíƒÂ³n, devolverlos
+        // Si hay errores de validaci?n, devolverlos
         if (!empty($fieldErrors)) {
             http_response_code(422);
             echo json_encode([
@@ -266,7 +266,7 @@ try {
 
         if ($id <= 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID de ciudad no víƒÂ¡lido']);
+            echo json_encode(['success' => false, 'error' => 'ID de ciudad no v?lido']);
             exit;
         }
 
@@ -305,9 +305,9 @@ try {
         exit;
     }
 
-    // MíƒÂ©todo no permitido
+    // M?todo no permitido
     http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'MíƒÂ©todo no permitido']);
+    echo json_encode(['success' => false, 'error' => 'M?todo no permitido']);
 } catch (PDOException $e) {
     error_log("Error ciudades.php PDO: " . $e->getMessage());
     http_response_code(500);

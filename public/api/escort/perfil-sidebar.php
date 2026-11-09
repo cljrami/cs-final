@@ -15,7 +15,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || (isset($tokenData['exp']) ? $tokenData['exp'] : 0) < time()) {
         jsonError('Token inválido o expirado', 401);
@@ -30,12 +30,22 @@ try {
     $pdo = getDBConnection();
 
     $fotoPortada = null;
+    $fotoPortadaTipo = null;
+    $fotoPortadaGif = null;
     try {
-        $stmtFoto = $pdo->prepare("SELECT f.url FROM escort_fotos f WHERE f.escort_id = ? AND f.es_portada = 1 LIMIT 1");
+        $stmtFoto = $pdo->prepare("SELECT f.url, f.tipo, f.gif_url FROM escort_fotos f WHERE f.escort_id = ? AND f.es_portada = 1 LIMIT 1");
         $stmtFoto->execute([$escortId]);
-        $fotoPortada = $stmtFoto->fetchColumn();
+        $fotoRow = $stmtFoto->fetch(PDO::FETCH_ASSOC);
+        if ($fotoRow) {
+            $fotoPortada = $fotoRow['url'];
+            $fotoPortadaTipo = $fotoRow['tipo'];
+            $fotoPortadaGif = $fotoRow['gif_url'];
+        }
     } catch (Throwable $e) {
         $fotoPortada = null;
+    }
+    if ($fotoPortadaTipo === 'video' && !empty($fotoPortadaGif)) {
+        $fotoPortada = $fotoPortadaGif;
     }
 
     // ¿Existe la columna aprobada? (por si la migración aún no se ejecuta)
@@ -56,6 +66,7 @@ try {
             e.estado as estado_cuenta,
             CAST(e.verificado AS UNSIGNED) as verificado,
             CAST(e.vip AS UNSIGNED) as vip,
+            e.fecha_vip_expira as fecha_vip_expira,
             p.nombre as plan_nombre,
             p.color_badge as plan_color,
             s.estado as plan_estado,
@@ -65,10 +76,12 @@ try {
              JOIN planes px ON px.id = sx.plan_id 
              WHERE sx.escort_id = e.id 
                AND px.tipo = 'extra' 
-               AND sx.estado = 'activa') as extras_activos
+               AND sx.estado = 'activa'
+               AND (sx.fecha_fin IS NULL OR sx.fecha_fin >= CURDATE())) as extras_activos
         FROM escorts e
         LEFT JOIN suscripciones s ON s.escort_id = e.id 
             AND s.estado IN ('activa', 'pausada')
+            AND (s.estado = 'pausada' OR s.fecha_fin >= CURDATE())
             AND s.plan_id IN (SELECT id FROM planes WHERE tipo = 'base')
         LEFT JOIN planes p ON p.id = s.plan_id
         WHERE e.id = ?
@@ -82,6 +95,11 @@ try {
         jsonError('Escort no encontrada', 404);
     }
 
+    if ($fotoPortada) {
+        if (strpos($fotoPortada, '/api/serve-upload.php') !== 0 && strpos($fotoPortada, 'http') !== 0) {
+            $fotoPortada = '/api/serve-upload.php?path=/' . ltrim($fotoPortada, '/');
+        }
+    }
     $escort['foto_portada'] = $fotoPortada;
     $escort['nombre_artistico'] = $escort['nombre'];
     $escort['aprobada'] = (bool)($escort['aprobada'] ?? 0) 
@@ -115,6 +133,13 @@ try {
     $escort['pausas_maximas'] = isset($escort['pausas_maximas']) ? (int)$escort['pausas_maximas'] : 0;
     $escort['pausas_restantes'] = max(0, $escort['pausas_maximas'] - $escort['pausas_usadas']);
 
+    // Calcular VIP vigente
+    $vipVigente = 0;
+    if (!empty($escort['vip']) && $escort['vip'] == 1 && !empty($escort['fecha_vip_expira'])) {
+        $vipVigente = strtotime($escort['fecha_vip_expira']) >= time() ? 1 : 0;
+    }
+    $escort['vip_vigente'] = $vipVigente;
+
     $stmtVip = $pdo->prepare("
         SELECT estado 
         FROM escort_vip_solicitudes 
@@ -126,6 +151,20 @@ try {
     $stmtVip->execute([$escortId]);
     $vipSolicitud = $stmtVip->fetch(PDO::FETCH_ASSOC);
     $escort['vip_solicitud_estado'] = isset($vipSolicitud['estado']) ? $vipSolicitud['estado'] : null;
+
+    // Estado de solicitud de extras
+    $stmtExtras = $pdo->prepare("
+        SELECT s.estado
+        FROM suscripciones s
+        JOIN planes p ON p.id = s.plan_id AND p.tipo = 'extra'
+        WHERE s.escort_id = ?
+          AND s.estado IN ('pendiente', 'enviado', 'rechazada')
+        ORDER BY s.creado_en DESC
+        LIMIT 1
+    ");
+    $stmtExtras->execute([$escortId]);
+    $extrasSolicitud = $stmtExtras->fetch(PDO::FETCH_ASSOC);
+    $escort['extras_solicitud_estado'] = isset($extrasSolicitud['estado']) ? $extrasSolicitud['estado'] : null;
 
     if ($escort['verificado'] == 1) {
         $escort['verificacion_estado'] = 'aprobada';

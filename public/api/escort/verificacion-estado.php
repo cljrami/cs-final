@@ -21,7 +21,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || ($tokenData['exp'] ?? 0) < time()) {
         http_response_code(401);
@@ -57,7 +57,8 @@ $pdo = getDBConnection();
         if ($verificacion) {
             $cb = !empty($verificacion['creado_en']) ? '&_=' . strtotime($verificacion['creado_en']) : '';
             if (!empty($verificacion['foto_perfil_real'])) {
-                $verificacion['foto_perfil_real'] = '/api/serve-upload.php?path=' . urlencode($verificacion['foto_perfil_real']) . $cb;
+                $tokenPart = '&token=' . urlencode($token);
+                $verificacion['foto_perfil_real'] = '/api/serve-upload.php?path=' . urlencode($verificacion['foto_perfil_real']) . ($cb ? $cb : '') . $tokenPart;
             }
         }
 
@@ -81,7 +82,8 @@ $pdo = getDBConnection();
     if ($verificacion) {
         $cb = !empty($verificacion['creado_en']) ? '&_=' . strtotime($verificacion['creado_en']) : '';
         if (!empty($verificacion['foto_perfil_real'])) {
-            $verificacion['foto_perfil_real'] = '/api/serve-upload.php?path=' . urlencode($verificacion['foto_perfil_real']) . $cb;
+            $tokenPart = '&token=' . urlencode($token);
+            $verificacion['foto_perfil_real'] = '/api/serve-upload.php?path=' . urlencode($verificacion['foto_perfil_real']) . ($cb ? $cb : '') . $tokenPart;
         }
         echo json_encode([
             'success' => true,

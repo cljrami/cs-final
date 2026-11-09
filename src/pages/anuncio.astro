@@ -1,0 +1,12 @@
+---
+import Layout from "../layouts/Layout.astro";
+import AnuncioPortal from "../components/AnuncioPortal";
+
+const codigo = Astro.url.searchParams.get("c") || "";
+---
+
+<Layout title="Estadísticas de mi anuncio" robots="noindex, nofollow" showNavFooter={true}>
+  <main class="min-h-screen bg-page px-4 py-10">
+    <AnuncioPortal client:load codigoInicial={codigo} />
+  </main>
+</Layout>

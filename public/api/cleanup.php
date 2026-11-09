@@ -2,7 +2,7 @@
 header('Content-Type: application/json');
 header('Cache-Control: no-cache, no-store, must-revalidate');
 
-require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/bootstrap.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);

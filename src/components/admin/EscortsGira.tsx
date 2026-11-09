@@ -1,5 +1,6 @@
 // src/components/admin/EscortsGira.tsx
 import { useState, useEffect, useRef } from 'react';
+import { Skeleton } from '../ui/Skeleton';
 import StatCard from '../ui/StatCard';
 import DataTable from '../ui/DataTable';
 import type { Column, ActionItem } from '../ui/DataTable';
@@ -336,9 +337,10 @@ export default function EscortsGira() {
       />
 
       {isLoading ? (
-        <div className="bg-admin-card border border-admin-border rounded-2xl p-8 text-center">
-          <i className="fas fa-circle-notch fa-spin text-purple-400 text-3xl mb-3"></i>
-          <p className="text-gray-400">Cargando escorts en gira...</p>
+        <div className="space-y-3">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="h-4 w-full" />
+          ))}
         </div>
       ) : escorts.length === 0 ? (
         <div className="bg-admin-card border border-admin-border rounded-2xl p-8 text-center">

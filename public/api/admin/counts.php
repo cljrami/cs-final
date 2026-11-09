@@ -39,6 +39,8 @@ try {
     $sinceEscorts = getSince('escorts');
     $escorts = safeCount($pdo, "SELECT COUNT(*) FROM escorts WHERE eliminada = 0" . ($sinceEscorts ? " AND created_at > " . $pdo->quote($sinceEscorts) : ""));
 
+    $escortsPendientes = safeCount($pdo, "SELECT COUNT(*) FROM escorts WHERE aprobada = 0 AND eliminada = 0");
+
     $escortsEnGira = safeCount($pdo, "SELECT COUNT(*) FROM escorts WHERE en_gira = 1 AND eliminada = 0");
 
     $verificacionesPendientes = safeCount($pdo, "SELECT COUNT(*) FROM verificaciones WHERE estado = 'pendiente'");
@@ -100,10 +102,14 @@ try {
         SELECT COUNT(*) FROM reportes WHERE estado = 'pending'"
     );
 
+    $bannersSolicitudes = safeCount($pdo, "SELECT COUNT(*) FROM banners WHERE estado = 'solicitud'");
+    $bannersActivos = safeCount($pdo, "SELECT COUNT(*) FROM banners WHERE estado = 'activo'");
+
     echo json_encode([
         'success' => true,
         'counts' => [
             'escorts' => $escorts,
+            'escortsPendientes' => $escortsPendientes,
             'escortsEnGira' => $escortsEnGira,
             'verificaciones' => $verificacionesTotal,
             'verificacionesPendientes' => $verificacionesPendientes,
@@ -124,6 +130,8 @@ try {
             'suscripcionesPendientes' => $suscripcionesPendientes,
             'comentariosPendientes' => $comentariosPendientes,
             'reportesPendientes' => $reportesPendientes,
+            'bannersSolicitudes' => $bannersSolicitudes,
+            'bannersActivos' => $bannersActivos,
         ]
     ]);
 } catch (PDOException $e) {

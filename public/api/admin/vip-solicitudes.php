@@ -125,9 +125,7 @@ try {
             ],
             'plan_vip' => $s['plan_vip'],
             'estado' => $s['estado'],
-            'comprobante_pago' => $s['comprobante_pago']
-                ? '/api/serve-upload.php?path=/' . ltrim($s['comprobante_pago'], '/')
-                : null,
+            'comprobante_pago' => comprobante_url($s['comprobante_pago']),
             'admin_notas' => $s['admin_notas'],
             'fecha_solicitud' => $s['fecha_solicitud'],
             'fecha_respuesta' => $s['fecha_respuesta'],

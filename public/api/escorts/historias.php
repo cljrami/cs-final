@@ -37,11 +37,15 @@ try {
             h.creado_en,
             e.nombre,
             e.foto_principal,
-            (SELECT f.url FROM escort_fotos f WHERE f.escort_id = e.id AND f.es_portada = 1 LIMIT 1) as foto_portada,
+            pf.url as foto_portada,
+            pf.tipo as foto_portada_tipo,
+            pf.gif_url as foto_portada_gif_url,
             e.vip,
-            e.verificado
+            e.verificado,
+            e.fecha_vip_expira
         FROM escort_historias h
         JOIN escorts e ON e.id = h.escort_id
+        LEFT JOIN escort_fotos pf ON pf.escort_id = e.id AND pf.es_portada = 1
         LEFT JOIN ciudades gc ON gc.id = e.gira_ciudad_id
         WHERE h.expira_en > NOW()
           AND $where
@@ -70,6 +74,15 @@ try {
             $fotoPortada = '/api/serve-upload.php?path=/' . ltrim($fotoPortada, '/');
         }
 
+        $fotoPortadaGif = $r['foto_portada_gif_url'];
+        if ($fotoPortadaGif && strpos($fotoPortadaGif, '/api/serve-upload.php') !== 0 && strpos($fotoPortadaGif, 'http') !== 0) {
+            $fotoPortadaGif = '/api/serve-upload.php?path=/' . ltrim($fotoPortadaGif, '/');
+        }
+        $fotoPortadaTipo = $r['foto_portada_tipo'] ?? null;
+        if ($fotoPortadaTipo === 'video' && $fotoPortadaGif) {
+            $fotoPortada = $fotoPortadaGif;
+        }
+
         if (!isset($escorts[$eid])) {
             $escorts[$eid] = [
                 'escort_id' => $eid,
@@ -78,6 +91,10 @@ try {
                 'foto_portada' => $fotoPortada,
                 'vip' => (int)$r['vip'],
                 'verificado' => (int)$r['verificado'],
+                // Plan vigente garantizado por el WHERE: vigente = crudo,
+                // salvo VIP expirado por fecha propia.
+                'verificado_vigente' => (int)$r['verificado'],
+                'vip_vigente' => ((int)$r['vip'] === 1 && (empty($r['fecha_vip_expira']) || $r['fecha_vip_expira'] >= date('Y-m-d H:i:s'))) ? 1 : 0,
                 'historias' => [],
             ];
         }

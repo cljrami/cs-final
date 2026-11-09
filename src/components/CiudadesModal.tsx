@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Skeleton } from './ui/Skeleton';
+import { useSiteTexts } from '../hooks/useSiteTexts';
+import BannerSlot from './BannerSlot';
 
 interface Ciudad {
   id: number;
@@ -19,6 +21,18 @@ export default function CiudadesModal({ isOpen, onClose }: Props) {
   const [loading, setLoading] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
+  const texts = useSiteTexts();
+
+  const T = {
+    titulo: texts?.modal_ciudades_titulo || 'Selecciona una ciudad',
+    placeholder: texts?.modal_ciudades_placeholder || 'Escribe el nombre de la ciudad...',
+    sinResultados: texts?.modal_ciudades_sin_resultados || 'No hay ciudades disponibles',
+    noEncontrada: texts?.modal_ciudades_no_encontrada || 'No se encontró "{query}"',
+    contador: texts?.modal_ciudades_contador || '{cantidad} ciudades',
+    escortsCount: texts?.modal_ciudades_escorts_count || '{cantidad} escorts',
+  };
+
+  const fmt = (tpl: string, vars: Record<string, string>) => tpl.replace(/\{(\w+)\}/g, (m, k) => vars[k] ?? m);
 
   useEffect(() => {
     if (isOpen) {
@@ -57,7 +71,7 @@ export default function CiudadesModal({ isOpen, onClose }: Props) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[10vh] p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[500] flex items-start justify-center pt-[10vh] p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div
         ref={modalRef}
         onClick={(e) => e.stopPropagation()}
@@ -67,7 +81,7 @@ export default function CiudadesModal({ isOpen, onClose }: Props) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
           <div className="flex items-center gap-2">
             <i className="fas fa-map-marker-alt text-red-400"></i>
-            <h3 className="text-ink font-bold text-base">Selecciona una ciudad</h3>
+            <h3 className="text-ink font-bold text-base">{texts ? T.titulo : <Skeleton width={150} height={16} inline />}</h3>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-muted hover:text-ink transition-colors">
             <i className="fas fa-times text-sm"></i>
@@ -81,7 +95,7 @@ export default function CiudadesModal({ isOpen, onClose }: Props) {
             <input
               ref={inputRef}
               type="text"
-              placeholder="Escribe el nombre de la ciudad..."
+              placeholder={texts ? T.placeholder : ''}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="flex-1 bg-transparent text-ink text-sm outline-none placeholder-gray-600 ml-2"
@@ -116,7 +130,7 @@ export default function CiudadesModal({ isOpen, onClose }: Props) {
                 <i className="fas fa-search text-muted text-sm"></i>
               </div>
               <p className="text-muted text-sm">
-                {query ? `No se encontró "${query}"` : 'No hay ciudades disponibles'}
+                {query ? fmt(T.noEncontrada, { query }) : T.sinResultados}
               </p>
             </div>
           ) : (
@@ -135,7 +149,7 @@ export default function CiudadesModal({ isOpen, onClose }: Props) {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs bg-white/10 text-muted px-2 py-0.5 rounded-full">
-                      {c.escorts_activas} escort{c.escorts_activas !== 1 ? 's' : ''}
+                      {fmt(T.escortsCount, { cantidad: String(c.escorts_activas) })}
                     </span>
                     <i className="fas fa-chevron-right text-muted text-xs group-hover:text-red-400 transition-colors"></i>
                   </div>
@@ -145,9 +159,14 @@ export default function CiudadesModal({ isOpen, onClose }: Props) {
           )}
         </div>
 
+        {/* Banner bajo el buscador */}
+        <div className="px-5 py-2 border-t border-white/5">
+          <BannerSlot placement="selector_ciudad" />
+        </div>
+
         {/* Footer */}
         <div className="px-5 py-3 border-t border-white/5 text-center">
-          <span className="text-muted text-xs">{filtered.length} ciudad{filtered.length !== 1 ? 'es' : ''}</span>
+          <span className="text-muted text-xs">{fmt(T.contador, { cantidad: String(filtered.length) })}</span>
         </div>
       </div>
     </div>

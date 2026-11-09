@@ -26,17 +26,26 @@ if (!$id) {
 
 try {
     $pdo = getDBConnection();
-
-    $stmt = $pdo->prepare("UPDATE escorts SET activa = 0, estado = 'suspendida' WHERE id = ? AND eliminada = 0");
-    $stmt->execute([$id]);
-
-    if ($stmt->rowCount() === 0) {
-        echo json_encode(['success' => false, 'error' => 'Escort no encontrada']);
-        exit;
+    $pdo->beginTransaction();
+    // Eliminación definitiva completa con datos relacionados
+    $tables = [
+        'pagos', 'suscripciones', 'escort_vip_solicitudes', 'verificaciones',
+        'reportes', 'planes_usados', 'historial_pausas', 'suscripciones_historial',
+        'estadisticas_diarias', 'servicios', 'valoraciones',
+        'escort_fotos', 'escort_historias', 'escort_idiomas', 'escort_servicios',
+        'favoritos', 'comentarios', 'notificaciones', 'codigos_verificacion',
+        'sticky_posiciones', 'banners'
+    ];
+    foreach ($tables as $t) {
+        try { $pdo->prepare("DELETE FROM `{$t}` WHERE escort_id = ?")->execute([$id]); } catch (PDOException $e) { error_log("desactivar table {$t}: " . $e->getMessage()); }
     }
-
-    echo json_encode(['success' => true]);
+    $stmt = $pdo->prepare("DELETE FROM escorts WHERE id = ?");
+    $stmt->execute([$id]);
+    $pdo->commit();
+    echo json_encode(['success' => true, 'message' => 'Escort eliminada definitivamente']);
 } catch (PDOException $e) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+    error_log("Error escort-desactivar.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Error de base de datos']);
+    echo json_encode(['success' => false, 'error' => 'Error de base de datos: ' . $e->getMessage()]);
 }

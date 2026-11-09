@@ -36,19 +36,23 @@ try {
     // Rate limit: máx 10 intentos por IP cada 15 minutos
     rateLimitLogin('login_escort', 10, 15, strtolower($usuario));
 
-    $stmt = $pdo->prepare("SELECT id, usuario, email, password_hash, nombre, primer_login, activa, eliminada, verificado, vip FROM escorts WHERE usuario = ? OR email = ?");
+    compatEnsureTokenVersion();
+
+    $stmt = $pdo->prepare("SELECT id, usuario, email, password_hash, nombre, primer_login, activa, eliminada, verificado, vip, token_version FROM escorts WHERE usuario = ? OR email = ?");
     $stmt->execute([$usuario, $usuario]);
     $escort = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$escort) {
+        // Hash dummy para igualar tiempos y no revelar si el usuario existe.
+        password_verify($password, '$2y$12$cqBFJdbT1wCVHlckB1Mz.uA8UUor2HjyinboWpzHNSt6Qf4pWagD');
         http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Usuario no encontrado']);
+        echo json_encode(['success' => false, 'error' => 'Credenciales incorrectas']);
         exit;
     }
 
     if (!password_verify($password, $escort['password_hash'])) {
         http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Contrasena incorrecta']);
+        echo json_encode(['success' => false, 'error' => 'Credenciales incorrectas']);
         exit;
     }
 
@@ -58,7 +62,7 @@ try {
             'success' => false,
             'error' => 'Cuenta eliminada',
             'eliminada' => true,
-            'mensaje' => 'Tu cuenta fue eliminada. Para volver a publicar, regístrate nuevamente con este mismo email: tu cuenta se reactivará automáticamente y deberás seleccionar un plan de pago.'
+            'mensaje' => 'Tu cuenta fue eliminada. Para volver a publicar, registrate con el mismo email: se reactivara automaticamente y deberas elegir un plan de pago.',
         ]);
         exit;
     }
@@ -69,6 +73,7 @@ try {
         'id' => $escort['id'],
         'usuario' => $escort['usuario'],
         'tipo' => 'escort',
+        'tv' => (int)($escort['token_version'] ?? 0),
         'primer_login' => (int)$escort['primer_login'],
         'exp' => time() + (7 * 24 * 60 * 60)
     ];

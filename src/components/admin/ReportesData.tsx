@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import DataTable from '../ui/DataTable';
+import ConfirmModal from '../ui/ConfirmModal';
 import type { Column, ActionItem } from '../ui/DataTable';
 import StatCard from '../ui/StatCard';
 import type { Report } from '../../types/report';
@@ -27,6 +28,9 @@ export default function ReportesData() {
   const [actionType, setActionType] = useState<'review' | 'dismiss' | null>(null);
   const [viewReport, setViewReport] = useState<Report | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [selected, setSelected] = useState<Set<string | number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState<{ ids: (string | number)[]; message: string } | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const fetchReports = useCallback(async () => {
@@ -117,6 +121,30 @@ export default function ReportesData() {
       setConfirmActionId(null);
       setActionType(null);
     }
+  };
+
+  const handleBulkDelete = (sel: Set<string | number>) => {
+    if (sel.size === 0) return;
+    setBulkConfirm({
+      ids: Array.from(sel),
+      message: `Estas a punto de eliminar ${sel.size} reporte(s) seleccionado(s). Esta accion no se puede deshacer.`,
+    });
+  };
+
+  const confirmBulkDelete = async () => {
+    if (!bulkConfirm) return;
+    const ids = bulkConfirm.ids;
+    setBulkConfirm(null);
+    setBulkDeleting(true);
+    try {
+      const token = localStorage.getItem('admin_token') || '';
+      for (const id of ids) {
+        await fetch(API_BASE_URL, { method: 'DELETE', headers: { 'Content-Type': 'application/json', 'Authorization': Bearer  }, body: JSON.stringify({ id: Number(id) }) });
+      }
+      setSelected(new Set());
+      fetchReports(); window.dispatchEvent(new Event('counts-refresh'));
+    } catch (err: any) { setError(err.message); }
+    finally { setBulkDeleting(false); }
   };
 
   const handleDelete = async () => {
@@ -356,7 +384,23 @@ export default function ReportesData() {
         emptyMessage="No hay reportes"
         emptyIcon="fa-flag"
         getRowKey={(item) => item.id}
+        selectable
+        selected={selected}
+        onSelectionChange={setSelected}
+        onBulkDelete={handleBulkDelete}
         getActions={getActions}
+      />
+
+      <ConfirmModal
+        isOpen={bulkConfirm !== null}
+        title="Eliminar seleccionados"
+        message={bulkConfirm?.message || ''}
+        confirmText={bulkDeleting ? 'Eliminando...' : 'Eliminar'}
+        cancelText="Cancelar"
+        variant="danger"
+        confirmDisabled={bulkDeleting}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkConfirm(null)}
       />
 
       {totalPages > 1 && !loading && (

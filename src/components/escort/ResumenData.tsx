@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { Skeleton } from '../ui/Skeleton';
 import { API_BASE, getEscortHeaders } from '../../lib/escortAuth';
+import BloqueoPlan from './BloqueoPlan';
+import BloqueoAprobacion from './BloqueoAprobacion';
 
 interface EscortData {
   id: number;
@@ -15,8 +17,10 @@ interface EscortData {
   destacado: number;
   disponibleAhora: number;
   planVencido: boolean;
+  planSinPlan: boolean;
   planPausado: boolean;
   planVigente: boolean;
+  planPendiente: boolean;
   planNombre: string | null;
   planBadge: string | null;
   planColor: string | null;
@@ -35,6 +39,12 @@ interface EscortData {
   extraNombre: string | null;
   pausasUsadas: number;
   pausasMaximas: number;
+  // Estados efectivos (consideran plan vencido)
+  verificado_vigente?: number;
+  vip_vigente?: number;
+  destacado_vigente?: number;
+  sticky_vigente?: number;
+  activa_vigente?: number;
 }
 
 interface ToastState {
@@ -102,6 +112,33 @@ export default function ResumenData() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Sin plan vigente (vencido, sin plan, pendiente de aprobación, error o
+  // dato vacío) no se muestra nada de la sección: misma regla que el resto
+  // (ver usePlanEstado). Solo pausado sigue su flujo propio.
+  const sinPlanActivo = !loading && !!data && !data.planPausado && !data.planVigente;
+
+  if (sinPlanActivo && data) {
+    const motivo = data.planVencido || (data.planDiasRestantes ?? 1) <= 0 ? 'vencido' : 'sin-plan';
+    const esperaAprobacion = !!data.planPendiente;
+    // Misma pantalla de bloqueo que el resto de las secciones, con el
+    // encabezado propio del resumen (bienvenida + estado pendiente).
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold text-white">
+            Bienvenida, {data.nombreArtistico || data.nombre || 'Escort'}
+          </h1>
+          <div className="flex flex-wrap items-center gap-3 mt-2">
+            <span className="px-3 py-1 bg-amber-500/10 text-amber-400 rounded-full text-sm font-medium border border-amber-500/20">
+              <i className="fas fa-clock mr-1"></i>Pendiente
+            </span>
+          </div>
+        </div>
+        {esperaAprobacion ? <BloqueoAprobacion /> : <BloqueoPlan motivo={motivo} />}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -119,6 +156,14 @@ export default function ResumenData() {
             {data?.planPausado ? (
               <span className="px-3 py-1 bg-blue-500/10 text-blue-400 rounded-full text-sm font-medium border border-blue-500/20">
                 <i className="fas fa-pause-circle mr-1"></i>Pausado
+              </span>
+            ) : data?.planVencido || (data?.planDiasRestantes ?? 1) <= 0 ? (
+              <span className="px-3 py-1 bg-red-500/10 text-red-400 rounded-full text-sm font-medium border border-red-500/20">
+                <i className="fas fa-exclamation-triangle mr-1"></i>Vencido
+              </span>
+            ) : data?.planSinPlan ? (
+              <span className="px-3 py-1 bg-amber-500/10 text-amber-400 rounded-full text-sm font-medium border border-amber-500/20">
+                <i className="fas fa-exclamation-circle mr-1"></i>Sin plan
               </span>
             ) : data?.aprobada ? (
               <span className="px-3 py-1 bg-green-500/10 text-green-400 rounded-full text-sm font-medium border border-green-500/20">Aprobado</span>
@@ -141,14 +186,28 @@ export default function ResumenData() {
           </>
         ) : (
           <>
-            {data?.verificado === 1 && (
+            {data?.verificado_vigente === 1 && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-500/10 text-blue-400 text-xs font-medium border border-blue-500/20">
-                <i className="fas fa-check-circle"></i> Verificada
+                <i className="fas fa-check-circle" />
+                Verificada
               </span>
             )}
-            {data?.vip === 1 && (
+            {data?.verificado === 1 && data?.verificado_vigente === 0 && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/10 text-amber-400 text-xs font-medium border border-amber-500/20">
-                <i className="fas fa-crown"></i> VIP
+                <i className="fas fa-exclamation-triangle" />
+                Verificada (expirada)
+              </span>
+            )}
+            {data?.vip_vigente === 1 && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/10 text-amber-400 text-xs font-medium border border-amber-500/20">
+                <i className="fas fa-crown" />
+                VIP
+              </span>
+            )}
+            {data?.vip === 1 && data?.vip_vigente === 0 && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/10 text-amber-400 text-xs font-medium border border-amber-500/20">
+                <i className="fas fa-exclamation-triangle" />
+                VIP (expirado)
               </span>
             )}
             {data?.extraNombre && (
@@ -171,7 +230,7 @@ export default function ResumenData() {
       </div>
 
       {/* Disponible Ahora 🔥 toggle */}
-      {!loading && data && data.aprobada && (
+      {!loading && data && data.activa_vigente === 1 && (
         <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-all duration-300 ${data.disponibleAhora ? 'bg-red-500/20 text-red-400' : 'bg-gray-800 text-gray-600'}`}>
@@ -206,12 +265,28 @@ export default function ResumenData() {
       )}
 
       {/* Plan vencido warning */}
-      {!loading && data?.planVencido && !data?.planPausado && (
+      {!loading && (data?.planVencido || (data?.planDiasRestantes ?? 1) <= 0) && !data?.planPausado && (
         <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-6 text-center">
           <i className="fas fa-exclamation-triangle text-red-500 text-3xl mb-3"></i>
           <h3 className="text-white font-bold mb-1">Tu plan ha vencido</h3>
           <p className="text-gray-400 text-sm mb-4">Tu anuncio ya no aparece en el directorio</p>
-          <a href="/micuenta/planes" className="inline-block px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium transition-all">Renovar plan</a>
+          {(data?.verificado_vigente === 1 || data?.vip_vigente === 1) && (
+            <p className="text-amber-400 text-sm mb-4 flex items-center justify-center gap-1.5">
+              <i className="fas fa-exclamation-triangle" />
+              Al renovar perderás <strong>verificación</strong> y <strong>VIP</strong> (deberás solicitarlos de nuevo)
+            </p>
+          )}
+          <a href="/micuenta/planes" className="inline-block px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium transition-all">Contratar plan</a>
+        </div>
+      )}
+
+      {/* Plan sin plan (cuenta activa sin ningún plan base) */}
+      {!loading && data?.planSinPlan && (
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-6 text-center">
+          <i className="fas fa-exclamation-circle text-amber-500 text-3xl mb-3"></i>
+          <h3 className="text-white font-bold mb-1">Aún no tienes un plan activo</h3>
+          <p className="text-gray-400 text-sm mb-4">Contrata un plan para que tu anuncio aparezca en el directorio</p>
+          <a href="/micuenta/planes" className="inline-block px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-medium transition-all">Contratar plan</a>
         </div>
       )}
 

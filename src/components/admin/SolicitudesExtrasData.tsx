@@ -4,6 +4,7 @@ import DataTable from '../ui/DataTable';
 import type { Column, ActionItem } from '../ui/DataTable';
 import ConfirmModal from '../ui/ConfirmModal';
 import SearchFilters from './SearchFilters';
+import ComprobanteThumb from '../ui/ComprobanteThumb';
 import '@fancyapps/ui/dist/fancybox/fancybox.css';
 
 interface ExtraSuscripcion {
@@ -81,6 +82,9 @@ export default function SolicitudesExtrasData() {
   const [totalPages, setTotalPages] = useState(1);
 
   const [modalAction, setModalAction] = useState<{ item: ExtraSuscripcion; action: 'aprobar' | 'rechazar' | 'cancelar' | 'eliminar' } | null>(null);
+  const [selected, setSelected] = useState<Set<string | number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState<{ ids: (string | number)[]; message: string } | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [motivo, setMotivo] = useState('');
 
@@ -124,6 +128,29 @@ export default function SolicitudesExtrasData() {
     const timer = setTimeout(() => { setPage(1); fetchItems(1); }, 400);
     return () => clearTimeout(timer);
   }, [search]);
+
+  const handleBulkDelete = (sel: Set<string | number>) => {
+    if (sel.size === 0) return;
+    setBulkConfirm({
+      ids: Array.from(sel),
+      message: `Estas a punto de eliminar ${sel.size} suscripcion(es) extra seleccionado(s). Esta accion no se puede deshacer.`,
+    });
+  };
+
+  const confirmBulkDelete = async () => {
+    if (!bulkConfirm) return;
+    const ids = bulkConfirm.ids;
+    setBulkConfirm(null);
+    setBulkDeleting(true);
+    try {
+      for (const id of ids) {
+        await fetch(API_URL, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ action: 'eliminar', suscripcion_id: id, notas: '' }) });
+      }
+      setSelected(new Set());
+      fetchItems(); window.dispatchEvent(new Event('counts-refresh'));
+    } catch (err: any) { setError(err.message); }
+    finally { setBulkDeleting(false); }
+  };
 
   const handleAction = async () => {
     if (!modalAction) return;
@@ -232,16 +259,13 @@ export default function SolicitudesExtrasData() {
     },
     {
       key: 'comprobante', header: 'Comprobante', width: '70', align: 'center',
-      render: (item) => {
-        if (!item.suscripcion.comprobante_pago) return <span className="text-gray-600 text-xs">—</span>;
-        const isPdf = item.suscripcion.comprobante_pago.match(/\.pdf$/i);
-        return (
-          <a href={item.suscripcion.comprobante_pago} data-fancybox="extra-comprobante"
-            className="hover:opacity-80 transition-opacity">
-            <i className={`fas ${isPdf ? 'fa-file-pdf text-red-400' : 'fa-file-image text-emerald-400'} text-lg`}></i>
-          </a>
-        );
-      },
+      render: (item) => (
+        <ComprobanteThumb
+          url={item.suscripcion.comprobante_pago}
+          scope="admin"
+          group="extra-comprobante"
+        />
+      ),
     },
     {
       key: 'estado', header: 'Estado', width: '110', align: 'center',
@@ -309,6 +333,19 @@ export default function SolicitudesExtrasData() {
                 <p className="text-gray-400 text-sm mt-0.5">{cfg.message}</p>
               </div>
             </div>
+
+            {modalAction.item.suscripcion.comprobante_pago && (
+              <div className="bg-[#13131a] border border-[#2a2a3e] rounded-lg p-3 mb-4">
+                <div className="text-gray-500 text-xs mb-2">Comprobante de pago</div>
+                <div className="max-w-[220px]">
+                  <ComprobanteThumb
+                    url={modalAction.item.suscripcion.comprobante_pago}
+                    scope="admin"
+                    variant="preview"
+                  />
+                </div>
+              </div>
+            )}
 
             {(modalAction.action === 'rechazar' || modalAction.action === 'eliminar') && (
               <div className="mb-4">
@@ -389,7 +426,23 @@ export default function SolicitudesExtrasData() {
         emptyMessage="No hay solicitudes extras"
         emptyIcon="fa-plus-circle"
         getRowKey={(item) => item.suscripcion_id}
+        selectable
+        selected={selected}
+        onSelectionChange={setSelected}
+        onBulkDelete={handleBulkDelete}
         getActions={getActions}
+      />
+
+      <ConfirmModal
+        isOpen={bulkConfirm !== null}
+        title="Eliminar seleccionados"
+        message={bulkConfirm?.message || ''}
+        confirmText={bulkDeleting ? 'Eliminando...' : 'Eliminar'}
+        cancelText="Cancelar"
+        variant="danger"
+        confirmDisabled={bulkDeleting}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkConfirm(null)}
       />
 
       {totalPages > 1 && !isLoading && (

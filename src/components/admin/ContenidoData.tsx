@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Skeleton } from '../ui/Skeleton';
+import AdminField from './AdminField';
 
 interface TextoConfig {
   valor: string;
@@ -55,94 +55,13 @@ const GROUPS: Grupo[] = [
   },
   {
     titulo: 'Página de ciudad',
-    descripcion: 'Títulos de secciones y SEO de la página de cada ciudad.',
+    descripcion: 'Títulos de las secciones de la página de cada ciudad.',
     icono: 'fa-city',
     placeholders: 'Usa {ciudad} para insertar el nombre de la ciudad.',
     campos: [
       { key: 'seccion_ciudad_disponibles_titulo', label: 'Título disponibles (usa {ciudad})' },
       { key: 'seccion_ciudad_valoradas_titulo', label: 'Título más valoradas (usa {ciudad})' },
       { key: 'seccion_ciudad_nuevas_titulo', label: 'Título nuevas (usa {ciudad})' },
-      { key: 'seo_ciudad_h1', label: 'H1 (usa {ciudad})' },
-      { key: 'seo_ciudad_titulo', label: 'Título <title> (usa {ciudad})' },
-      { key: 'seo_ciudad_description', label: 'Meta description (usa {ciudad}, máx 160 chars)', textarea: true },
-      { key: 'seo_ciudad_keywords', label: 'Meta keywords (usa {ciudad})', textarea: true },
-    ],
-  },
-  {
-    titulo: 'Perfil de escort',
-    descripcion: 'Títulos y metadatos SEO del perfil público de cada escort.',
-    icono: 'fa-user',
-    placeholders: 'Usa {nombre}, {edad}, {ciudad} y {descripcion}.',
-    campos: [
-      { key: 'seo_escort_titulo', label: 'Título <title> (usa {nombre}, {edad})' },
-      { key: 'seo_escort_description', label: 'Meta description (usa {nombre}, {ciudad}, {descripcion})', textarea: true },
-      { key: 'seo_escort_og_titulo', label: 'Título Open Graph (usa {nombre}, {edad})' },
-      { key: 'seo_escort_og_description', label: 'Descripción Open Graph (usa {nombre}, {ciudad})', textarea: true },
-    ],
-  },
-  {
-    titulo: 'Páginas del sitio',
-    descripcion: 'Títulos y descripciones de las páginas internas.',
-    icono: 'fa-file-lines',
-    campos: [
-      { key: 'seo_inicio_titulo', label: 'Meta Título <title> de inicio' },
-      { key: 'seo_inicio_description', label: 'Descripción inicio', textarea: true },
-      { key: 'seo_login_titulo', label: 'Título iniciar sesión' },
-      { key: 'seo_login_description', label: 'Descripción iniciar sesión', textarea: true },
-      { key: 'seo_registro_titulo', label: 'Título registro' },
-      { key: 'seo_registro_description', label: 'Descripción registro', textarea: true },
-      { key: 'seo_recuperar_titulo', label: 'Título recuperar contraseña' },
-      { key: 'seo_recuperar_description', label: 'Descripción recuperar contraseña', textarea: true },
-      { key: 'seo_404_titulo', label: 'Título 404' },
-      { key: 'seo_404_description', label: 'Descripción 404', textarea: true },
-      { key: 'seo_pausado_titulo', label: 'Título perfil pausado' },
-      { key: 'seo_pausado_description', label: 'Descripción perfil pausado', textarea: true },
-    ],
-  },
-  {
-    titulo: 'Open Graph / Redes',
-    descripcion: 'Configuración de Open Graph y Twitter Card para compartir en redes.',
-    icono: 'fa-share-nodes',
-    campos: [
-      { key: 'og_imagen', label: 'Imagen Open Graph (1200x630)', tipo: 'imagen' },
-      { key: 'og_type', label: 'Tipo (ej: website)' },
-      { key: 'twitter_handle', label: 'Handle de Twitter/X (ej: @marca)' },
-      { key: 'og_fb_app_id', label: 'Facebook App ID' },
-    ],
-  },
-  {
-    titulo: 'Schema.org (JSON-LD)',
-    descripcion: 'Datos estructurados de la organización (Organización/WebSite) para buscadores.',
-    icono: 'fa-magnifying-glass-chart',
-    placeholders: 'sameAs debe ser un JSON: ["https://facebook.com/...", "https://instagram.com/..."]',
-    campos: [
-      { key: 'schema_habilitado', label: 'Habilitar Schema.org', tipo: 'bool' },
-      { key: 'schema_tipo', label: 'Tipo (ej: Organization)' },
-      { key: 'schema_nombre', label: 'Nombre' },
-      { key: 'schema_url', label: 'URL' },
-      { key: 'schema_logo', label: 'Logo (URL)' },
-      { key: 'schema_description', label: 'Descripción', textarea: true },
-      { key: 'schema_sameAs', label: 'Perfiles sociales (JSON)', tipo: 'json' },
-      { key: 'schema_email', label: 'Email de contacto' },
-      { key: 'schema_telefono', label: 'Teléfono' },
-      { key: 'schema_localidad', label: 'Localidad' },
-      { key: 'schema_pais', label: 'País (ej: CL)' },
-      { key: 'schema_imagen', label: 'Imagen (1200x630 recomendado)', tipo: 'imagen' },
-    ],
-  },
-  {
-    titulo: 'SEO general',
-    descripcion: 'Metadatos y configuración SEO global del sitio.',
-    icono: 'fa-magnifying-glass',
-    campos: [
-      { key: 'seo_description', label: 'Meta Description (máx 160 chars)', textarea: true },
-      { key: 'seo_keywords', label: 'Meta Keywords', textarea: true },
-      { key: 'seo_url', label: 'URL principal' },
-      { key: 'seo_canonical', label: 'Canonical URL' },
-      { key: 'seo_robots', label: 'Robots Tag (ej: INDEX, FOLLOW)' },
-      { key: 'seo_author', label: 'Author' },
-      { key: 'seo_publisher', label: 'Publisher' },
-      { key: 'seo_lang', label: 'Idioma del sitio (ej: es, en)' },
     ],
   },
   {
@@ -187,6 +106,85 @@ const GROUPS: Grupo[] = [
       { key: 'nav_cerrar_sesion', label: 'Botón "Cerrar sesión"' },
     ],
   },
+  {
+    titulo: 'Footer',
+    descripcion: 'Los textos del pie de página que se muestran en todo el sitio.',
+    icono: 'fa-shoe-prints',
+    campos: [
+      { key: 'footer_logo_1', label: 'Parte 1 del logo' },
+      { key: 'footer_logo_2', label: 'Parte 2 del logo' },
+      { key: 'footer_descripcion', label: 'Descripción bajo el logo', textarea: true },
+      { key: 'footer_titulo_paginas', label: 'Título columna "Páginas"' },
+      { key: 'footer_titulo_contacto', label: 'Título columna "Contacto"' },
+      { key: 'footer_panel_escort', label: 'Enlace "Panel Escort"' },
+      { key: 'footer_registro_usuario', label: 'Enlace "Registro Usuario"' },
+      { key: 'footer_registro_escort', label: 'Enlace "Registro Escort"' },
+      { key: 'footer_entrar_usuario', label: 'Enlace "Entrar como Usuario"' },
+      { key: 'footer_entrar_escort', label: 'Enlace "Entrar como Escort"' },
+      { key: 'footer_negocios', label: 'Enlace "Negocios"' },
+      { key: 'footer_anuncia_negocio', label: 'Enlace "Anuncia tu negocio"' },
+      { key: 'footer_email', label: 'Email de contacto (completo)' },
+      { key: 'footer_url_twitter', label: 'URL Twitter (vacío = sin enlace)' },
+      { key: 'footer_url_instagram', label: 'URL Instagram (vacío = sin enlace)' },
+      { key: 'footer_url_telegram', label: 'URL Telegram (vacío = sin enlace)' },
+      { key: 'footer_copy', label: 'Línea de copyright (pie)' },
+      { key: 'footer_derechos', label: 'Texto de derechos reservados' },
+      { key: 'footer_mayores18', label: 'Aviso mayores de 18 años' },
+    ],
+  },
+  {
+    titulo: 'Textos de tarjetas y stats',
+    descripcion: 'Badges de las tarjetas de escorts, etiquetas de estadísticas y testimonios.',
+    icono: 'fa-id-card',
+    campos: [
+      { key: 'badge_disponible', label: 'Badge "Disponible"' },
+      { key: 'badge_gira', label: 'Badge "En gira"' },
+      { key: 'badge_gira_ciudad', label: 'Badge gira con ciudad (usa {ciudad})' },
+      { key: 'badge_nueva', label: 'Badge "Nueva"' },
+      { key: 'badge_verificada', label: 'Badge "Verificada"' },
+      { key: 'badge_vip', label: 'Badge "VIP"' },
+      { key: 'badge_anios', label: 'Formato edad (usa {edad})' },
+      { key: 'badge_valoracion', label: 'Formato valoración (usa {rating}, {reseñas})' },
+      { key: 'stat_escorts_label', label: 'Stats: escorts activas' },
+      { key: 'stat_ciudades_label', label: 'Stats: ciudades' },
+      { key: 'stat_verificadas_label', label: 'Stats: perfiles verificados' },
+      { key: 'stat_valoraciones_label', label: 'Stats: valoraciones' },
+      { key: 'testimonios_titulo', label: 'Título de testimonios' },
+    ],
+  },
+  {
+    titulo: 'Modal de ciudades y estados vacíos',
+    descripcion: 'Mensajes del modal de ciudades, contadores y estados sin resultados.',
+    icono: 'fa-city',
+    campos: [
+      { key: 'modal_ciudades_titulo', label: 'Título del modal' },
+      { key: 'modal_ciudades_placeholder', label: 'Placeholder del buscador' },
+      { key: 'modal_ciudades_sin_resultados', label: 'Sin ciudades' },
+      { key: 'modal_ciudades_no_encontrada', label: 'Ciudad no encontrada (usa {query})' },
+      { key: 'modal_ciudades_contador', label: 'Contador de ciudades (usa {cantidad})' },
+      { key: 'modal_ciudades_escorts_count', label: 'Contador de escorts por ciudad (usa {cantidad})' },
+      { key: 'seccion_escorts_vacia', label: 'Secciones sin escorts' },
+      { key: 'seccion_cargando_mas', label: 'Texto "Cargando más..."' },
+      { key: 'contador_escorts', label: 'Contador de escorts (usa {cantidad})' },
+      { key: 'contador_nuevas', label: 'Contador de nuevas (usa {cantidad})' },
+      { key: 'contador_disponibles', label: 'Contador de disponibles (usa {cantidad})' },
+    ],
+  },
+  {
+    titulo: 'Página de ciudad',
+    descripcion: 'Estados vacíos y contadores de la página de ciudad.',
+    icono: 'fa-map-location-dot',
+    campos: [
+      { key: 'cta_badge', label: 'Badge del CTA final' },
+      { key: 'ciudad_sin_resultados', label: 'Sin resultados de búsqueda' },
+      { key: 'ciudad_sin_resultados_filtros', label: 'Complemento con filtros' },
+      { key: 'ciudad_sin_escorts', label: 'Sin escorts en ciudad (usa {ciudad})' },
+      { key: 'ciudad_contador_resultados', label: 'Contador de resultados (usa {cantidad})' },
+      { key: 'ciudad_hint_filtros', label: 'Sugerencia con filtros' },
+      { key: 'ciudad_hint_vuelve', label: 'Sugerencia sin publicaciones' },
+      { key: 'ciudad_limpiar_filtros', label: 'Botón "Limpiar filtros"' },
+    ],
+  },
 ];
 
 const DEFAULTS: Record<string, string> = {
@@ -205,55 +203,11 @@ const DEFAULTS: Record<string, string> = {
   seccion_ciudad_disponibles_titulo: 'Disponibles ahora en {ciudad}',
   seccion_ciudad_valoradas_titulo: 'Más valoradas en {ciudad}',
   seccion_ciudad_nuevas_titulo: 'Nuevas en {ciudad}',
-  seo_ciudad_h1: 'Escorts en {ciudad}',
-  seo_ciudad_titulo: 'Escorts en {ciudad} | CSEscorts',
-  seo_ciudad_description: 'Encuentra escorts y acompañantes en {ciudad}. Perfiles verificados y actualizados diariamente.',
-  seo_ciudad_keywords: 'escorts en {ciudad}, acompañantes en {ciudad}, escorts {ciudad}',
-  seo_escort_titulo: '{nombre}, {edad} años | CSEscorts',
-  seo_escort_description: 'Perfil de {nombre} en {ciudad}. {descripcion}',
-  seo_escort_og_titulo: '{nombre}, {edad} años - CSEscorts',
-  seo_escort_og_description: 'Perfil verificado de {nombre} en {ciudad}',
-  seo_inicio_titulo: 'Inicio',
-  seo_inicio_description: 'Directorio Premium de Escorts en Chile',
-  seo_login_titulo: 'Iniciar sesión',
-  seo_login_description: 'Accede a tu cuenta para guardar favoritos y valorar perfiles',
-  seo_registro_titulo: 'Crear cuenta',
-  seo_registro_description: 'Crea tu cuenta de usuario para guardar favoritos y valorar perfiles',
-  seo_recuperar_titulo: 'Recuperar Contraseña',
-  seo_recuperar_description: 'Recupera el acceso a tu cuenta',
-  seo_404_titulo: 'Página no encontrada',
-  seo_404_description: 'La página que buscas no existe o fue movida',
-  seo_pausado_titulo: 'Perfil pausado',
-  seo_pausado_description: 'Este perfil está temporalmente pausado',
-  seo_description: 'Directorio Premium de Escorts en Chile',
-  seo_keywords: 'escorts, chile, acompañantes, putas, escort, modelo, chilena, santiago, valdivia',
-  seo_url: 'https://kimi.zona8.cl/',
-  seo_canonical: 'https://kimi.zona8.cl/',
-  seo_robots: 'INDEX, FOLLOW',
-  seo_author: 'Kimi',
-  seo_publisher: 'Kimi',
-  seo_lang: 'es',
-  og_imagen: '',
-  og_type: 'website',
-  twitter_handle: '',
-  og_fb_app_id: '',
-  schema_habilitado: '1',
-  schema_tipo: 'Organization',
-  schema_nombre: 'CSEscorts',
-  schema_url: 'https://kimi.zona8.cl/',
-  schema_logo: '',
-  schema_description: 'Directorio Premium de Escorts en Chile',
-  schema_sameAs: '',
-  schema_email: '',
-  schema_telefono: '',
-  schema_localidad: '',
-  schema_pais: 'CL',
-  schema_imagen: '',
   cta_titulo: '¿Eres escort o agencia?',
   cta_subtitulo: 'Publica tu perfil y llega a miles de clientes potenciales',
   cta_boton_1: 'Publicar Ahora',
   cta_boton_2: 'Ver Planes',
-  site_nombre: 'CSEscorts',
+  site_nombre: 'Consexvip',
   site_descripcion: 'Directorio Premium de Escorts',
   nav_logo_1: 'CS',
   nav_logo_2: 'Escorts',
@@ -270,9 +224,68 @@ const DEFAULTS: Record<string, string> = {
   nav_mis_favoritos: 'Mis Favoritos',
   nav_mi_perfil: 'Mi Perfil',
   nav_cerrar_sesion: 'Cerrar sesión',
+  footer_logo_1: 'CS',
+  footer_logo_2: 'ESCORTS',
+  footer_descripcion: 'Directorio Premium de Escorts en Chile',
+  footer_titulo_paginas: 'Páginas',
+  footer_titulo_contacto: 'Contacto',
+  footer_panel_escort: 'Panel Escort',
+  footer_registro_usuario: 'Registro Usuario',
+  footer_registro_escort: 'Registro Escort',
+  footer_entrar_usuario: 'Entrar como Usuario',
+  footer_entrar_escort: 'Entrar como Escort',
+  footer_negocios: 'Negocios',
+  footer_anuncia_negocio: 'Anuncia tu negocio',
+  footer_email: 'contacto@consexvip.cl',
+  footer_url_twitter: '',
+  footer_url_instagram: '',
+  footer_url_telegram: '',
+  footer_copy: '© 2026 Consexvip - Todos los derechos reservados.',
+  footer_derechos: 'Todos los derechos reservados.',
+  footer_mayores18: 'Solo para mayores de 18 años.',
+  stat_escorts_label: 'Escorts activas',
+  stat_ciudades_label: 'Ciudades',
+  stat_verificadas_label: 'Perfiles verificados',
+  stat_valoraciones_label: 'Valoraciones',
+  testimonios_titulo: 'Opiniones de clientes',
+  badge_disponible: 'Disponible',
+  badge_gira: 'En gira',
+  badge_gira_ciudad: 'En gira en {ciudad}',
+  badge_nueva: 'Nueva',
+  badge_verificada: 'Verificada',
+  badge_vip: 'VIP',
+  badge_anios: '{edad} años',
+  badge_valoracion: 'Valoración: {rating} estrellas, {reseñas} reseñas',
+  modal_ciudades_titulo: 'Selecciona una ciudad',
+  modal_ciudades_placeholder: 'Escribe el nombre de la ciudad...',
+  modal_ciudades_sin_resultados: 'No hay ciudades disponibles',
+  modal_ciudades_no_encontrada: 'No se encontró "{query}"',
+  modal_ciudades_contador: '{cantidad} ciudades',
+  modal_ciudades_escorts_count: '{cantidad} escorts',
+  seccion_escorts_vacia: 'No hay escorts disponibles',
+  seccion_cargando_mas: 'Cargando más...',
+  contador_escorts: '{cantidad} escorts',
+  contador_nuevas: '{cantidad} nuevas',
+  contador_disponibles: '{cantidad} disponibles',
+  cta_badge: 'Publica tu anuncio',
+  ciudad_sin_resultados: 'Sin resultados',
+  ciudad_sin_resultados_filtros: 'con esos filtros',
+  ciudad_sin_escorts: 'No hay escorts en {ciudad} por ahora',
+  ciudad_contador_resultados: '{cantidad} resultados',
+  ciudad_hint_filtros: 'Prueba con otros filtros o término de búsqueda',
+  ciudad_hint_vuelve: 'Vuelve más tarde para ver nuevas publicaciones',
+  ciudad_limpiar_filtros: 'Limpiar filtros',
 };
 
 const ALL_KEYS = GROUPS.flatMap(g => g.campos.map(c => c.key));
+
+const slugify = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
 
 export default function ContenidoData() {
   const [textos, setTextos] = useState<Textos | null>(null);
@@ -283,6 +296,13 @@ export default function ContenidoData() {
   const [saved, setSaved] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [uploadingKey, setUploadingKey] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState(slugify(GROUPS[0].titulo));
+  const [dirty, setDirty] = useState(false);
+
+  const updateField = (key: string, value: string) => {
+    setFormData(prev => ({ ...prev, [key]: value }));
+    setDirty(true);
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token');
@@ -309,6 +329,38 @@ export default function ContenidoData() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    const ratios: Record<string, number> = {};
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          ratios[entry.target.id] = entry.isIntersecting ? entry.intersectionRatio : 0;
+        }
+        let best = '';
+        let bestRatio = 0;
+        for (const group of GROUPS) {
+          const id = slugify(group.titulo);
+          const ratio = ratios[id] ?? 0;
+          if (ratio > bestRatio) {
+            bestRatio = ratio;
+            best = id;
+          }
+        }
+        if (best) setActiveSection(best);
+      },
+      { rootMargin: '-120px 0px -50% 0px', threshold: [0, 0.1, 0.5, 1] }
+    );
+    for (const group of GROUPS) {
+      const id = slugify(group.titulo);
+      const el = document.getElementById(id);
+      if (el) {
+        ratios[id] = 0;
+        observer.observe(el);
+      }
+    }
+    return () => observer.disconnect();
+  }, [loading]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -328,6 +380,7 @@ export default function ContenidoData() {
       const data = await res.json();
       if (data.success) {
         setSaved(true);
+        setDirty(false);
         setTimeout(() => setSaved(false), 3000);
       } else {
         setErrorMsg(data.error || 'Error al guardar');
@@ -362,6 +415,7 @@ export default function ContenidoData() {
       const data = await res.json();
       if (data.success) {
         setFormData(prev => ({ ...prev, [key]: data.path }));
+        setDirty(true);
       } else {
         setErrorMsg(data.error || 'Error al subir la imagen');
       }
@@ -384,123 +438,117 @@ export default function ContenidoData() {
   return (
     <>
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold mb-2">Contenido del sitio</h1>
-        <p className="text-admin-muted mb-8">Edita todos los textos y metadatos del sitio: inicio, secciones, ciudad, perfiles, SEO, Open Graph y Schema.org</p>
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold mb-2">Contenido del sitio</h1>
+            <p className="text-admin-muted max-w-2xl">Edita los textos del sitio: inicio, secciones, ciudad, CTA, header, footer y tarjetas. Los metadatos SEO y Open Graph están en la sección SEO.</p>
+          </div>
+          <button
+            type="submit"
+            form="contenido-form"
+            disabled={saving}
+            className="hidden xl:inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition-colors"
+          >
+            {saving ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-save"></i>}
+            Guardar cambios
+          </button>
+        </div>
 
         {saved && (
-          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 mb-4 text-emerald-400 text-sm flex items-center gap-2">
+          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 mb-5 text-emerald-400 text-sm flex items-center gap-2">
             <i className="fas fa-check-circle"></i> Contenido guardado correctamente
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">
+          <form id="contenido-form" onSubmit={handleSubmit} className="space-y-5 min-w-0">
           {GROUPS.map(g => (
-            <div key={g.titulo} className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl p-6">
+            <section key={g.titulo} id={slugify(g.titulo)} className="scroll-mt-24 bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl p-5 md:p-6">
               <div className="flex items-center gap-3 mb-1">
-                <span className="w-9 h-9 rounded-lg bg-[#252538] flex items-center justify-center">
+                <span className="w-9 h-9 rounded-lg bg-blue-500/10 flex items-center justify-center">
                   <i className={`fas ${g.icono} text-blue-400 text-sm`}></i>
                 </span>
-                <h2 className="text-base font-semibold text-white">{g.titulo}</h2>
+                <div>
+                  <h2 className="text-base font-semibold text-white">{g.titulo}</h2>
+                  <p className="text-xs text-gray-500">{g.descripcion}</p>
+                </div>
               </div>
-              <p className="text-xs text-gray-500 mb-1 ml-12">{g.descripcion}</p>
               {g.placeholders && (
-                <p className="text-xs text-amber-400/80 mb-5 ml-12"><i className="fas fa-info-circle mr-1"></i>{g.placeholders}</p>
+                <p className="text-xs text-amber-400/80 mt-2"><i className="fas fa-info-circle mr-1"></i>{g.placeholders}</p>
               )}
 
-              <div className="space-y-4">
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
                 {g.campos.map(c => (
-                  <div key={c.key}>
-                    <label className="block text-sm text-gray-400 mb-1">{c.label}</label>
-                    <p className="text-xs text-gray-500 mb-2">
-                      {loading ? <Skeleton width={200} height={14} /> : textos?.[c.key]?.descripcion || '—'}
-                    </p>
-                    {loading ? (
-                      <Skeleton height={42} className="w-full rounded-lg" />
-                    ) : c.tipo === 'bool' ? (
-                      <button
-                        type="button"
-                        onClick={() => setFormData({ ...formData, [c.key]: formData[c.key] === '1' ? '0' : '1' })}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${formData[c.key] === '1' ? 'bg-green-500' : 'bg-[#2a2a3e] border border-[#2a2a3e]'}`}
-                        aria-pressed={formData[c.key] === '1'}
-                      >
-                        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${formData[c.key] === '1' ? 'left-6' : 'left-0.5'}`}></span>
-                      </button>
-                    ) : c.tipo === 'json' ? (
-                      <textarea
-                        value={formData[c.key] ?? ''}
-                        onChange={(e) => setFormData({ ...formData, [c.key]: e.target.value })}
-                        rows={3}
-                        placeholder='["https://facebook.com/...", "https://instagram.com/..."]'
-                        className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm font-mono focus:outline-none focus:border-blue-500 resize-y"
-                      />
-                    ) : c.textarea ? (
-                      <textarea
-                        value={formData[c.key] ?? ''}
-                        onChange={(e) => setFormData({ ...formData, [c.key]: e.target.value })}
-                        rows={2}
-                        className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500 resize-y"
-                      />
-                    ) : c.tipo === 'imagen' ? (
-                      <div className="flex items-center gap-3">
-                        <div className="w-16 h-9 rounded-lg bg-[#1a1a2e] border border-[#2a2a3e] overflow-hidden flex-shrink-0">
-                          {formData[c.key] ? (
-                            <img
-                              src={formData[c.key]}
-                              alt="Vista previa"
-                              className="w-full h-full object-cover"
-                              onError={(ev) => { (ev.target as HTMLImageElement).style.display = 'none'; }}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-600 text-xs">
-                              <i className="fas fa-image"></i>
-                            </div>
-                          )}
-                        </div>
-                        <label className="inline-flex items-center gap-2 px-4 py-2 bg-[#2a2a3e] hover:bg-[#353550] text-gray-300 rounded-lg text-sm font-medium cursor-pointer transition-colors">
-                          <i className={`fas ${uploadingKey === c.key ? 'fa-spinner fa-spin' : 'fa-cloud-upload-alt'}`}></i>
-                          {uploadingKey === c.key ? 'Subiendo...' : 'Subir imagen'}
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            className="hidden"
-                            onChange={(e) => handleUpload(e, c.key)}
-                            disabled={uploadingKey !== null}
-                          />
-                        </label>
-                        <input
-                          type="text"
-                          value={formData[c.key] ?? ''}
-                          onChange={(e) => setFormData({ ...formData, [c.key]: e.target.value })}
-                          placeholder="/uploads/og/... o https://..."
-                          className="flex-1 min-w-0 bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
-                        />
-                      </div>
-                    ) : (
-                      <input
-                        type="text"
-                        value={formData[c.key] ?? ''}
-                        onChange={(e) => setFormData({ ...formData, [c.key]: e.target.value })}
-                        className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500"
-                      />
-                    )}
-                  </div>
+                  <AdminField
+                    key={c.key}
+                    campo={c}
+                    value={formData[c.key] ?? ''}
+                    descripcion={textos?.[c.key]?.descripcion || '—'}
+                    onChange={updateField}
+                    onUpload={handleUpload}
+                    uploading={uploadingKey === c.key}
+                    loading={loading}
+                  />
                 ))}
               </div>
-            </div>
+            </section>
           ))}
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl p-4">
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition-colors"
             >
-              {saving && <i className="fas fa-spinner fa-spin"></i>}
-              <i className="fas fa-save"></i> Guardar Cambios
+              {saving ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-save"></i>}
+              Guardar cambios
             </button>
+            {dirty && !saving && (
+              <span className="text-amber-400 text-xs"><i className="fas fa-circle text-[6px] mr-1 align-middle"></i>Cambios sin guardar</span>
+            )}
             {saved && <span className="text-emerald-400 text-sm"><i className="fas fa-check-circle mr-1"></i>Guardado</span>}
           </div>
-        </form>
+          </form>
+
+          <aside className="xl:sticky xl:top-24 space-y-4">
+            <nav className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl p-4">
+              <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                <i className="fas fa-list text-blue-400"></i> Secciones
+              </h2>
+              <div className="space-y-0.5 max-h-[55vh] overflow-y-auto pr-1">
+                {GROUPS.map(g => {
+                  const id = slugify(g.titulo);
+                  return (
+                    <button
+                      key={g.titulo}
+                      type="button"
+                      onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                      className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs text-left transition-colors ${activeSection === id ? 'bg-blue-600/15 text-blue-300' : 'text-gray-400 hover:bg-[#252538] hover:text-white'}`}
+                    >
+                      <i className={`fas ${g.icono} w-4 text-center text-[11px]`}></i>
+                      <span className="truncate">{g.titulo}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </nav>
+
+            <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl p-5">
+              <button
+                type="submit"
+                form="contenido-form"
+                disabled={saving}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold transition-colors"
+              >
+                {saving ? <i className="fas fa-spinner fa-spin"></i> : <i className="fas fa-save"></i>}
+                Guardar cambios
+              </button>
+              <p className={`text-xs mt-2.5 text-center ${dirty ? 'text-amber-400' : 'text-gray-500'}`}>
+                {dirty ? 'Tienes cambios sin guardar' : 'Todo guardado'}
+              </p>
+            </div>
+          </aside>
+        </div>
       </div>
 
       {/* Modal Error */}

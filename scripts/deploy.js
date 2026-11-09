@@ -4,11 +4,30 @@ import { join, relative, dirname } from 'path';
 import { createHash } from 'crypto';
 import './fix-css-fonts.mjs';
 
+// La clave FTP JAMÁS va en código: entorno o archivo local .ftp-pass (gitignored).
+function readLocalFtpPass() {
+  try {
+    const p = join(process.cwd(), '.ftp-pass');
+    if (existsSync(p)) {
+      return readFileSync(p, 'utf-8').trim();
+    }
+  } catch {}
+  return '';
+}
+
+const FTP_PASSWORD = process.env.FTP_PASSWORD || readLocalFtpPass();
+if (!FTP_PASSWORD) {
+  console.error('Falta FTP_PASSWORD: define la variable de entorno o crea el archivo local .ftp-pass (gitignored) con la clave.');
+  process.exit(1);
+}
+
 const CONFIG = {
-  host: process.env.FTP_HOST || 'kimi.zona8.cl',
-  user: process.env.FTP_USER || 'kimi',
-  password: process.env.FTP_PASSWORD || 'CUERAzzCX2FZ9xRDfFUR',
-  remoteRoot: process.env.FTP_REMOTE_ROOT || '/domains/kimi.zona8.cl/public_html',
+  host: process.env.FTP_HOST || 'consexvip.cl',
+  user: process.env.FTP_USER || 'consexvip',
+  password: FTP_PASSWORD,
+  // OJO: el docroot real que sirve el sitio es /domains/consexvip.cl/public_html.
+  // /domains/www.consexvip.cl/public_html existe pero NO lo usan los vhosts.
+  remoteRoot: process.env.FTP_REMOTE_ROOT || '/domains/consexvip.cl/public_html',
   localRoot: 'public_html',
 };
 
@@ -173,8 +192,103 @@ async function deploy() {
       console.log('Vuelve a ejecutar el deploy: los archivos ya subidos se saltaran por cache.');
       process.exitCode = 1;
     }
+
+    // Poda automática: borrar en remoto los chunks _astro que ya no existen
+    // en el build local (el deploy solo subía y acumulaba basura).
+    try {
+      const localAstro = new Set(readdirSync(join(CONFIG.localRoot, '_astro')));
+      const remoteAstroDir = [CONFIG.remoteRoot, '_astro'].join('/').replace(/\\/g, '/');
+      const remoteAstro = await client.list(remoteAstroDir);
+      let pruned = 0;
+      for (const f of remoteAstro) {
+        if (f.isDirectory || localAstro.has(f.name)) continue;
+        try {
+          await client.remove(remoteAstroDir + '/' + f.name);
+          pruned++;
+        } catch (e) {
+          console.error(`  no se pudo podar ${f.name}: ${e.message || e}`);
+        }
+      }
+      console.log(`Poda _astro: ${pruned} huérfano(s) eliminado(s).`);
+    } catch (e) {
+      console.error(`Poda _astro omitida: ${e.message || e}`);
+    }
+
+    // IndexNow: avisar a Google/Bing de los cambios para reindexar en minutos.
+    // La clave vive en .indexnow-key (gitignored). Si no existe, se omite sin fallar.
+    await pingIndexNow();
   } finally {
     try { client.close(); } catch {}
+  }
+}
+
+/**
+ * Envía el ping de IndexNow con las URLs clave del sitio (home, ciudades, negocios,
+ * artículos). Lee las URLs del sitemap desplegado para no mantener una lista manual.
+ */
+async function pingIndexNow() {
+  try {
+    const keyFile = join(process.cwd(), '.indexnow-key');
+    if (!existsSync(keyFile)) {
+      console.log('IndexNow: sin clave local (.indexnow-key), se omite el ping.');
+      return;
+    }
+    const key = readFileSync(keyFile, 'utf-8').trim();
+    if (!/^[a-zA-Z0-9-]{8,128}$/.test(key)) {
+      console.log('IndexNow: clave local inválida, se omite el ping.');
+      return;
+    }
+
+    const siteUrl = 'https://www.consexvip.cl';
+    const urls = new Set([siteUrl + '/']);
+    try {
+      const res = await fetch(siteUrl + '/sitemap.xml', { headers: { 'User-Agent': 'Consexvip-Deploy' } });
+      const xml = await res.text();
+      const locs = [...xml.matchAll(/<loc>(.*?)<\/loc>/g)].map((m) => m[1].trim());
+      for (const u of locs) {
+        // Solo las páginas públicas principales (no login/registro/panel)
+        if (/\/(login|ingresar|unirse|registro|micuenta|admin|recuperar)/i.test(u)) continue;
+        urls.add(u);
+      }
+    } catch (e) {
+      console.log('IndexNow: no se pudo leer el sitemap, se avisa solo la home.');
+    }
+
+    const payload = {
+      host: 'www.consexvip.cl',
+      key,
+      keyLocation: siteUrl + '/' + key + '.txt',
+      urlList: [...urls].slice(0, 10000),
+    };
+    const body = JSON.stringify(payload);
+
+    let ok = 0;
+    for (const endpoint of ['https://api.indexnow.org/indexnow', 'https://www.bing.com/indexnow']) {
+      try {
+        const r = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json; charset=utf-8' },
+          body,
+        });
+        if (r.status === 200 || r.status === 202) ok++;
+        else console.log(`IndexNow: ${endpoint} respondió ${r.status}`);
+      } catch (e) {
+        console.log(`IndexNow: fallo en ${endpoint}: ${e.message || e}`);
+      }
+    }
+    console.log(`IndexNow: ${payload.urlList.length} URL(s) notificadas a ${ok}/2 buscador(es).`);
+
+    // Ping Google sitemap
+    try {
+      const gRes = await fetch(`https://www.google.com/ping?sitemap=${encodeURIComponent(siteUrl + '/sitemap.xml')}`, { method: 'GET' }).catch(() => null);
+      if (gRes && (gRes.status === 200 || gRes.status === 202)) {
+        console.log('Google sitemap ping: OK');
+      } else {
+        console.log('Google sitemap ping: no respondió 200');
+      }
+    } catch {}
+  } catch (e) {
+    console.log(`IndexNow omitido: ${e.message || e}`);
   }
 }
 

@@ -9,6 +9,15 @@ try {
     $usuarioId = intval($tokenData['id'] ?? 0);
     if ($usuarioId <= 0) { http_response_code(401); echo json_encode(['success' => false, 'error' => 'No autorizado']); exit; }
 
+    // Solo tokens de tipo 'usuario'. Sin esto, un token de escort/admin con el
+    // mismo id numérico podía modificar (o cambiar la contraseña de) una cuenta.
+    $tokenTipo = (string)($tokenData['tipo'] ?? '');
+    if ($tokenTipo !== '' && $tokenTipo !== 'usuario') {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Acceso denegado: token de otro tipo']);
+        exit;
+    }
+
     $pdo = getDBConnection();
     $method = $_SERVER['REQUEST_METHOD'];
 
@@ -40,6 +49,7 @@ try {
         $ciudad = trim($input['ciudad'] ?? '');
         $password = $input['password'] ?? '';
         $passwordConfirm = $input['password_confirm'] ?? '';
+        $passwordActual = $input['password_actual'] ?? '';
 
         $errors = [];
         if (strlen($nombre) < 2) $errors['nombre'] = 'Nombre muy corto';
@@ -48,6 +58,11 @@ try {
         if (!empty($password)) {
             if (strlen($password) < 8) $errors['password'] = 'Mínimo 8 caracteres';
             if ($password !== $passwordConfirm) $errors['password_confirm'] = 'Las contraseñas no coinciden';
+            // Para cambiar la contraseña hay que demostrar la actual: si no,
+            // basta con robar el token para tomar el control de la cuenta.
+            if (trim((string)$passwordActual) === '') {
+                $errors['password_actual'] = 'Ingresa tu contraseña actual';
+            }
         }
 
         if (!empty($errors)) { http_response_code(422); echo json_encode(['success' => false, 'fieldErrors' => $errors]); exit; }
@@ -56,10 +71,38 @@ try {
         $check->execute([$email, $usuarioId]);
         if ($check->fetch()) { http_response_code(409); echo json_encode(['success' => false, 'fieldErrors' => ['email' => 'Email ya registrado']]); exit; }
 
+        $nuevoToken = null;
+
         if (!empty($password)) {
+            // Verificar la contraseña actual
+            $stmtHash = $pdo->prepare("SELECT password_hash FROM usuarios WHERE id = ?");
+            $stmtHash->execute([$usuarioId]);
+            $filaHash = $stmtHash->fetch(PDO::FETCH_ASSOC);
+            $hashActual = (string)($filaHash['password_hash'] ?? '');
+            if ($hashActual === '' || !password_verify((string)$passwordActual, $hashActual)) {
+                http_response_code(422);
+                echo json_encode(['success' => false, 'error' => 'La contraseña actual no es correcta', 'fieldErrors' => ['password_actual' => 'La contraseña actual no es correcta']]);
+                exit;
+            }
+
             $hash = password_hash($password, PASSWORD_BCRYPT);
-            $stmt = $pdo->prepare("UPDATE usuarios SET nombre = ?, email = ?, telefono = ?, ciudad = ?, password_hash = ? WHERE id = ?");
+            // Al cambiar la contraseña se revocan las demás sesiones (token_version)
+            $stmt = $pdo->prepare("UPDATE usuarios SET nombre = ?, email = ?, telefono = ?, ciudad = ?, password_hash = ?, token_version = token_version + 1, updated_at = NOW() WHERE id = ?");
             $stmt->execute([$nombre, $email, $telefono, $ciudad, $hash, $usuarioId]);
+
+            // Se emite un token nuevo para que esta sesión siga activa
+            $stmtTv = $pdo->prepare("SELECT token_version FROM usuarios WHERE id = ?");
+            $stmtTv->execute([$usuarioId]);
+            $tv = (int)($stmtTv->fetchColumn() ?? 0);
+            $nuevoToken = signToken([
+                'id' => $usuarioId,
+                'tipo' => 'usuario',
+                'email' => $email,
+                'tv' => $tv,
+                'exp' => time() + (30 * 24 * 3600),
+                'rand' => bin2hex(random_bytes(16)),
+            ]);
+
             require_once __DIR__ . '/../mail.php';
             sendPasswordChanged($email, $nombre);
         } else {
@@ -67,14 +110,17 @@ try {
             $stmt->execute([$nombre, $email, $telefono, $ciudad, $usuarioId]);
         }
 
-        echo json_encode([
+        $respuesta = [
             'success' => true,
             'usuario' => [
                 'id' => $usuarioId,
                 'nombre' => $nombre,
                 'email' => $email,
             ]
-        ]);
+        ];
+        if ($nuevoToken) $respuesta['nuevo_token'] = $nuevoToken;
+
+        echo json_encode($respuesta);
         exit;
     }
 

@@ -30,7 +30,7 @@ try {
 
     if ($method !== 'GET') {
         http_response_code(405);
-        echo json_encode(['success' => false, 'error' => 'MíƒÂ©todo no permitido']);
+        echo json_encode(['success' => false, 'error' => 'M?todo no permitido']);
         exit;
     }
 

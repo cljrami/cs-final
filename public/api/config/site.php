@@ -5,14 +5,14 @@ require_once __DIR__ . '/../bootstrap.php';
 
 try {
     $pdo = getDBConnection();
-    $stmt = $pdo->prepare("SELECT clave, valor FROM configuracion WHERE tipo IN ('string', 'int', 'bool', 'json')");
+    $stmt = $pdo->prepare("SELECT clave, valor FROM configuracion WHERE tipo IN ('string', 'int', 'bool', 'json') OR clave IN ('verify_google', 'verify_bing')");
     $stmt->execute();
     $config = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
 
     echo json_encode([
         'success' => true,
         'data' => [
-            'site_nombre' => $config['site_nombre'] ?? 'CSEscorts',
+            'site_nombre' => $config['site_nombre'] ?? 'Consexvip',
             'site_descripcion' => $config['site_descripcion'] ?? 'Directorio Premium de Escorts',
             'hero_badge' => $config['hero_badge'] ?? 'Perfiles verificados',
             'hero_titulo' => $config['hero_titulo'] ?? 'Encuentra tu Experiencia Hoy',
@@ -31,22 +31,21 @@ try {
             'seccion_ciudad_nuevas_titulo' => $config['seccion_ciudad_nuevas_titulo'] ?? 'Nuevas en {ciudad}',
             'seo_description' => $config['seo_description'] ?? 'Directorio Premium de Escorts en Chile',
             'seo_keywords' => $config['seo_keywords'] ?? 'escorts, chile, acompañantes, escort, modelo',
-            'seo_url' => $config['seo_url'] ?? 'https://kimi.zona8.cl/',
-            'seo_canonical' => $config['seo_canonical'] ?? 'https://kimi.zona8.cl/',
+            'seo_url' => $config['seo_url'] ?? 'https://www.consexvip.cl/',
+            'seo_canonical' => $config['seo_canonical'] ?? 'https://www.consexvip.cl/',
             'seo_robots' => $config['seo_robots'] ?? 'INDEX, FOLLOW',
-            'seo_author' => $config['seo_author'] ?? 'Kimi',
-            'seo_publisher' => $config['seo_publisher'] ?? 'Kimi',
+            'seo_author' => $config['seo_author'] ?? 'ConsexVIP',
+            'seo_publisher' => $config['seo_publisher'] ?? 'ConsexVIP',
             'seo_lang' => $config['seo_lang'] ?? 'es',
-            'seo_ciudad_h1' => $config['seo_ciudad_h1'] ?? 'Escorts en {ciudad}',
-            'seo_ciudad_titulo' => $config['seo_ciudad_titulo'] ?? 'Escorts en {ciudad} | CSEscorts',
-            'seo_ciudad_description' => $config['seo_ciudad_description'] ?? 'Encuentra escorts y acompañantes en {ciudad}. Perfiles verificados y actualizados diariamente.',
+            'seo_ciudad_titulo' => $config['seo_ciudad_titulo'] ?? 'Escorts en {ciudad} | Consexvip',
+            'seo_ciudad_description' => $config['seo_ciudad_description'] ?? 'Encuentra escorts verificadas en {ciudad}. Perfiles con fotos, tarifas y contacto directo en Consexvip.',
             'seo_ciudad_keywords' => $config['seo_ciudad_keywords'] ?? 'escorts en {ciudad}, acompañantes en {ciudad}, escorts {ciudad}',
-            'seo_escort_titulo' => $config['seo_escort_titulo'] ?? '{nombre}, {edad} años | CSEscorts',
+            'seo_escort_titulo' => $config['seo_escort_titulo'] ?? '{nombre}, {edad} años | Consexvip',
             'seo_escort_description' => $config['seo_escort_description'] ?? 'Perfil de {nombre} en {ciudad}. {descripcion}',
-            'seo_escort_og_titulo' => $config['seo_escort_og_titulo'] ?? '{nombre}, {edad} años - CSEscorts',
+            'seo_escort_og_titulo' => $config['seo_escort_og_titulo'] ?? '{nombre}, {edad} años - Consexvip',
             'seo_escort_og_description' => $config['seo_escort_og_description'] ?? 'Perfil verificado de {nombre} en {ciudad}',
-            'seo_inicio_titulo' => $config['seo_inicio_titulo'] ?? 'Inicio',
-            'seo_inicio_description' => $config['seo_inicio_description'] ?? 'Directorio Premium de Escorts en Chile',
+            'seo_inicio_titulo' => $config['seo_inicio_titulo'] ?? 'Consexvip: Escorts y Damas de Compañía en Chile',
+            'seo_inicio_description' => $config['seo_inicio_description'] ?? 'Directorio premium de escorts en Chile. Perfiles verificados, fotos, tarifas y contacto directo en todas las ciudades.',
             'seo_login_titulo' => $config['seo_login_titulo'] ?? 'Iniciar sesión',
             'seo_login_description' => $config['seo_login_description'] ?? 'Accede a tu cuenta para guardar favoritos y valorar perfiles',
             'seo_registro_titulo' => $config['seo_registro_titulo'] ?? 'Crear cuenta',
@@ -61,12 +60,19 @@ try {
             'og_type' => $config['og_type'] ?? 'website',
             'twitter_handle' => $config['twitter_handle'] ?? '',
             'og_fb_app_id' => $config['og_fb_app_id'] ?? '',
+            'site_favicon_svg' => $config['site_favicon_svg'] ?? '/favicon.svg',
+            'site_favicon_32' => $config['site_favicon_32'] ?? '/favicon-32x32.png',
+            'site_favicon_16' => $config['site_favicon_16'] ?? '/favicon-16x16.png',
+            'site_apple_touch' => $config['site_apple_touch'] ?? '/apple-touch-icon.png',
             'schema_habilitado' => (int) ($config['schema_habilitado'] ?? 1),
+            'verify_google' => $config['verify_google'] ?? '',
+            'verify_bing' => $config['verify_bing'] ?? '',
+            'indexnow_key' => $config['indexnow_key'] ?? '',
             'schema_tipo' => $config['schema_tipo'] ?? 'Organization',
-            'schema_nombre' => $config['schema_nombre'] ?? 'CSEscorts',
-            'schema_url' => $config['schema_url'] ?? 'https://kimi.zona8.cl/',
-            'schema_logo' => $config['schema_logo'] ?? '',
-            'schema_description' => $config['schema_description'] ?? 'Directorio Premium de Escorts en Chile',
+            'schema_nombre' => $config['schema_nombre'] ?? 'Consexvip',
+            'schema_url' => $config['schema_url'] ?? 'https://www.consexvip.cl/',
+            'schema_logo' => $config['schema_logo'] ?? 'https://www.consexvip.cl/favicon-32x32.png',
+            'schema_description' => $config['schema_description'] ?? 'Directorio premium de escorts en Chile. Perfiles verificados, fotos, tarifas y contacto directo.',
             'schema_sameAs' => $config['schema_sameAs'] ?? '',
             'schema_email' => $config['schema_email'] ?? '',
             'schema_telefono' => $config['schema_telefono'] ?? '',
@@ -94,6 +100,68 @@ try {
             'nav_mis_favoritos' => $config['nav_mis_favoritos'] ?? 'Mis Favoritos',
             'nav_mi_perfil' => $config['nav_mi_perfil'] ?? 'Mi Perfil',
             'nav_cerrar_sesion' => $config['nav_cerrar_sesion'] ?? 'Cerrar sesión',
+
+            // === Footer ===
+            'footer_logo_1' => $config['footer_logo_1'] ?? 'CS',
+            'footer_logo_2' => $config['footer_logo_2'] ?? 'ESCORTS',
+            'footer_titulo_paginas' => $config['footer_titulo_paginas'] ?? 'Páginas',
+            'footer_titulo_contacto' => $config['footer_titulo_contacto'] ?? 'Contacto',
+            'footer_panel_escort' => $config['footer_panel_escort'] ?? 'Panel Escort',
+            'footer_registro_usuario' => $config['footer_registro_usuario'] ?? 'Registro Usuario',
+            'footer_registro_escort' => $config['footer_registro_escort'] ?? 'Registro Escort',
+            'footer_entrar_usuario' => $config['footer_entrar_usuario'] ?? 'Entrar como Usuario',
+            'footer_entrar_escort' => $config['footer_entrar_escort'] ?? 'Entrar como Escort',
+            'footer_negocios' => $config['footer_negocios'] ?? 'Negocios',
+            'footer_anuncia_negocio' => $config['footer_anuncia_negocio'] ?? 'Anuncia tu negocio',
+            'footer_email_cuenta' => $config['footer_email_cuenta'] ?? 'contacto',
+            'footer_derechos' => $config['footer_derechos'] ?? 'Todos los derechos reservados.',
+            'footer_mayores18' => $config['footer_mayores18'] ?? 'Solo para mayores de 18 años.',
+
+            // === Estadísticas (StatsStrip) ===
+            'stat_escorts_label' => $config['stat_escorts_label'] ?? 'Escorts activas',
+            'stat_ciudades_label' => $config['stat_ciudades_label'] ?? 'Ciudades',
+            'stat_verificadas_label' => $config['stat_verificadas_label'] ?? 'Perfiles verificados',
+            'stat_valoraciones_label' => $config['stat_valoraciones_label'] ?? 'Valoraciones',
+
+            // === Testimonios ===
+            'testimonios_titulo' => $config['testimonios_titulo'] ?? 'Opiniones de clientes',
+
+            // === Badges de tarjetas de escort ===
+            'badge_disponible' => $config['badge_disponible'] ?? 'Disponible',
+            'badge_gira' => $config['badge_gira'] ?? 'En gira',
+            'badge_gira_ciudad' => $config['badge_gira_ciudad'] ?? 'En gira en {ciudad}',
+            'badge_nueva' => $config['badge_nueva'] ?? 'Nueva',
+            'badge_verificada' => $config['badge_verificada'] ?? 'Verificada',
+            'badge_vip' => $config['badge_vip'] ?? 'VIP',
+            'badge_anios' => $config['badge_anios'] ?? '{edad} años',
+            'badge_valoracion' => $config['badge_valoracion'] ?? 'Valoración: {rating} estrellas, {reseñas} reseñas',
+
+            // === Modal de ciudades ===
+            'modal_ciudades_titulo' => $config['modal_ciudades_titulo'] ?? 'Selecciona una ciudad',
+            'modal_ciudades_placeholder' => $config['modal_ciudades_placeholder'] ?? 'Escribe el nombre de la ciudad...',
+            'modal_ciudades_sin_resultados' => $config['modal_ciudades_sin_resultados'] ?? 'No hay ciudades disponibles',
+            'modal_ciudades_no_encontrada' => $config['modal_ciudades_no_encontrada'] ?? 'No se encontró "{query}"',
+            'modal_ciudades_contador' => $config['modal_ciudades_contador'] ?? '{cantidad} ciudades',
+            'modal_ciudades_escorts_count' => $config['modal_ciudades_escorts_count'] ?? '{cantidad} escorts',
+
+            // === Contadores y estados de secciones ===
+            'seccion_escorts_vacia' => $config['seccion_escorts_vacia'] ?? 'No hay escorts disponibles',
+            'seccion_cargando_mas' => $config['seccion_cargando_mas'] ?? 'Cargando más...',
+            'contador_escorts' => $config['contador_escorts'] ?? '{cantidad} escorts',
+            'contador_nuevas' => $config['contador_nuevas'] ?? '{cantidad} nuevas',
+            'contador_disponibles' => $config['contador_disponibles'] ?? '{cantidad} disponibles',
+
+            // === CTA final ===
+            'cta_badge' => $config['cta_badge'] ?? 'Publica tu anuncio',
+
+            // === Página de ciudad ===
+            'ciudad_sin_resultados' => $config['ciudad_sin_resultados'] ?? 'Sin resultados',
+            'ciudad_sin_resultados_filtros' => $config['ciudad_sin_resultados_filtros'] ?? 'con esos filtros',
+            'ciudad_sin_escorts' => $config['ciudad_sin_escorts'] ?? 'No hay escorts en {ciudad} por ahora',
+            'ciudad_contador_resultados' => $config['ciudad_contador_resultados'] ?? '{cantidad} resultados',
+            'ciudad_hint_filtros' => $config['ciudad_hint_filtros'] ?? 'Prueba con otros filtros o término de búsqueda',
+            'ciudad_hint_vuelve' => $config['ciudad_hint_vuelve'] ?? 'Vuelve más tarde para ver nuevas publicaciones',
+            'ciudad_limpiar_filtros' => $config['ciudad_limpiar_filtros'] ?? 'Limpiar filtros',
         ]
     ]);
 } catch (Exception $e) {

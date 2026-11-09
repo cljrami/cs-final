@@ -13,6 +13,10 @@ interface Favorito {
   destacado: number;
   rating: string;
   favorito_desde: string;
+  // Estados efectivos
+  verificado_vigente?: number;
+  vip_vigente?: number;
+  destacado_vigente?: number;
 }
 
 export default function MisFavoritos() {
@@ -88,7 +92,7 @@ export default function MisFavoritos() {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {favoritos.map(f => (
             <div key={f.id} className="group relative bg-[#1a1a2e] rounded-xl overflow-hidden border border-white/5 hover:border-red-500/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-red-500/5">
-              <a href={`/${f.id}`} className="block">
+              <a href={`/cs${f.id}`} className="block">
                 <div className="relative aspect-[3/4] bg-gradient-to-b from-[#2a2a3e] to-[#1a1a2e] overflow-hidden">
                   {f.foto_principal ? (
                     <img
@@ -105,14 +109,24 @@ export default function MisFavoritos() {
                       </div>
                     </div>
                   )}
-                  {f.vip === 1 && (
+                  {f.vip_vigente === 1 && (
                     <div className="absolute bottom-3 right-3 bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-md shadow-lg">
                       <i className="fas fa-crown text-[0.6rem] mr-1"></i>VIP
                     </div>
                   )}
-                  {f.verificado === 1 && (
+                  {f.vip === 1 && f.vip_vigente === 0 && (
+                    <div className="absolute bottom-3 right-3 bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-md shadow-lg">
+                      <i className="fas fa-exclamation-triangle text-[0.6rem] mr-1"></i>VIP (expirado)
+                    </div>
+                  )}
+                  {f.verificado_vigente === 1 && (
                     <div className="absolute top-3 right-3 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center shadow-lg">
                       <i className="fas fa-check text-white text-[0.6rem]"></i>
+                    </div>
+                  )}
+                  {f.verificado === 1 && f.verificado_vigente === 0 && (
+                    <div className="absolute top-3 right-3 w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                      <i className="fas fa-exclamation-triangle text-white text-[0.6rem]"></i>
                     </div>
                   )}
                 </div>

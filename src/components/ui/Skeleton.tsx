@@ -1,4 +1,5 @@
-import { Fragment } from 'react';
+import type { CSSProperties } from 'react';
+import SkeletonLib from 'react-loading-skeleton';
 
 interface SkeletonProps {
   width?: string | number;
@@ -8,34 +9,45 @@ interface SkeletonProps {
   inline?: boolean;
   borderRadius?: string | number;
   className?: string;
+  enableAnimation?: boolean;
+  baseColor?: string;
+  highlightColor?: string;
 }
 
-export function Skeleton({ width, height = '1em', circle, count = 1, inline, borderRadius, className = '' }: SkeletonProps) {
-  const style: React.CSSProperties = {};
-
-  if (width !== undefined) {
-    style.width = typeof width === 'number' ? `${width}px` : width;
-  }
-  if (height !== undefined) {
-    style.height = typeof height === 'number' ? `${height}px` : height;
-  }
-  if (borderRadius !== undefined) {
-    style.borderRadius = typeof borderRadius === 'number' ? `${borderRadius}px` : borderRadius;
-  }
-
-  const base = `skel ${circle ? '!rounded-full' : ''} ${inline ? 'inline-block align-bottom' : 'block'} ${className}`;
-
-  const el = <div className={base} style={Object.keys(style).length > 0 ? style : undefined} aria-hidden="true" />;
-
-  if (count > 1) {
-    return (
-      <div className={inline ? 'inline-flex gap-1.5' : 'space-y-1.5'}>
-        {Array.from({ length: count }).map((_, i) => (
-          <Fragment key={i}>{el}</Fragment>
-        ))}
-      </div>
-    );
-  }
-
-  return el;
+export function Skeleton({
+  width,
+  height = '1em',
+  circle,
+  count = 1,
+  inline,
+  borderRadius,
+  className = '',
+  enableAnimation,
+  baseColor,
+  highlightColor,
+}: SkeletonProps) {
+  return (
+    <span
+      className={inline ? 'inline-flex items-center' : 'block'}
+      style={
+        {
+          '--base-color':
+            baseColor || 'color-mix(in srgb, var(--color-ink) 16%, transparent)',
+          '--highlight-color':
+            highlightColor || 'color-mix(in srgb, var(--color-ink) 26%, transparent)',
+        } as CSSProperties
+      }
+    >
+      <SkeletonLib
+        width={width}
+        height={height}
+        circle={circle}
+        count={count}
+        inline={inline}
+        borderRadius={borderRadius}
+        className={className}
+        enableAnimation={enableAnimation}
+      />
+    </span>
+  );
 }

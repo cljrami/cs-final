@@ -25,6 +25,8 @@ interface DataTableProps<T> {
   onSelectionChange?: (selected: Set<string | number>) => void;
   selected?: Set<string | number>;
   selectable?: boolean;
+  onBulkDelete?: (selected: Set<string | number>) => void;
+  bulkDeleteLabel?: string;
 }
 
 export default function DataTable<T>({
@@ -39,6 +41,8 @@ export default function DataTable<T>({
   onSelectionChange,
   selected = new Set(),
   selectable = false,
+  onBulkDelete,
+  bulkDeleteLabel = 'Eliminar seleccionados',
 }: DataTableProps<T>) {
   const minWidth = columns.reduce((sum, c) => sum + (parseInt(c.width || '150')), 0);
 
@@ -102,15 +106,27 @@ export default function DataTable<T>({
             <tbody>
               {Array.from({ length: skeletonRows }).map((_, i) => (
                 <tr key={i} className="border-b border-admin-border">
-                  {selectable && <td className="p-4 text-center"><div className="w-4 h-4 bg-admin-border rounded mx-auto" /></td>}
+                  {selectable && (
+                    <td className="p-4 text-center">
+                      <input
+                        type="checkbox"
+                        disabled
+                        aria-hidden="true"
+                        tabIndex={-1}
+                        className="w-4 h-4 text-blue-600 border-admin-border rounded opacity-40"
+                      />
+                    </td>
+                  )}
                   {columns.map((c) => (
                     <td key={c.key} className="p-4 whitespace-nowrap">
                       <DataCell value="" loading={true} className="w-full h-4" />
                     </td>
                   ))}
                   {getActions && (
-                    <td className="p-4 text-right">
-                      <DataCell value="" loading={true} className="w-8 h-8 rounded-md ml-auto" />
+                    <td className="p-4 text-right" aria-hidden="true">
+                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-admin-border text-admin-muted opacity-40">
+                        <i className="fas fa-ellipsis-v" />
+                      </span>
                     </td>
                   )}
                 </tr>
@@ -131,8 +147,16 @@ export default function DataTable<T>({
     );
   }
 
+  const handleBulkDeleteClick = () => { if (onBulkDelete && selected.size > 0) onBulkDelete(selected); };
+
   return (
     <div className="bg-admin-card border border-admin-border rounded-2xl">
+      {selectable && onBulkDelete && selected.size > 0 && (
+        <div className="flex items-center justify-between px-4 py-3 border-b border-admin-border bg-red-500/5">
+          <span className="text-sm text-gray-300"><span className="font-semibold text-white">{selected.size}</span> seleccionado(s)</span>
+          <button type="button" onClick={handleBulkDeleteClick} className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg text-sm transition-colors"><i className="fas fa-trash-alt"></i> {bulkDeleteLabel}</button>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full border-collapse" style={{ minWidth }}>
           <thead>

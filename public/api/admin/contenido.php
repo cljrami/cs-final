@@ -9,7 +9,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 require_once __DIR__ . '/../bootstrap.php';
-require_once __DIR__ . '/../og_util.php';
 
 $textos = [
     // === Inicio (Hero) ===
@@ -32,62 +31,6 @@ $textos = [
     'seccion_ciudad_valoradas_titulo'   => 'Título de la sección de más valoradas en la página de ciudad (usa {ciudad})',
     'seccion_ciudad_nuevas_titulo'      => 'Título de la sección de nuevas en la página de ciudad (usa {ciudad})',
     'seccion_ciudad_grid_titulo'        => 'Título de la sección de escorts principales en la página de ciudad (usa {ciudad})',
-
-    // === SEO Página de ciudad ===
-    'seo_ciudad_h1'                 => 'Encabezado H1 de la página de ciudad (usa {ciudad})',
-    'seo_ciudad_titulo'             => 'Título <title> de la página de ciudad (usa {ciudad})',
-    'seo_ciudad_description'        => 'Meta description de la página de ciudad (usa {ciudad}, máx 160 chars)',
-    'seo_ciudad_keywords'           => 'Meta keywords de la página de ciudad (usa {ciudad})',
-
-    // === SEO Perfil de escort ===
-    'seo_escort_titulo'             => 'Título <title> del perfil de escort (usa {nombre}, {edad})',
-    'seo_escort_description'        => 'Meta description del perfil de escort (usa {nombre}, {ciudad}, {descripcion})',
-    'seo_escort_og_titulo'          => 'Título Open Graph del perfil de escort (usa {nombre}, {edad})',
-    'seo_escort_og_description'     => 'Descripción Open Graph del perfil de escort (usa {nombre}, {ciudad})',
-
-    // === SEO Páginas del sitio ===
-    'seo_inicio_titulo'             => 'Título <title> de la página de inicio',
-    'seo_inicio_description'        => 'Meta description de la página de inicio',
-    'seo_login_titulo'              => 'Título <title> de la página de inicio de sesión',
-    'seo_login_description'         => 'Meta description de la página de inicio de sesión',
-    'seo_registro_titulo'           => 'Título <title> de la página de registro',
-    'seo_registro_description'      => 'Meta description de la página de registro',
-    'seo_recuperar_titulo'          => 'Título <title> de la página de recuperar contraseña',
-    'seo_recuperar_description'     => 'Meta description de la página de recuperar contraseña',
-    'seo_404_titulo'                => 'Título <title> de la página 404',
-    'seo_404_description'           => 'Meta description de la página 404',
-    'seo_pausado_titulo'            => 'Título <title> de la página de perfil pausado',
-    'seo_pausado_description'       => 'Meta description de la página de perfil pausado',
-
-    // === SEO General ===
-    'seo_description'                   => 'Meta description del sitio (máx 160 caracteres)',
-    'seo_keywords'                      => 'Meta keywords separadas por coma',
-    'seo_url'                           => 'URL principal del sitio',
-    'seo_canonical'                     => 'URL canónica del sitio',
-    'seo_robots'                        => 'Directiva robots (ej: INDEX, FOLLOW)',
-    'seo_author'                        => 'Nombre del autor para SEO',
-    'seo_publisher'                     => 'Nombre del publisher para SEO',
-    'seo_lang'                          => 'Idioma del sitio (ej: es, en)',
-
-    // === Open Graph / Twitter ===
-    'og_imagen'                      => 'URL de la imagen Open Graph por defecto (1200x630 recomendado)',
-    'og_type'                        => 'Tipo Open Graph por defecto (ej: website)',
-    'twitter_handle'                 => 'Handle de Twitter/X (ej: @marca)',
-    'og_fb_app_id'                   => 'Facebook App ID para Open Graph',
-
-    // === Schema.org (JSON-LD) ===
-    'schema_habilitado'              => 'Habilitar Schema.org (JSON-LD) en el sitio',
-    'schema_tipo'                    => 'Tipo de Schema (ej: Organization, WebSite)',
-    'schema_nombre'                  => 'Nombre de la organización para Schema',
-    'schema_url'                     => 'URL principal para Schema',
-    'schema_logo'                    => 'URL del logo para Schema',
-    'schema_description'             => 'Descripción de la organización para Schema',
-    'schema_sameAs'                  => 'Perfiles sociales (JSON, ej: ["https://facebook.com/...", "https://instagram.com/..."])',
-    'schema_email'                   => 'Email de contacto para Schema',
-    'schema_telefono'                => 'Teléfono de contacto para Schema',
-    'schema_localidad'               => 'Localidad para Schema (ej: Santiago)',
-    'schema_pais'                    => 'País para Schema (ej: CL)',
-    'schema_imagen'                  => 'URL de imagen de la organización para Schema',
 
     // === CTA final ===
     'cta_titulo'                     => 'Título del CTA final (ej: ¿Eres escort o agencia?)',
@@ -115,12 +58,72 @@ $textos = [
     'nav_mis_favoritos'              => 'Texto del enlace "Mis Favoritos" (usuario)',
     'nav_mi_perfil'                  => 'Texto del enlace "Mi Perfil" (usuario)',
     'nav_cerrar_sesion'              => 'Texto del botón "Cerrar sesión"',
+
+    // === Footer ===
+    'footer_logo_1'                  => 'Parte 1 del logo del footer (ej: CS)',
+    'footer_logo_2'                  => 'Parte 2 del logo del footer (ej: ESCORTS)',
+    'footer_titulo_paginas'          => 'Título de la columna "Páginas" del footer',
+    'footer_titulo_contacto'         => 'Título de la columna "Contacto" del footer',
+    'footer_panel_escort'            => 'Enlace "Panel Escort" del footer',
+    'footer_registro_usuario'        => 'Enlace "Registro Usuario" del footer',
+    'footer_registro_escort'         => 'Enlace "Registro Escort" del footer',
+    'footer_entrar_usuario'          => 'Enlace "Entrar como Usuario" del footer',
+    'footer_entrar_escort'           => 'Enlace "Entrar como Escort" del footer',
+    'footer_negocios'                => 'Enlace "Negocios" del footer (directorio de negocios del rubro)',
+    'footer_anuncia_negocio'         => 'Enlace "Anuncia tu negocio" del footer (formulario de banners)',
+    'footer_email_cuenta'            => 'Cuenta del email de contacto (ej: contacto)',
+    'footer_derechos'                => 'Texto de derechos reservados',
+    'footer_mayores18'               => 'Aviso "Solo para mayores de 18 años"',
+
+    // === Estadísticas (StatsStrip) ===
+    'stat_escorts_label'             => 'Etiqueta de la estadística de escorts',
+    'stat_ciudades_label'            => 'Etiqueta de la estadística de ciudades',
+    'stat_verificadas_label'         => 'Etiqueta de la estadística de perfiles verificados',
+    'stat_valoraciones_label'        => 'Etiqueta de la estadística de valoraciones',
+
+    // === Testimonios ===
+    'testimonios_titulo'             => 'Título de la sección de opiniones de clientes',
+
+    // === Badges de tarjetas de escort ===
+    'badge_disponible'               => 'Texto del badge disponible en las tarjetas',
+    'badge_gira'                     => 'Texto del badge de gira (sin ciudad definida)',
+    'badge_gira_ciudad'              => 'Texto del badge de gira con ciudad (usa {ciudad})',
+    'badge_nueva'                    => 'Texto del badge "Nueva"',
+    'badge_verificada'               => 'Texto del badge "Verificada"',
+    'badge_vip'                      => 'Texto del badge "VIP"',
+    'badge_anios'                    => 'Formato de la edad (usa {edad}, ej: {edad} años)',
+    'badge_valoracion'               => 'Formato de la valoración (usa {rating}, {reseñas})',
+
+    // === Modal de ciudades ===
+    'modal_ciudades_titulo'          => 'Título del modal de ciudades',
+    'modal_ciudades_placeholder'     => 'Placeholder del buscador de ciudades',
+    'modal_ciudades_sin_resultados'  => 'Mensaje cuando no hay ciudades',
+    'modal_ciudades_no_encontrada'   => 'Mensaje cuando no se encontró la ciudad (usa {query})',
+    'modal_ciudades_contador'        => 'Contador de ciudades (usa {cantidad})',
+    'modal_ciudades_escorts_count'   => 'Contador de escorts por ciudad (usa {cantidad})',
+
+    // === Contadores y estados de secciones ===
+    'seccion_escorts_vacia'          => 'Mensaje cuando no hay escorts en las secciones',
+    'seccion_cargando_mas'           => 'Texto del botón "Cargando más"',
+    'contador_escorts'               => 'Formato del contador de escorts (usa {cantidad})',
+    'contador_nuevas'                => 'Formato del contador de nuevas (usa {cantidad})',
+    'contador_disponibles'           => 'Formato del contador de disponibles (usa {cantidad})',
+
+    // === CTA final ===
+    'cta_badge'                      => 'Badge del CTA final (ej: Publica tu anuncio)',
+
+    // === Página de ciudad ===
+    'ciudad_sin_resultados'          => 'Mensaje cuando no hay resultados de búsqueda',
+    'ciudad_sin_resultados_filtros'  => 'Complemento del mensaje de sin resultados con filtros',
+    'ciudad_sin_escorts'             => 'Mensaje cuando no hay escorts en la ciudad (usa {ciudad})',
+    'ciudad_contador_resultados'     => 'Formato del contador de resultados de ciudad (usa {cantidad})',
+    'ciudad_hint_filtros'            => 'Sugerencia cuando hay filtros activos sin resultados',
+    'ciudad_hint_vuelve'             => 'Sugerencia cuando la ciudad no tiene publicaciones',
+    'ciudad_limpiar_filtros'         => 'Texto del botón "Limpiar filtros"',
 ];
 
 $tipos = [
     // Por defecto 'string'. Solo listamos los que no lo son.
-    'schema_habilitado' => 'bool',
-    'schema_sameAs'     => 'json',
     'precio_vip_mensual' => 'int',
     'precio_destacado_semanal' => 'int',
 ];
@@ -191,10 +194,6 @@ try {
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'No hay datos para guardar']);
             exit;
-        }
-
-        if (in_array('og_imagen', $updates, true) || in_array('schema_imagen', $updates, true)) {
-            refrescarOgActual($pdo);
         }
 
         echo json_encode([

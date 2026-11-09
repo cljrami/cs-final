@@ -74,19 +74,33 @@ try {
 
         $checkStmt = $pdo->prepare("SELECT id, escort_id FROM comentarios WHERE id = ?");
         $checkStmt->execute([$id]);
-        if (!$checkStmt->fetch()) {
+        $comentario = $checkStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$comentario) {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Comentario no encontrado']);
             exit;
         }
+        $escortId = intval($comentario['escort_id']);
 
         $stmt = $pdo->prepare("DELETE FROM comentarios WHERE id = ?");
         $stmt->execute([$id]);
 
+        // Recalcular rating y total_valoraciones de la escort (solo comentarios aprobados)
+        try {
+            $statsStmt = $pdo->prepare("SELECT COUNT(*) as total, COALESCE(AVG(puntuacion), 0) as promedio FROM comentarios WHERE escort_id = ? AND aprobado = 1");
+            $statsStmt->execute([$escortId]);
+            $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
+            $totalVal = (int)($stats['total'] ?? 0);
+            $promedioVal = (float)($stats['promedio'] ?? 0);
+            $pdo->prepare("UPDATE escorts SET rating = ?, total_valoraciones = ? WHERE id = ?")->execute([$promedioVal, $totalVal, $escortId]);
+        } catch (Throwable $e) {
+            error_log("Error recalcular rating tras borrar comentario admin: " . $e->getMessage());
+        }
+
         $pdo->prepare("INSERT INTO logs_auditoria (usuario_id, escort_id, accion, tabla_afectada, registro_id, ip_address, user_agent, created_at) VALUES (?, ?, 'eliminar_comentario', 'comentarios', ?, ?, ?, NOW())")
             ->execute([
                 $adminId,
-                null,
+                $escortId,
                 $id,
                 $_SERVER['REMOTE_ADDR'] ?? null,
                 $_SERVER['HTTP_USER_AGENT'] ?? null,

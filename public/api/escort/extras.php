@@ -24,7 +24,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || ($tokenData['exp'] ?? 0) < time()) {
         http_response_code(401);
@@ -55,7 +55,7 @@ try {
 
         // Buscar plan BASE activo por escort_id (los extras se rigen por los días del plan base)
         $planStmt = $pdo->prepare("
-            SELECT s.id, s.plan_id, s.fecha_fin, p.nombre as plan_nombre, p.duracion_dias as plan_duracion_dias
+            SELECT s.id, s.plan_id, s.fecha_fin, p.nombre as plan_nombre, p.duracion_dias as plan_duracion_dias, p.permite_destacado
             FROM suscripciones s
             LEFT JOIN planes p ON s.plan_id = p.id
             WHERE s.escort_id = ? AND s.estado = 'activa' AND s.fecha_fin >= CURDATE() AND p.tipo = 'base'
@@ -138,7 +138,12 @@ try {
         $extrasConFlags = array_map(function ($extra) use ($diasPlanRestantes, $planActivo, $tieneExtraVigente, $extraVigente) {
             $duracionOk = (int)$extra['duracion_dias'] <= $diasPlanRestantes;
 
-            $puedeSolicitar = $planActivo && $duracionOk && !$tieneExtraVigente;
+            // Los extras de tipo "destacado"/"fijo" (sticky) exigen que el plan base lo permita
+            $extraTipo = (string)$extra['extra_tipo'];
+            $necesitaDestacado = in_array($extraTipo, ['destacado', 'sticky'], true);
+            $permiteDestacado = (int)($planActivo['permite_destacado'] ?? 0) === 1;
+
+            $puedeSolicitar = $planActivo && $duracionOk && !$tieneExtraVigente && (!$necesitaDestacado || $permiteDestacado);
 
             $motivo = null;
             if ($tieneExtraVigente) {
@@ -148,6 +153,8 @@ try {
                 }
             } elseif (!$planActivo) {
                 $motivo = 'Necesitas un plan base activo para contratar extras.';
+            } elseif ($necesitaDestacado && !$permiteDestacado) {
+                $motivo = 'Tu plan base no incluye el extra de Destacado/Fijo. Actualiza tu plan base para contratarlo.';
             } elseif (!$duracionOk) {
                 $motivo = 'Este extra no cabe en los días restantes de tu plan.';
             }
@@ -207,7 +214,7 @@ try {
 
         // Buscar plan BASE activo
         $planStmt = $pdo->prepare("
-            SELECT s.id, s.fecha_fin, p.duracion_dias as plan_duracion_dias
+            SELECT s.id, s.fecha_fin, p.duracion_dias as plan_duracion_dias, p.permite_destacado
             FROM suscripciones s
             LEFT JOIN planes p ON s.plan_id = p.id
             WHERE s.escort_id = ? AND s.estado = 'activa' AND s.fecha_fin >= CURDATE() AND p.tipo = 'base'
@@ -231,6 +238,17 @@ try {
         if (!$extra) {
             http_response_code(404);
             echo json_encode(['success' => false, 'error' => 'Extra no encontrado o inactivo']);
+            exit;
+        }
+
+        // Bloquear extra "Destacado"/"Fijo" (sticky) si el plan base no lo incluye (permite_destacado = 0).
+        $extraTipo = (string)$extra['extra_tipo'];
+        if (in_array($extraTipo, ['destacado', 'sticky'], true) && (int)($planActivo['permite_destacado'] ?? 0) !== 1) {
+            http_response_code(409);
+            echo json_encode([
+                'success' => false,
+                'error' => 'Tu plan base no incluye el extra de Destacado. Actualiza tu plan base para poder contratarlo.'
+            ]);
             exit;
         }
 

@@ -24,7 +24,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || (isset($tokenData['exp']) ? $tokenData['exp'] : 0) < time()) {
         http_response_code(401);

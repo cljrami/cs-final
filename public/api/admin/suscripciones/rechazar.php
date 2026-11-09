@@ -33,7 +33,7 @@ try {
     $db = getDBConnection();
     $db->beginTransaction();
 
-    // Verificar suscripciíƒÂ³n
+    // Verificar suscripci?n
     $check = $db->prepare("
         SELECT s.*, e.nombre as escort_nombre, p.nombre as plan_nombre, p.tipo as plan_tipo
         FROM suscripciones s
@@ -65,7 +65,7 @@ try {
         exit;
     }
 
-    // Actualizar suscripciíƒÂ³n
+    // Actualizar suscripci?n
     $update = $db->prepare("
         UPDATE suscripciones 
         SET estado = 'rechazada',
@@ -76,7 +76,7 @@ try {
     ");
     $update->execute([$tokenData['id'], $suscripcionId]);
 
-    // Log auditoríƒÂ­a con motivo
+    // Log auditor?a con motivo
     $log = $db->prepare("
         INSERT INTO logs_auditoria 
         (usuario_id, escort_id, accion, tabla_afectada, registro_id, datos_nuevos, ip_address)
@@ -97,7 +97,7 @@ try {
         $_SERVER['REMOTE_ADDR'] ?? null
     ]);
 
-    // NotificaciíƒÂ³n a escort
+    // Notificaci?n a escort
     $notif = $db->prepare("
         INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url)
         VALUES (?, 'sistema', 'Plan rechazado', ?, '/panel/mi-plan')

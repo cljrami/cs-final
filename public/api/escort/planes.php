@@ -27,7 +27,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || !isset($tokenData['exp']) || $tokenData['exp'] < time()) {
         http_response_code(401);
@@ -141,6 +141,10 @@ try {
             'max_videos' => (int)$plan['max_videos'],
             'permite_vip' => (bool)$plan['permite_vip'],
             'permite_destacado' => (bool)$plan['permite_destacado'],
+            'permite_historias' => (bool)$plan['permite_historias'],
+            'permite_verificacion' => (bool)$plan['permite_verificacion'],
+            'permite_audio' => (bool)$plan['permite_audio'],
+            'max_pausas_permitidas' => (int)$plan['max_pausas_permitidas'],
             'uso_unico' => (bool)$plan['uso_unico'],
             'badge' => $plan['badge'],
             'color_badge' => $plan['color_badge'],

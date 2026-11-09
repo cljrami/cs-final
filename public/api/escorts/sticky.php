@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../bootstrap.php';
+require_once __DIR__ . '/../lib/escort_status.php';
 
 try {
     $pdo = getDBConnection();
@@ -50,6 +51,9 @@ try {
 
     $stmt->execute();
     $escorts = $stmt->fetchAll();
+
+    // Badges vigentes (verificado_vigente / vip_vigente) para las tarjetas
+    attachVigenciaBadges($pdo, $escorts);
 
     echo json_encode([
         'success' => true,

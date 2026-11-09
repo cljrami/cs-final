@@ -1,5 +1,6 @@
 // src/components/ui/DataCell.tsx
 import React from 'react';
+import { Skeleton } from './Skeleton';
 
 interface DataCellProps {
   value: React.ReactNode;
@@ -9,16 +10,14 @@ interface DataCellProps {
   className?: string;
 }
 
-export default function DataCell({ value, loading = false, width, height, className = '' }: DataCellProps) {
+export default function DataCell({ value, loading = false, width, height = 16, className = '' }: DataCellProps) {
   if (loading) {
     return (
-      <div
-        className={`animate-pulse bg-gray-800 rounded-lg ${className}`}
-        style={{
-          width: typeof width === 'number' ? `${width}px` : width,
-          height: height ? `${height}px` : 'auto',
-          minHeight: height ? `${height}px` : '1.5rem'
-        }}
+      <Skeleton
+        width={width}
+        height={height}
+        borderRadius="0.375rem"
+        className={className}
       />
     );
   }

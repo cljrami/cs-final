@@ -19,7 +19,7 @@ try {
     $data = json_decode(file_get_contents('php://input'), true);
     $suscripcionId = intval($data['suscripcion_id'] ?? 0);
     $notas = trim($data['notas'] ?? '');
-    $comprobantePago = $data['comprobante_pago'] ?? null;
+    $comprobantePago = comprobante_path($data['comprobante_pago'] ?? null);
 
     if (!$suscripcionId) {
         http_response_code(400);
@@ -30,7 +30,7 @@ try {
     $db = getDBConnection();
     $db->beginTransaction();
 
-    // Verificar suscripciíƒÂ³n existe y estíƒÂ¡ pendiente
+    // Verificar suscripci?n existe y est? pendiente
     $check = $db->prepare("
         SELECT s.*, e.nombre as escort_nombre, e.email as escort_email, 
                p.nombre as plan_nombre, p.duracion_dias, p.uso_unico, p.id as plan_id,
@@ -110,7 +110,7 @@ try {
             exit;
         }
 
-        // TambiíƒÂ©n verificar el flag directo en escorts (sticky=1 o destacado=1 vigente)
+        // Tambi?n verificar el flag directo en escorts (sticky=1 o destacado=1 vigente)
         $colFlag = $extraTipo === 'sticky' ? 'sticky' : ($extraTipo === 'destacado' ? 'destacado' : null);
         if ($colFlag) {
             $colExpira = $extraTipo === 'sticky' ? 'sticky_expira' : 'fecha_destacado_expira';
@@ -129,7 +129,7 @@ try {
     $fechaInicio = date('Y-m-d');
     $fechaFin = date('Y-m-d', strtotime("+{$suscripcion['duracion_dias']} days"));
 
-    // Actualizar suscripciíƒÂ³n
+    // Actualizar suscripci?n
     $update = $db->prepare("
         UPDATE suscripciones 
         SET estado = 'activa',
@@ -137,13 +137,18 @@ try {
             fecha_inicio = ?,
             fecha_fin = ?,
             aprobado_por = ?,
-            comprobante_pago = ?,
+            comprobante_pago = COALESCE(?, comprobante_pago),
             actualizado_en = NOW()
         WHERE id = ?
     ");
     $update->execute([$fechaInicio, $fechaInicio, $fechaFin, $tokenData['id'], $comprobantePago, $suscripcionId]);
 
-    // Registrar en planes_usados si es uso íƒÂºnico
+    if ($comprobantePago) {
+        $db->prepare("UPDATE pagos SET comprobante_url = ? WHERE suscripcion_id = ?")
+            ->execute([$comprobantePago, $suscripcionId]);
+    }
+
+    // Registrar en planes_usados si es uso ?nico
     if ($suscripcion['uso_unico']) {
         $insertUsado = $db->prepare("
             INSERT INTO planes_usados (plan_id, email, escort_id) 
@@ -156,8 +161,38 @@ try {
         ]);
     }
 
-    // Actualizar escort con plan activo (tambiíƒÂ©n aprueba la cuenta si no lo estaba)
-    // Verificar si la columna aprobada existe (migraciíƒÂ³n pendiente)
+    // Verificar estado del plan ANTERIOR para saber si resetear verificado/vip
+    $prevStmt = $db->prepare("
+        SELECT
+            s.estado,
+            s.fecha_fin,
+            s.fecha_aprobacion,
+            p.duracion_dias,
+            CASE
+                WHEN s.estado = 'activa' AND s.fecha_fin < CURDATE() THEN 'expirada'
+                WHEN s.fecha_aprobacion IS NULL AND s.fecha_rechazo IS NULL THEN 'pendiente_aprobacion'
+                WHEN s.fecha_rechazo IS NOT NULL THEN 'rechazada'
+                WHEN s.estado = 'pausada' THEN 'pausada'
+                WHEN s.estado = 'cancelada' THEN 'cancelada'
+                WHEN s.estado = 'activa' THEN 'activa'
+                ELSE s.estado
+            END AS estado_calculado
+        FROM suscripciones s
+        JOIN planes p ON p.id = s.plan_id
+        WHERE s.escort_id = ? AND p.tipo = 'base' AND s.id != ?
+        ORDER BY s.creado_en DESC
+        LIMIT 1
+    ");
+    $prevStmt->execute([$suscripcion['escort_id'], $suscripcionId]);
+    $planAnterior = $prevStmt->fetch(PDO::FETCH_ASSOC);
+
+    $resetVerificadoVip = false;
+    if ($planAnterior && in_array($planAnterior['estado_calculado'], ['expirada', 'cancelada', 'rechazada'], true)) {
+        $resetVerificadoVip = true;
+    }
+
+    // Actualizar escort con plan activo (tambi?n aprueba la cuenta si no lo estaba)
+    // Verificar si la columna aprobada existe (migraci?n pendiente)
     $colCheck = $db->prepare("
         SELECT COUNT(*) FROM information_schema.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'escorts' AND COLUMN_NAME = 'aprobada'
@@ -176,15 +211,44 @@ try {
         $extraParams[] = $fechaFin;
     }
 
+    // Si el plan anterior estaba expirado/cancelado/rechazado: reset completo del
+    // ciclo anterior (verificado, vip, destacado, sticky, disponible y extras).
+    $resetSets = $resetVerificadoVip ? ', verificado = 0, vip = 0, destacado = 0, fecha_destacado_expira = NULL, sticky = 0, sticky_orden = 0, sticky_expira = NULL, disponible_ahora = 0' : '';
+
     $updateEscort = $db->prepare("
         UPDATE escorts 
-        SET estado = 'aprobada'{$setAprobada}{$extraSets}, updated_at = NOW()
+        SET estado = 'aprobada'{$setAprobada}{$extraSets}{$resetSets}, updated_at = NOW()
         WHERE id = ?
     ");
     $updateEscort->execute(array_merge(
         $extraParams,
         [$suscripcion['escort_id']]
     ));
+
+    // Reset completo del ciclo anterior: posiciones sticky, extras activos
+    // viejos y solicitudes pendientes viejas (VIP/verificación) expiran para
+    // que todo parta de cero con el plan nuevo.
+    if ($resetVerificadoVip) {
+        $db->prepare("DELETE FROM sticky_posiciones WHERE escort_id = ?")
+            ->execute([$suscripcion['escort_id']]);
+        $db->prepare("
+            UPDATE suscripciones s
+            JOIN planes p ON p.id = s.plan_id
+            SET s.estado = 'expirada'
+            WHERE s.escort_id = ? AND s.estado = 'activa' AND s.eliminada = 0
+              AND p.extra_tipo IS NOT NULL AND s.id != ?
+        ")->execute([$suscripcion['escort_id'], $suscripcionId]);
+        $db->prepare("
+            UPDATE escort_vip_solicitudes
+            SET estado = 'rechazada', admin_notas = 'Expirada por vencimiento del plan. Solicítala de nuevo.'
+            WHERE escort_id = ? AND estado = 'enviado'
+        ")->execute([$suscripcion['escort_id']]);
+        $db->prepare("
+            UPDATE verificaciones
+            SET estado = 'rechazada', notas_revision = 'Expirada por vencimiento del plan. Solicítala de nuevo.'
+            WHERE escort_id = ? AND estado IN ('pendiente', 'en_revision')
+        ")->execute([$suscripcion['escort_id']]);
+    }
 
     if ($suscripcion['extra_tipo'] === 'sticky') {
         $ciudadSticky = $db->prepare("SELECT c.id FROM ciudades c JOIN escorts e ON e.ciudad = c.nombre WHERE e.id = ?");
@@ -200,7 +264,7 @@ try {
         }
     }
 
-    // Log auditoríƒÂ­a
+    // Log auditor?a
     $log = $db->prepare("
         INSERT INTO logs_auditoria 
         (usuario_id, escort_id, accion, tabla_afectada, registro_id, datos_nuevos, ip_address)
@@ -222,7 +286,7 @@ try {
         $_SERVER['REMOTE_ADDR'] ?? null
     ]);
 
-    // NotificaciíƒÂ³n a escort
+    // Notificaci?n a escort
     $notif = $db->prepare("
         INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url)
         VALUES (?, 'sistema', 'Plan aprobado', ?, '/panel/mi-plan')

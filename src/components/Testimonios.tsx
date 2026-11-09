@@ -1,6 +1,7 @@
 // src/components/Testimonios.tsx
 import { useState, useEffect } from 'react';
 import { Skeleton } from './ui/Skeleton';
+import { useSiteTexts } from '../hooks/useSiteTexts';
 
 interface Testimonio {
   id: number;
@@ -17,6 +18,7 @@ interface Testimonio {
 export default function Testimonios() {
   const [items, setItems] = useState<Testimonio[]>([]);
   const [loading, setLoading] = useState(true);
+  const texts = useSiteTexts();
 
   useEffect(() => {
     fetch('/api/comentarios/recientes.php?limit=6')
@@ -32,7 +34,7 @@ export default function Testimonios() {
     <section className="py-8">
       <div className="flex items-center gap-2 mb-6">
         <i className="fas fa-quote-left text-red-500"></i>
-        <h2 className="text-ink font-bold text-lg">Opiniones de clientes</h2>
+        <h2 className="text-ink font-bold text-lg">{texts ? (texts.testimonios_titulo || 'Opiniones de clientes') : <Skeleton width={160} height={18} inline />}</h2>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading ? (
@@ -53,7 +55,7 @@ export default function Testimonios() {
                 ))}
               </div>
               <p className="text-muted text-sm leading-relaxed flex-1">"{t.comentario}"</p>
-              <a href={`/${t.escort_id}`} className="flex items-center gap-3 mt-4 pt-4 border-t border-white/5 group">
+              <a href={`/cs${t.escort_id}`} className="flex items-center gap-3 mt-4 pt-4 border-t border-white/5 group">
                 <div className="w-9 h-9 rounded-full overflow-hidden bg-surface2 flex items-center justify-center flex-shrink-0">
                   {t.escort_foto ? (
                     <img src={t.escort_foto} alt={t.escort_nombre} className="w-full h-full object-cover" loading="lazy" />

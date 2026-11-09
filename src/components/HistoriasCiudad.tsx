@@ -12,7 +12,16 @@ interface HistoriaEscort {
   foto_principal: string | null;
   vip: number;
   verificado: number;
+  destacado: number;
+  sticky: number;
   historias: HistoriaItem[];
+  // Estados efectivos
+  verificado_vigente?: number;
+  vip_vigente?: number;
+  destacado_vigente?: number;
+  sticky_vigente?: number;
+  activa_vigente?: number;
+  plan_vencido?: boolean;
 }
 
 interface ApiResponse {
@@ -41,14 +50,7 @@ export default function HistoriasCiudad({ ciudad }: { ciudad?: string }) {
       .finally(() => setLoading(false));
   }, [ciudad]);
 
-  if (loading) {
-    return (
-      <section className="pt-4 pb-2" aria-hidden="true">
-        <div className="h-[110px]"></div>
-      </section>
-    );
-  }
-  if (escorts.length === 0) return null;
+  if (loading || escorts.length === 0) return null;
 
   const abrir = (idx: number) => {
     setCurrentEscortIdx(idx);
@@ -140,7 +142,7 @@ export default function HistoriasCiudad({ ciudad }: { ciudad?: string }) {
               ))}
             </div>
 
-            <a href={`/${esc.escort_id}`} className="absolute top-6 left-3 right-3 z-20 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <a href={`/cs${esc.escort_id}`} className="absolute top-6 left-3 right-3 z-20 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
               <span className="w-9 h-9 rounded-full bg-raised overflow-hidden border border-white/20 shrink-0">
                 {esc.foto_portada || esc.foto_principal ? (
                   <img src={esc.foto_portada || esc.foto_principal!} alt={esc.nombre} className="w-full h-full object-cover" />

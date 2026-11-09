@@ -27,7 +27,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || ($tokenData['exp'] ?? 0) < time()) {
         http_response_code(401);
@@ -38,7 +38,7 @@ try {
     $escortId = $tokenData['id'];
 
     $stmt = $pdo->prepare("
-        SELECT id, url, tipo, es_portada as esPortada, orden
+        SELECT id, url, tipo, es_portada as esPortada, gif_url, orden
         FROM escort_fotos
         WHERE escort_id = ?
         ORDER BY orden ASC, id ASC
@@ -48,7 +48,7 @@ try {
 
     // Límite del plan activo
     $planStmt = $pdo->prepare("
-        SELECT p.max_fotos
+        SELECT p.max_fotos, p.max_videos, p.permite_audio
         FROM suscripciones s
         JOIN planes p ON p.id = s.plan_id
         WHERE s.escort_id = ? AND s.estado = 'activa' AND s.fecha_fin >= CURDATE()
@@ -57,8 +57,10 @@ try {
     $planStmt->execute([$escortId]);
     $plan = $planStmt->fetch(PDO::FETCH_ASSOC);
     $maxFotos = $plan ? (int)$plan['max_fotos'] : 5;
+    $maxVideos = $plan ? (int)$plan['max_videos'] : 0;
+    $permiteAudio = $plan ? (bool)$plan['permite_audio'] : false;
 
-    echo json_encode(['success' => true, 'fotos' => $fotos, 'maxFotos' => $maxFotos]);
+    echo json_encode(['success' => true, 'fotos' => $fotos, 'maxFotos' => $maxFotos, 'maxVideos' => $maxVideos, 'permiteAudio' => $permiteAudio]);
 } catch (Throwable $e) {
     error_log("Error fotos/listar.php: " . $e->getMessage());
     http_response_code(500);

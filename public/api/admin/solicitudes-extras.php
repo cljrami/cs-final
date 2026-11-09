@@ -43,10 +43,12 @@ try {
                     $where .= " AND s.fecha_aprobacion IS NULL AND (s.estado IS NULL OR s.estado = '' OR s.estado = 'pendiente_aprobacion')";
                 } elseif ($estado === 'rechazada') {
                     $where .= " AND s.estado IN ('rechazada', 'cancelada')";
-                } else {
-                    $where .= " AND s.estado = ?";
-                    $params[] = $estado;
-                }
+} elseif ($estado === 'expirada') {
+    $where .= " AND (s.estado = 'expirada' OR (s.estado = 'activa' AND s.fecha_fin < CURDATE()))";
+} else {
+    $where .= " AND s.estado = ?";
+    $params[] = $estado;
+}
             }
         }
 
@@ -180,9 +182,7 @@ try {
                     'estado_raw' => $s['estado'],
                     'dias_restantes' => (int)$s['dias_restantes'],
 
-                    'comprobante_pago' => !empty($s['comprobante_pago'])
-                        ? '/api/serve-upload.php?path=/uploads/comprobantes/' . ltrim($s['comprobante_pago'], '/')
-                        : null,
+                    'comprobante_pago' => comprobante_url($s['comprobante_pago']),
                     'creado_en' => $s['creado_en'],
                     'contador_pausas' => (int)$s['contador_pausas'],
                     'aprobado_por' => $s['aprobado_por_nombre'],

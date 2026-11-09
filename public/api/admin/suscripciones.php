@@ -229,9 +229,7 @@ try {
                 'dias_restantes' => (int)$det['dias_restantes'],
                 'dias_activo' => $diasActivo,
 
-                'comprobante_pago' => !empty($det['comprobante_pago'])
-                    ? '/api/serve-upload.php?path=/uploads/comprobantes/' . ltrim($det['comprobante_pago'], '/')
-                    : null,
+                'comprobante_pago' => comprobante_url($det['comprobante_pago']),
                 'creado_en' => $det['creado_en'],
                 'contador_pausas' => (int)$det['contador_pausas'],
                 'dias_pausados' => (int)$det['dias_pausados'],
@@ -258,15 +256,27 @@ try {
     $params = [];
     $where = "WHERE e.eliminada = 0";
 
+    // Escorts activas sin NINGUNA suscripción base (extra_tipo IS NULL):
+    // el CRUD de Escorts las etiqueta como 'expirada'. Nota: aquí NO se usa p.tipo='base'
+    // porque la subconsulta cruza planes por extra_tipo, igual que escorts.php.
+    $sinPlanCondicion = "NOT EXISTS (SELECT 1 FROM suscripciones b JOIN planes q ON q.id = b.plan_id WHERE b.escort_id = e.id AND q.extra_tipo IS NULL)";
+    $incluirSinPlan = false;
+
     // Filtro por estado
     if ($estado !== 'todos') {
         $mapEstados = [
             'pendientes' => 'pendiente_aprobacion',
+            'pendiente' => 'pendiente_aprobacion',
             'activas' => 'activa',
+            'activa' => 'activa',
             'pausadas' => 'pausada',
+            'pausada' => 'pausada',
             'expiradas' => 'expirada',
+            'expirada' => 'expirada',
             'rechazadas' => 'rechazada',
+            'rechazada' => 'rechazada',
             'canceladas' => 'cancelada',
+            'cancelada' => 'cancelada',
         ];
         if ($estado === 'vencen_hoy') {
             $where .= " AND s.estado = 'activa' AND s.fecha_fin = CURDATE()";
@@ -279,6 +289,7 @@ try {
                 } elseif ($estado === 'expirada') {
                     // Incluye estado 'expirada' y activas cuyo vencimiento ya pasó
                     $where .= " AND (s.estado = 'expirada' OR (s.estado = 'activa' AND s.fecha_fin < CURDATE()))";
+                    $incluirSinPlan = true;
                 } else {
                     $where .= " AND s.estado = ?";
                     $params[] = $estado;
@@ -320,7 +331,26 @@ try {
     $stmtCount->execute($params);
     $total = (int)$stmtCount->fetch(PDO::FETCH_ASSOC)['total'];
 
-    // Obtener suscripciones
+    // Contar escorts activas sin plan base (solo cuando el filtro es 'expiradas')
+    $sinPlanTotal = 0;
+    $sinPlanRows = [];
+    if ($incluirSinPlan) {
+        $sinPlanWhere = "e.eliminada = 0 AND e.activa = 1 AND $sinPlanCondicion";
+        $sinPlanParams = [];
+        if ($search !== '') {
+            $sinPlanWhere .= " AND (e.id = :spId OR e.nombre LIKE :sp1 OR e.ciudad LIKE :sp2 OR e.email LIKE :sp3)";
+            $sinPlanParams[':spId'] = is_numeric($search) ? (int)$search : 0;
+            $sinPlanParams[':sp1'] = "%{$escapedSearch}%";
+            $sinPlanParams[':sp2'] = "%{$escapedSearch}%";
+            $sinPlanParams[':sp3'] = "%{$escapedSearch}%";
+        }
+        $stmtSp = $pdo->prepare("SELECT COUNT(*) FROM escorts e WHERE $sinPlanWhere");
+        $stmtSp->execute($sinPlanParams);
+        $sinPlanTotal = (int)$stmtSp->fetchColumn();
+        $total += $sinPlanTotal;
+    }
+
+    // Filas reales de suscripciones
     $sql = "
         SELECT 
             s.id as suscripcion_id,
@@ -390,6 +420,18 @@ try {
     $stmt->execute($params);
     $suscripciones = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Escorts activas sin plan base → filas sintéticas para el filtro 'expiradas'
+    if ($incluirSinPlan) {
+        $stmtSpList = $pdo->prepare("
+            SELECT e.id, e.nombre, e.email, e.telefono, e.ciudad, e.foto_principal, e.verificado, e.vip, e.created_at
+            FROM escorts e
+            WHERE $sinPlanWhere
+            ORDER BY e.created_at DESC
+        ");
+        $stmtSpList->execute($sinPlanParams);
+        $sinPlanRows = $stmtSpList->fetchAll(PDO::FETCH_ASSOC);
+    }
+
     $suscripcionesFormateadas = [];
     foreach ($suscripciones as $s) {
         $suscripcionesFormateadas[] = [
@@ -428,13 +470,58 @@ try {
                 'estado_raw' => $s['estado'],
                 'dias_restantes' => (int)$s['dias_restantes'],
 
-                'comprobante_pago' => !empty($s['comprobante_pago'])
-                    ? '/api/serve-upload.php?path=/uploads/comprobantes/' . ltrim($s['comprobante_pago'], '/')
-                    : null,
+                'comprobante_pago' => comprobante_url($s['comprobante_pago']),
                 'creado_en' => $s['creado_en'],
                 'contador_pausas' => (int)$s['contador_pausas'],
                 'aprobado_por' => $s['aprobado_por_nombre'],
                 'rechazado_por' => $s['rechazado_por_nombre']
+            ]
+        ];
+    }
+
+    // Filas sintéticas: escorts activas sin plan base (vencidas por falta de plan)
+    foreach ($sinPlanRows as $sp) {
+        $suscripcionesFormateadas[] = [
+            'suscripcion_id' => null,
+            'sin_plan' => true,
+            'escort' => [
+                'id' => (int)$sp['id'],
+                'nombre' => $sp['nombre'],
+                'email' => $sp['email'],
+                'telefono' => $sp['telefono'],
+                'ciudad' => $sp['ciudad'],
+                'foto_principal' => $sp['foto_principal'],
+                'verificado' => (bool)$sp['verificado'],
+                'vip' => (bool)$sp['vip']
+            ],
+            'plan' => [
+                'id' => null,
+                'nombre' => 'Sin plan',
+                'slug' => '',
+                'tipo' => 'base',
+                'duracion_dias' => 0,
+                'precio' => 0,
+                'badge' => 'SP',
+                'color' => '#6b7280',
+                'permite_vip' => false,
+                'permite_destacado' => false,
+                'max_pausas_permitidas' => 0
+            ],
+            'suscripcion' => [
+                'fecha_inicio' => null,
+                'fecha_aprobacion' => null,
+                'fecha_rechazo' => null,
+                'fecha_fin' => null,
+                'precio_pagado' => 0,
+                'moneda' => 'CLP',
+                'estado' => 'expirada',
+                'estado_raw' => 'sin_plan',
+                'dias_restantes' => 0,
+                'contador_pausas' => 0,
+                'comprobante_pago' => null,
+                'creado_en' => $sp['created_at'],
+                'aprobado_por' => null,
+                'rechazado_por' => null
             ]
         ];
     }
@@ -455,6 +542,10 @@ try {
         WHERE e.eliminada = 0 AND p.tipo = 'base'
     ");
     $counts = $stmtCounts->fetch(PDO::FETCH_ASSOC);
+
+    // Escorts activas sin plan base → se suman al contador 'expiradas'
+    $stmtSinPlanStat = $pdo->query("SELECT COUNT(*) FROM escorts e WHERE e.eliminada = 0 AND e.activa = 1 AND $sinPlanCondicion");
+    $counts['expiradas'] += (int)$stmtSinPlanStat->fetchColumn();
 
     echo json_encode([
         'success' => true,

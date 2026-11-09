@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { Skeleton } from '../ui/Skeleton';
 import { API_BASE, getEscortHeaders } from '../../lib/escortAuth';
 
@@ -69,6 +69,13 @@ function StatCard({ icon, iconColor, label, value, sub, subClass, loading }: {
   subClass?: string;
   loading?: boolean;
 }) {
+  const hasRealValue = useRef(false);
+  useEffect(() => {
+    if (!loading) hasRealValue.current = true;
+  }, [loading]);
+
+  const showSkeleton = loading && !hasRealValue.current;
+
   return (
     <div className="bg-[#13131a] border border-gray-800 rounded-2xl p-5">
       <div className="flex items-center gap-2 mb-2">
@@ -76,9 +83,9 @@ function StatCard({ icon, iconColor, label, value, sub, subClass, loading }: {
         <span className="text-gray-500 text-xs uppercase tracking-wider">{label}</span>
       </div>
       <p className="text-2xl font-bold text-white">
-        {loading ? <Skeleton width={60} height={28} /> : value}
+        {showSkeleton ? <Skeleton width={60} height={28} /> : value}
       </p>
-      {loading
+      {showSkeleton
         ? <Skeleton width={80} height={12} className="mt-1" />
         : sub ? <p className={`text-xs mt-1 ${subClass || 'text-gray-600'}`}>{sub}</p> : null}
     </div>

@@ -12,15 +12,17 @@ require_once __DIR__ . '/../bootstrap.php';
 
 try {
     $tokenData = requireAuth();
-    requireAdminRole($tokenData);
+    // Suplantar escort es privilegio alto: solo admin/superadmin (no moderador).
+    requireAdminRole($tokenData, ['admin', 'superadmin']);
     $pdo = getDBConnection();
+    compatEnsureTokenVersion();
 
     $id = (int)($_GET['id'] ?? 0);
     if ($id <= 0) {
         jsonError('ID de escort requerido', 400);
     }
 
-    $stmt = $pdo->prepare("SELECT id, usuario, nombre, primer_login, eliminada FROM escorts WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT id, usuario, nombre, primer_login, eliminada, token_version FROM escorts WHERE id = ?");
     $stmt->execute([$id]);
     $escort = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -35,10 +37,19 @@ try {
         'id' => (int)$escort['id'],
         'usuario' => $escort['usuario'],
         'tipo' => 'escort',
+        'tv' => (int)($escort['token_version'] ?? 0),
         'primer_login' => (int)$escort['primer_login'],
-        'admin_acting' => true,
+        'admin_acting' => (int)($tokenData['id'] ?? 0),
         'exp' => time() + (7 * 24 * 60 * 60)
     ]);
+
+    // Auditoría: quién suplantó a quién.
+    try {
+        $pdo->prepare("INSERT INTO logs_auditoria (usuario_id, escort_id, accion, tabla_afectada, registro_id, datos_nuevos, ip_address) VALUES (?, ?, 'login_as_escort', 'escorts', ?, ?, ?)")
+            ->execute([(int)($tokenData['id'] ?? 0), (int)$escort['id'], (int)$escort['id'], json_encode(['escort_nombre' => $escort['nombre']]), $_SERVER['REMOTE_ADDR'] ?? null]);
+    } catch (Throwable $auditErr) {
+        error_log('escort-login-as audit error: ' . $auditErr->getMessage());
+    }
 
     echo json_encode([
         'success' => true,

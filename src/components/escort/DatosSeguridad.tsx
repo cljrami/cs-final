@@ -1,5 +1,7 @@
 // src/components/escort/DatosSeguridad.tsx
 import { useState, useEffect } from 'react';
+import { Skeleton } from '../ui/Skeleton';
+import { showToast } from '../ui/Toast';
 
 
 const API_BASE = '/api/escort';
@@ -10,6 +12,107 @@ function getAuthHeaders(): Record<string, string> {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`
   };
+}
+
+interface InputFieldProps {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+  type?: string;
+  placeholder?: string;
+  icon: string;
+  error?: string;
+  loading: boolean;
+}
+
+function InputField({
+  label,
+  value,
+  onChange,
+  type = 'text',
+  placeholder,
+  icon,
+  error,
+  loading
+}: InputFieldProps) {
+  if (loading) {
+    return (
+      <div>
+        <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">{label}</label>
+        <Skeleton height={48} borderRadius="0.75rem" />
+      </div>
+    );
+  }
+  return (
+    <div>
+      <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">{label}</label>
+      <div className="relative">
+        <i className={`fas ${icon} absolute left-4 top-1/2 -translate-y-1/2 text-gray-500`}></i>
+        <input
+          type={type}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className={`w-full bg-[#1a1a24] border ${error ? 'border-red-500' : 'border-gray-700'} rounded-xl py-3 pl-11 pr-4 text-white placeholder-gray-600 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/30 transition-all`}
+        />
+      </div>
+      {error && <p className="text-red-400 text-xs mt-1.5 flex items-center gap-1"><i className="fas fa-exclamation-circle"></i>{error}</p>}
+    </div>
+  );
+}
+
+interface PassFieldProps {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+  show: boolean;
+  onToggle: () => void;
+  placeholder: string;
+  error?: string;
+  loading: boolean;
+}
+
+function PassField({
+  label,
+  value,
+  onChange,
+  show,
+  onToggle,
+  placeholder,
+  error,
+  loading
+}: PassFieldProps) {
+  if (loading) {
+    return (
+      <div>
+        <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">{label}</label>
+        <Skeleton height={48} borderRadius="0.75rem" />
+      </div>
+    );
+  }
+  return (
+    <div>
+      <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">{label}</label>
+      <div className="relative">
+        <i className="fas fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
+        <input
+          type={show ? 'text' : 'password'}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className={`w-full bg-[#1a1a24] border ${error ? 'border-red-500' : 'border-gray-700'} rounded-xl py-3 pl-11 pr-12 text-white placeholder-gray-600 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/30 transition-all`}
+        />
+        <button
+          type="button"
+          onClick={onToggle}
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+        >
+          <i className={`fas ${show ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+        </button>
+      </div>
+      {error && <p className="text-red-400 text-xs mt-1.5 flex items-center gap-1"><i className="fas fa-exclamation-circle"></i>{error}</p>}
+    </div>
+  );
 }
 
 interface EscortData {
@@ -27,11 +130,20 @@ interface EscortData {
   activa: number;
   verificado: number;
   vip: number;
+  destacado: number;
+  sticky: number;
   created_at: string;
   updated_at: string;
   rating: string;
   visitas_perfil: number;
   total_valoraciones: number;
+  // Estados efectivos
+  verificado_vigente?: number;
+  vip_vigente?: number;
+  destacado_vigente?: number;
+  sticky_vigente?: number;
+  activa_vigente?: number;
+  plan_vencido?: boolean;
 }
 
 export default function DatosSeguridad() {
@@ -40,7 +152,8 @@ export default function DatosSeguridad() {
   const [saving, setSaving] = useState(false);
   const [savingPass, setSavingPass] = useState(false);
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+  const [successMsg] = useState('');
+  const setSuccessMsg = (m: string) => showToast(m);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeletePassModal, setShowDeletePassModal] = useState(false);
@@ -203,89 +316,6 @@ export default function DatosSeguridad() {
     }
   };
 
-  const InputField = ({
-    label,
-    value,
-    onChange,
-    type = 'text',
-    placeholder,
-    icon,
-    error
-  }: {
-    label: string;
-    value: string;
-    onChange: (val: string) => void;
-    type?: string;
-    placeholder?: string;
-    icon: string;
-    error?: string;
-  }) => loading ? (
-    <div>
-      <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">{label}</label>
-      <div className="animate-pulse bg-gray-800 rounded-xl h-12" />
-    </div>
-  ) : (
-    <div>
-      <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">{label}</label>
-      <div className="relative">
-        <i className={`fas ${icon} absolute left-4 top-1/2 -translate-y-1/2 text-gray-500`}></i>
-        <input
-          type={type}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className={`w-full bg-[#1a1a24] border ${error ? 'border-red-500' : 'border-gray-700'} rounded-xl py-3 pl-11 pr-4 text-white placeholder-gray-600 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/30 transition-all`}
-        />
-      </div>
-      {error && <p className="text-red-400 text-xs mt-1.5 flex items-center gap-1"><i className="fas fa-exclamation-circle"></i>{error}</p>}
-    </div>
-  );
-
-  const PassField = ({
-    label,
-    value,
-    onChange,
-    show,
-    onToggle,
-    placeholder,
-    error
-  }: {
-    label: string;
-    value: string;
-    onChange: (val: string) => void;
-    show: boolean;
-    onToggle: () => void;
-    placeholder: string;
-    error?: string;
-  }) => loading ? (
-    <div>
-      <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">{label}</label>
-      <div className="animate-pulse bg-gray-800 rounded-xl h-12" />
-    </div>
-  ) : (
-    <div>
-      <label className="block text-gray-400 text-xs uppercase tracking-wider mb-2">{label}</label>
-      <div className="relative">
-        <i className="fas fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-gray-500"></i>
-        <input
-          type={show ? 'text' : 'password'}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className={`w-full bg-[#1a1a24] border ${error ? 'border-red-500' : 'border-gray-700'} rounded-xl py-3 pl-11 pr-12 text-white placeholder-gray-600 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/30 transition-all`}
-        />
-        <button
-          type="button"
-          onClick={onToggle}
-          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
-        >
-          <i className={`fas ${show ? 'fa-eye-slash' : 'fa-eye'}`}></i>
-        </button>
-      </div>
-      {error && <p className="text-red-400 text-xs mt-1.5 flex items-center gap-1"><i className="fas fa-exclamation-circle"></i>{error}</p>}
-    </div>
-  );
-
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -333,6 +363,7 @@ export default function DatosSeguridad() {
               placeholder="tu@email.com"
               icon="fa-envelope"
               error={fieldErrors.email}
+              loading={loading}
             />
 
             <InputField
@@ -342,6 +373,7 @@ export default function DatosSeguridad() {
               placeholder="+56 9 1234 5678"
               icon="fa-phone"
               error={fieldErrors.telefono}
+              loading={loading}
             />
 
             <InputField
@@ -351,6 +383,7 @@ export default function DatosSeguridad() {
               placeholder="+56 9 1234 5678"
               icon="fa-brands fa-whatsapp"
               error={fieldErrors.whatsapp}
+              loading={loading}
             />
 
             <div className="pt-2">
@@ -387,6 +420,7 @@ export default function DatosSeguridad() {
               onToggle={() => setShowPass({ ...showPass, actual: !showPass.actual })}
               placeholder="********"
               error={fieldErrors.passActual}
+              loading={loading}
             />
 
             <PassField
@@ -397,6 +431,7 @@ export default function DatosSeguridad() {
               onToggle={() => setShowPass({ ...showPass, nueva: !showPass.nueva })}
               placeholder="Minimo 8 caracteres"
               error={fieldErrors.passNueva}
+              loading={loading}
             />
 
             <PassField
@@ -407,6 +442,7 @@ export default function DatosSeguridad() {
               onToggle={() => setShowPass({ ...showPass, confirmar: !showPass.confirmar })}
               placeholder="Repite la nueva contrasena"
               error={fieldErrors.passConfirmar}
+              loading={loading}
             />
 
             <div className="pt-2">
@@ -462,15 +498,23 @@ export default function DatosSeguridad() {
           </div>
           <div className="bg-[#1a1a24] rounded-xl p-4">
             <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Verificada</p>
-            <p className={`text-sm font-medium ${escort?.verificado ? 'text-green-400' : 'text-gray-400'}`}>
-              {escort?.verificado ? 'Si' : 'No'}
-            </p>
+            {escort?.verificado_vigente === 1 ? (
+              <p className="text-sm font-medium text-green-400">Si</p>
+            ) : escort?.verificado === 1 && escort?.verificado_vigente === 0 ? (
+              <p className="text-sm font-medium text-amber-400">Si (expirada - plan vencido)</p>
+            ) : (
+              <p className="text-sm font-medium text-gray-400">No</p>
+            )}
           </div>
           <div className="bg-[#1a1a24] rounded-xl p-4">
             <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">VIP</p>
-            <p className={`text-sm font-medium ${escort?.vip ? 'text-yellow-400' : 'text-gray-400'}`}>
-              {escort?.vip ? 'Si' : 'No'}
-            </p>
+            {escort?.vip_vigente === 1 ? (
+              <p className="text-sm font-medium text-yellow-400">Si</p>
+            ) : escort?.vip === 1 && escort?.vip_vigente === 0 ? (
+              <p className="text-sm font-medium text-amber-400">Si (expirado - plan vencido)</p>
+            ) : (
+              <p className="text-sm font-medium text-gray-400">No</p>
+            )}
           </div>
           <div className="bg-[#1a1a24] rounded-xl p-4">
             <p className="text-gray-500 text-xs uppercase tracking-wider mb-1">Registro</p>

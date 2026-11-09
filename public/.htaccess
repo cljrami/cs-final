@@ -1,20 +1,49 @@
 RewriteEngine On
 
-# Error 404
+# Redirigir www
+RewriteCond %{HTTP_HOST} ^consexvip\.cl$ [NC]
+RewriteRule ^(.*)$ https://www.consexvip.cl/$1 [R=301,L]
+
+# Antiguo anunciate -> publicidad
+RewriteRule ^anunciate/?$ /publicidad/ [R=301,L]
+
+# Antiguo publicar -> registro de escort
+RewriteRule ^publicar/?$ /micuenta/registro/ [R=301,L]
+
+# Paginas PHP
+RewriteRule ^publicidad/?$ publicidad/index.html [L,QSA]
+RewriteRule ^blog/?$ blog.php [L,QSA]
+# Sitemap
+RewriteRule ^sitemap\.xml$ sitemap.php [L]
+# Negocios ahora es Astro -> sin rewrite a PHP
+RewriteRule ^negocio/([0-9]+)?$ negocio.php?id=$1 [L,QSA]
+
+# Escorts
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^cs(\d+)/?$ /perfil/?id=$1 [L,QSA]
+
+# Redirect antigua ruta numérica 106 a nueva ruta cs106
+RewriteRule ^106/?$ /cs106/ [R=301,L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(\d+)/?$ escort.php?id=$1 [L,QSA]
+RewriteCond %{DOCUMENT_ROOT}/ciudad/$1/index.html -f
+RewriteRule ^escorts-([a-z0-9-]+)/?$ /ciudad/$1/index.html [L,QSA]
+RewriteRule ^escorts-([a-z0-9-]+)/?$ /ciudad-fallback.php?slug=$1 [L,QSA]
+
+# Error
 ErrorDocument 404 /404.html
 
-# ============================================
-# SEGURIDAD - Cabeceras globales
-# ============================================
+# Seguridad
 Header always set X-Content-Type-Options "nosniff"
 Header always set X-Frame-Options "SAMEORIGIN"
 Header always set Referrer-Policy "strict-origin-when-cross-origin"
 Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+Header always set Strict-Transport-Security "max-age=31536000"
 
-# ============================================
-# CACHÉ - Assets estáticos con hash (Astro /_astro/ y fuentes)
-# Los nombres contienen hash (inmutables) → años de caché
-# ============================================
+# Cache
 <IfModule mod_expires.c>
   ExpiresActive On
   ExpiresByType text/css "access plus 1 year"
@@ -32,82 +61,8 @@ Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
   </IfModule>
 </FilesMatch>
 
-# HTML: revalidación corta para no servir HTML viejo
 <FilesMatch "\.(html)$">
   <IfModule mod_headers.c>
     Header set Cache-Control "public, max-age=0, must-revalidate"
   </IfModule>
 </FilesMatch>
-
-# ============================================
-# CRÍTICO: Pasar Authorization header a PHP
-# ============================================
-RewriteCond %{HTTP:Authorization} ^(.*)
-RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
-
-# ============================================
-# PREFLIGHT - Solo para API (204 = No Content)
-# ============================================
-RewriteCond %{REQUEST_METHOD} OPTIONS
-RewriteCond %{REQUEST_URI} ^/api/
-RewriteRule ^ - [R=204,L]
-
-# ============================================
-# ROBOTS.TXT → robots.php (gestionado desde admin)
-# ============================================
-RewriteRule ^robots\.txt$ robots.php [L,QSA]
-
-# ============================================
-# CIUDAD - Redirigir 301 /ciudad/{slug} → /escorts-{slug}
-# (se coloca antes del bloque -f/-d para capturar siempre la URL vieja)
-# ============================================
-RewriteRule ^ciudad/([^/]+)/?$ /escorts-$1 [R=301,L]
-
-# ============================================
-# ARCHIVOS/CARPETAS EXISTENTES - No redirigir
-# ============================================
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
-RewriteRule ^ - [L]
-
-# ============================================
-# API - No redirigir
-# ============================================
-RewriteRule ^api/ - [L]
-
-# ============================================
-# ADMIN - No redirigir
-# ============================================
-RewriteRule ^admin/ - [L]
-
-# ============================================
-# RUTAS NUMÉRICAS (/8, /123) → escort.php?id=8
-# ============================================
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{REQUEST_URI} ^/(\d+)/?$
-RewriteRule ^(\d+)/?$ escort.php?id=$1 [L,QSA]
-
-# ============================================
-# SITEMAP.XML → sitemap.php
-# ============================================
-RewriteRule ^sitemap\.xml$ sitemap.php [L,QSA]
-
-# ============================================
-# CIUDAD /escorts-{slug} → ciudad/{slug}/index.html (pagina SEO estatica)
-# ============================================
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{DOCUMENT_ROOT}/ciudad/$1/index.html -f
-RewriteRule ^escorts-([a-z0-9-]+)/?$ /ciudad/$1/index.html [L,QSA]
-
-# ============================================
-# PÁGINAS ASTRO - Servir HTML estático si existe
-# ============================================
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteCond %{DOCUMENT_ROOT}/$1.html -f
-RewriteRule ^(.*)$ /$1.html [L]
-
-# Si nada coincide → 404
-RewriteRule ^(.*)$ - [R=404,L]

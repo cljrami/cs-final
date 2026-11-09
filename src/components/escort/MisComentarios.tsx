@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Skeleton } from '../ui/Skeleton';
+import { showToast } from '../ui/Toast';
 
 interface Comentario {
   id: number;
@@ -25,13 +27,15 @@ export default function MisComentarios() {
   const [comentarios, setComentarios] = useState<Comentario[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+  const [successMsg] = useState('');
+  const setSuccessMsg = (m: string) => showToast(m);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
   const [codigos, setCodigos] = useState<CodigoVerificacion[]>([]);
   const [codigosLoading, setCodigosLoading] = useState(false);
   const [generando, setGenerando] = useState(false);
+  const [whatsappNumero, setWhatsappNumero] = useState('');
   const [nuevoCodigo, setNuevoCodigo] = useState('');
   const [eliminandoCodigoId, setEliminandoCodigoId] = useState<number | null>(null);
   const [confirmarEliminarCodigo, setConfirmarEliminarCodigo] = useState<CodigoVerificacion | null>(null);
@@ -122,9 +126,11 @@ export default function MisComentarios() {
     }
   };
 
-  const enviarWhatsApp = (codigo: string) => {
-    const msg = `Tu código de verificación para dejar tu valoración es: ${codigo}. Ingresa este código en mi perfil para publicar tu comentario. Válido por 48 horas.`;
-    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+  const enviarWhatsApp = (codigo: string, numero?: string) => {
+    const target = (numero || whatsappNumero || '').replace(/\D/g, '');
+    const msg = `Tu codigo de verificacion para dejar tu valoracion es: ${codigo}. Ingresa este codigo en mi perfil para publicar tu comentario. Valido por 48 horas.`;
+    const url = target ? `https://wa.me/${target}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
   };
 
   const enviarEmail = (codigo: string) => {
@@ -169,18 +175,22 @@ export default function MisComentarios() {
             <p className="text-green-400 text-sm mb-1">¡Nuevo código generado! Compártelo con tu cliente:</p>
             <p className="text-white text-2xl font-bold tracking-widest select-all">{nuevoCodigo}</p>
             <p className="text-gray-500 text-xs mt-1">Válido por 48 horas</p>
+            <div className="mt-3 mb-3">
+              <input
+                type="tel"
+                value={whatsappNumero}
+                onChange={e => setWhatsappNumero(e.target.value)}
+                placeholder="INGRESA NUMERO DE WHATSAPP (ej: +569 123 456 789)"
+                className="w-full px-3 py-2 bg-[#1a1a24] border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-green-500"
+              />
+            </div>
             <div className="flex flex-col sm:flex-row justify-center gap-2 mt-4">
               <button
-                onClick={() => enviarWhatsApp(nuevoCodigo)}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-xl transition-all"
+                onClick={() => enviarWhatsApp(nuevoCodigo, whatsappNumero)}
+                disabled={!whatsappNumero || !whatsappNumero.trim().startsWith('+569') || whatsappNumero.trim().replace(/\D/g, '').length < 11}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl transition-all"
               >
                 <i className="fab fa-whatsapp"></i> Enviar por WhatsApp
-              </button>
-              <button
-                onClick={() => enviarEmail(nuevoCodigo)}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-all"
-              >
-                <i className="fas fa-envelope"></i> Enviar por Email
               </button>
             </div>
           </div>
@@ -213,20 +223,13 @@ export default function MisComentarios() {
                   {!c.usado && !c.expirado && (
                     <>
                       <button
-                        onClick={() => enviarWhatsApp(c.codigo)}
+                        onClick={() => { const n = window.prompt('INGRESA NUMERO DE WHATSAPP'); if (n) enviarWhatsApp(c.codigo, n); }}
                         title="Enviar por WhatsApp"
                         className="w-7 h-7 flex items-center justify-center rounded-lg text-green-500 hover:bg-green-500/10 transition-colors"
                       >
                         <i className="fab fa-whatsapp"></i>
                       </button>
-                      <button
-                        onClick={() => enviarEmail(c.codigo)}
-                        title="Enviar por Email"
-                        className="w-7 h-7 flex items-center justify-center rounded-lg text-blue-500 hover:bg-blue-500/10 transition-colors"
-                      >
-                        <i className="fas fa-envelope"></i>
-                      </button>
-                    </>
+                      </>
                   )}
                   <span className={`text-[0.6rem] px-2 py-0.5 rounded-full font-medium ${
                     c.usado ? 'bg-gray-500/10 text-gray-400' :
@@ -266,19 +269,19 @@ export default function MisComentarios() {
             <div key={i} className="bg-[#13131a] border border-gray-800 rounded-2xl p-5">
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gray-800 animate-pulse"></div>
+                  <Skeleton circle width={40} height={40} />
                   <div className="space-y-2">
-                    <div className="h-4 bg-gray-800 rounded animate-pulse w-32"></div>
-                    <div className="h-3 bg-gray-800 rounded animate-pulse w-40"></div>
+                    <Skeleton height={16} width={128} borderRadius="0.25rem" />
+                    <Skeleton height={12} width={160} borderRadius="0.25rem" />
                   </div>
                 </div>
-                <div className="h-5 bg-gray-800 rounded-full animate-pulse w-20"></div>
+                <Skeleton height={20} width={80} borderRadius="9999px" />
               </div>
-              <div className="h-4 bg-gray-800 rounded animate-pulse w-full mb-2"></div>
-              <div className="h-4 bg-gray-800 rounded animate-pulse w-3/4"></div>
+              <Skeleton height={16} width="100%" borderRadius="0.25rem" />
+              <Skeleton height={16} width="75%" borderRadius="0.25rem" />
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-800">
-                <div className="h-3 bg-gray-800 rounded animate-pulse w-28"></div>
-                <div className="h-6 bg-gray-800 rounded-lg animate-pulse w-20"></div>
+                <Skeleton height={12} width={112} borderRadius="0.25rem" />
+                <Skeleton height={24} width={80} borderRadius="0.375rem" />
               </div>
             </div>
           ))}

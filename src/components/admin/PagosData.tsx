@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { esAdminOSuperior } from '../../lib/adminRole';
+import { adminFileUrl } from '../../lib/fileUrl';
+import ComprobanteThumb from '../ui/ComprobanteThumb';
 import StatCard from '../ui/StatCard';
 import DataTable from '../ui/DataTable';
 import type { Column, ActionItem } from '../ui/DataTable';
@@ -19,6 +21,7 @@ interface Pago {
   escort_telefono: string | null;
   escort_foto: string | null;
   escort_activa: number;
+  escort_eliminada: number;
   suscripcion_id: number | null;
   plan_id: number | null;
   plan_nombre: string;
@@ -75,6 +78,9 @@ export default function PagosData() {
 
   const [deleteConfirm, setDeleteConfirm] = useState<Pago | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [selected, setSelected] = useState<Set<string | number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState<{ ids: (string | number)[]; message: string } | null>(null);
 
   // Fancybox
   useEffect(() => {
@@ -86,8 +92,12 @@ export default function PagosData() {
         compact: false,
         idle: false,
         Toolbar: { display: ['close'] },
+        maxWidth: '90%',
+        maxHeight: '60vh',
+        backdropClick: true,
       });
     });
+
     return () => { disposed = true; };
   }, [items]);
 
@@ -232,7 +242,9 @@ export default function PagosData() {
           <div className="min-w-0">
             <div className="font-medium whitespace-nowrap text-sm text-white">
               {item.escort_nombre}
-              {item.escort_activa === 1 && <i className="fas fa-check-circle text-emerald-400 text-xs ml-1" />}
+              {item.escort_eliminada === 1
+                ? <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-500/20 text-gray-400">Eliminada</span>
+                : item.escort_activa === 1 && <i className="fas fa-check-circle text-emerald-400 text-xs ml-1" />}
             </div>
             <div className="text-xs text-admin-muted">{item.escort_email}</div>
             {item.escort_telefono && <div className="text-xs text-gray-500">{item.escort_telefono}</div>}
@@ -284,23 +296,8 @@ export default function PagosData() {
       key: 'comprobante', header: 'Comprobante', width: '80', align: 'center',
       render: (item) => {
         if (!item.comprobante_url) return <span className="text-gray-600 text-xs">—</span>;
-        const isPdf = item.comprobante_url.match(/\.pdf$/i);
-        if (isPdf) {
-          return (
-            <a href={item.comprobante_url} target="_blank" rel="noopener noreferrer"
-              className="flex items-center justify-center w-10 h-10 mx-auto rounded-lg bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 transition-colors"
-              title="Ver comprobante PDF">
-              <i className="fas fa-file-pdf text-red-400 text-lg"></i>
-            </a>
-          );
-        }
         return (
-          <a href={item.comprobante_url} data-fancybox="pago-comprobante" className="block relative w-10 h-10 mx-auto">
-            <img src={item.comprobante_url} alt="Comprobante"
-              className="w-10 h-10 rounded-lg object-cover cursor-pointer hover:opacity-80 transition-opacity border border-emerald-500/30"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-            <i className="fas fa-file-image text-emerald-400 text-lg absolute inset-0 flex items-center justify-center pointer-events-none" />
-          </a>
+          <ComprobanteThumb url={item.comprobante_url} scope="admin" group="pago-comprobante" />
         );
       },
     },
@@ -326,6 +323,35 @@ export default function PagosData() {
       ),
     },
   ];
+
+  const handleBulkDelete = (sel: Set<string | number>) => {
+    if (sel.size === 0) return;
+    setBulkConfirm({
+      ids: Array.from(sel),
+      message: `Estas a punto de eliminar ${sel.size} pago(s) seleccionado(s). Esta accion no se puede deshacer.`,
+    });
+  };
+
+  const confirmBulkDelete = async () => {
+    if (!bulkConfirm) return;
+    const ids = bulkConfirm.ids;
+    setBulkConfirm(null);
+    setBulkDeleting(true);
+    try {
+      const fallos: string[] = [];
+      for (const id of ids) {
+        const res = await fetch(`${API_URL}?id=${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+        const data = await res.json().catch(() => ({ success: false, error: 'Error de conexión' }));
+        if (!data.success) fallos.push(`#${id}: ${data.error || 'Error'}`);
+      }
+      if (fallos.length > 0) {
+        setError(`No se pudieron eliminar ${fallos.length} registro(s): ${fallos.slice(0, 3).join(' | ')}`);
+      }
+      setSelected(new Set());
+      fetchItems(); window.dispatchEvent(new Event('counts-refresh'));
+    } catch (err: any) { setError(err.message); }
+    finally { setBulkDeleting(false); }
+  };
 
   return (
     <div className="space-y-6">
@@ -378,7 +404,23 @@ export default function PagosData() {
         emptyMessage="No hay pagos registrados"
         emptyIcon="fa-receipt"
         getRowKey={(item) => item.pago_id}
+        selectable={esAdminOSuperior()}
+        selected={selected}
+        onSelectionChange={setSelected}
+        onBulkDelete={handleBulkDelete}
         getActions={getActions}
+      />
+
+      <ConfirmModal
+        isOpen={bulkConfirm !== null}
+        title="Eliminar seleccionados"
+        message={bulkConfirm?.message || ''}
+        confirmText={bulkDeleting ? 'Eliminando...' : 'Eliminar'}
+        cancelText="Cancelar"
+        variant="danger"
+        confirmDisabled={bulkDeleting}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkConfirm(null)}
       />
 
       {totalPages > 1 && !isLoading && (
@@ -417,12 +459,10 @@ export default function PagosData() {
 
               {actionItem.comprobante_url && (
                 <div className="bg-[#13131a] border border-[#2a2a3e] rounded-lg p-3 mb-4">
-                  <div className="text-gray-500 text-xs mb-1">Comprobante de pago</div>
-                  <a href={actionItem.comprobante_url} data-fancybox="pago-comprobante"
-                    className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm">
-                    <i className="fas fa-image"></i>
-                    Ver comprobante
-                  </a>
+                  <div className="text-gray-500 text-xs mb-2">Comprobante de pago</div>
+                  <div className="max-w-[220px]">
+                    <ComprobanteThumb url={actionItem.comprobante_url} scope="admin" variant="preview" />
+                  </div>
                 </div>
               )}
 

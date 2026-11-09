@@ -158,9 +158,18 @@ export default function PagosTable({ pagos, loading }: Props) {
                     <td className="px-4 py-3">{getEstadoBadge(p.estado_pago)}</td>
                     <td className="px-4 py-3">
                       {p.comprobante_url ? (
-                        <a href={p.comprobante_url} data-fancybox="pago-comprobante" className="text-blue-400 hover:text-blue-300 text-sm">
-                          <i className="fas fa-file-alt mr-1"></i> Ver
-                        </a>
+                        (() => {
+                          const url = p.comprobante_url;
+                          const isPdf = /\.pdf(?:[?#]|$)/i.test(url);
+                          const isImg = /\.(jpe?g|png|webp|gif)(?:[?#]|$)/i.test(url);
+                          const icon = isPdf ? 'fa-file-pdf text-red-400' : isImg ? 'fa-file-image text-emerald-400' : 'fa-file-alt text-sky-400';
+                          const dataType = isPdf ? 'iframe' : undefined;
+                          return (
+                            <a data-fancybox="pago-comprobante" data-type={dataType || undefined} href={url} className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300 text-sm">
+                              <i className={`fas ${icon} mr-1`}></i> Ver
+                            </a>
+                          );
+                        })()
                       ) : (
                         <span className="text-gray-600 text-xs">Sin comprobante</span>
                       )}

@@ -4,6 +4,7 @@
 
 require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/../lib/gira.php';
+require_once __DIR__ . '/../lib/escort_status.php';
 
 header('Content-Type: application/json');
 header('Cache-Control: no-store, no-cache, must-revalidate');
@@ -33,14 +34,19 @@ try {
         LEFT JOIN suscripciones s ON s.escort_id = e.id AND s.estado IN ('activa', 'pausada')
         LEFT JOIN planes p ON p.id = s.plan_id
         LEFT JOIN ciudades gc ON gc.id = e.gira_ciudad_id
-        WHERE e.activa = 1
+        WHERE 1=1
     ";
+    $params = [];
     if ($id) {
-        $stmt = $pdo->prepare($baseSql . " AND e.id = :id LIMIT 1");
-        $stmt->execute([':id' => $id]);
+        $baseSql .= " AND e.id = :id LIMIT 1";
+        $params[':id'] = $id;
+        $stmt = $pdo->prepare($baseSql);
+        $stmt->execute($params);
     } else {
-        $stmt = $pdo->prepare($baseSql . " AND e.slug = :slug LIMIT 1");
-        $stmt->execute([':slug' => $slug]);
+        $baseSql .= " AND e.slug = :slug LIMIT 1";
+        $params[':slug'] = $slug;
+        $stmt = $pdo->prepare($baseSql);
+        $stmt->execute($params);
     }
     $perfil = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -48,6 +54,18 @@ try {
         echo json_encode(['success' => false, 'error' => 'Perfil no encontrado']);
         exit;
     }
+
+    // Calcular plan_vencido y estados efectivos
+    $suscripcionBase = null;
+    if (!empty($perfil['plan_nombre'])) {
+        $suscripcionBase = [
+            'estado' => 'activa',
+            'fecha_fin' => $perfil['plan_precio'] // approximate, we don't have fecha_fin here
+        ];
+    }
+    // For public profile, we consider plan active if plan_nombre exists
+    $planVencido = !$perfil['plan_nombre'];
+    $efectivo = getEscortEffectiveStatus($perfil, $planVencido, $perfil['plan_nombre'] !== null);
 
     // Incrementar visitas
     $pdo->prepare("UPDATE escorts SET visitas_perfil = visitas_perfil + 1 WHERE id = :id")
@@ -72,10 +90,10 @@ try {
 
     // Obtener fotos
     $stmtFotos = $pdo->prepare("
-        SELECT id, url, orden, es_portada 
+        SELECT id, url, tipo, gif_url, orden, es_portada 
         FROM escort_fotos 
         WHERE escort_id = :escort_id 
-        ORDER BY es_portada DESC, orden ASC
+        ORDER BY orden ASC, created_at ASC
     ");
     $stmtFotos->execute([':escort_id' => $perfil['id']]);
     $fotos = $stmtFotos->fetchAll(PDO::FETCH_ASSOC);
@@ -95,6 +113,22 @@ try {
         $horarios = [];
     }
 
+    // Obtener idiomas desde tabla relacionada
+    $idiomas = [];
+    try {
+        $stmtIdiomas = $pdo->prepare("
+            SELECT i.nombre FROM idiomas i
+            JOIN escort_idiomas ei ON i.id = ei.idioma_id
+            WHERE ei.escort_id = :escort_id
+            ORDER BY i.nombre ASC
+        ");
+        $stmtIdiomas->execute([':escort_id' => $perfil['id']]);
+        $idiomas = $stmtIdiomas->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Throwable $e) {
+        $idiomas = [];
+    }
+    $idiomasStr = !empty($idiomas) ? implode(', ', $idiomas) : null;
+
     // Aplicar privacidad: ocultar campos según JSON almacenado
     $camposOcultos = [];
     if (!empty($perfil['privacidad'])) {
@@ -113,15 +147,17 @@ try {
         'success' => true,
         'perfil' => [
             'id' => (int)$perfil['id'],
+            'foto_principal' => $perfil['foto_principal'] ?? null,
             'nombre' => $perfil['nombre'],
             'slug' => $perfil['slug'],
             'email' => $perfil['email'],
             'telefono' => $perfil['telefono'],
             'whatsapp' => $perfil['whatsapp'],
-            'edad' => (int)$perfil['edad'],
-            'altura' => $perfil['altura'] ? (int)$perfil['altura'] : null,
-            'peso' => $perfil['peso'] ? (int)$perfil['peso'] : null,
-            'medidas' => $ocultar('medidas'),
+        'edad' => (int)$perfil['edad'],
+        'altura' => $perfil['altura'] ? (int)$perfil['altura'] : null,
+        'peso' => $perfil['peso'] ? (int)$perfil['peso'] : null,
+        'medidas' => $ocultar('medidas'),
+        'created_at' => $perfil['created_at'] ?? null,
             'rating' => (float)($perfil['rating'] ?? 0),
             'total_valoraciones' => (int)($perfil['total_valoraciones'] ?? 0),
             'ciudad' => $perfil['ciudad_efectiva'],
@@ -133,7 +169,7 @@ try {
             'gira_fecha_fin' => $perfil['gira_fecha_fin'] ?? null,
             'categoria_nombre' => $perfil['categoria_nombre'] ?? null,
             'nacionalidad' => $ocultar('nacionalidad'),
-            'idiomas' => $perfil['idiomas'],
+            'idiomas' => $idiomasStr,
             'orientacion' => $ocultar('orientacion'),
             'etnia' => $ocultar('etnia'),
             'color_ojos' => $perfil['color_ojos'],
@@ -143,6 +179,13 @@ try {
             'descripcion_larga' => $perfil['descripcion_larga'],
             'audio_preview' => $perfil['audio_preview'] ?? null,
             'privacidad' => $perfil['privacidad'] ?? null,
+            // Estados efectivos
+            'verificado_vigente' => $efectivo['verificado_vigente'],
+            'vip_vigente' => $efectivo['vip_vigente'],
+            'destacado_vigente' => $efectivo['destacado_vigente'],
+            'sticky_vigente' => $efectivo['sticky_vigente'],
+            'activa_vigente' => $efectivo['activa_vigente'],
+            'plan_vencido' => $efectivo['plan_vencido'],
             'plan' => $perfil['plan_nombre'] ? [
                 'nombre' => $perfil['plan_nombre'],
                 'precio' => (float)$perfil['plan_precio']

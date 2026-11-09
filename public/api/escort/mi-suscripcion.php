@@ -12,7 +12,7 @@ if (!$token) {
     exit;
 }
 
-$tokenData = verifyToken($token);
+$tokenData = verifyEscortToken($token);
 $escortId = $tokenData['id'] ?? 0;
 
 if (!$escortId) {

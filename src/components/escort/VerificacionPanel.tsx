@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { Skeleton } from '../ui/Skeleton';
+import { showToast } from '../ui/Toast';
 
 interface VerificacionData {
   estado: 'no_solicitado' | 'pendiente' | 'aprobada' | 'rechazada';
@@ -14,7 +16,8 @@ export default function VerificacionPanel() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [success] = useState('');
+  const setSuccess = (m: string) => showToast(m);
 
   const [fotoPerfil, setFotoPerfil] = useState<File | null>(null);
   const [previewPerfil, setPreviewPerfil] = useState('');
@@ -108,26 +111,51 @@ export default function VerificacionPanel() {
 
     try {
       const formData = new FormData();
-      formData.append('foto_perfil', fotoPerfil);
+      formData.append('comprobante', fotoPerfil);
+      formData.append('tipo', 'verificacion');
+
+      const uploadRes = await fetch('/api/escort/subir-comprobante.php', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+
+      const uploadText = await uploadRes.text();
+      let uploadData;
+      try {
+        uploadData = JSON.parse(uploadText);
+      } catch {
+        throw new Error('Respuesta no es JSON al subir la selfie');
+      }
+      if (!uploadData.success) {
+        setError(uploadData.error || 'Error al subir la selfie');
+        return;
+      }
 
       const res = await fetch('/api/escort/solicitar-verificacion.php', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          foto_perfil: uploadData.comprobante_url,
+        }),
       });
 
       const json = await res.json();
       if (json.success) {
-        setSuccess(puedeReSubir ? (data?.estado === 'aprobada' ? '¡Foto actualizada correctamente!' : '¡Foto actualizada! Tu verificación sigue en revisión.') : '¡Solicitud enviada! Tu verificación está en revisión.');
+        setSuccess(puedeReSubir ? (data?.estado === 'aprobada' ? 'Foto actualizada correctamente' : 'Foto actualizada. Tu verificacion sigue en revision.') : 'Solicitud enviada. Tu verificacion esta en revision.');
         setFotoPerfil(null);
         setPreviewPerfil('');
         fetchEstado();
         window.dispatchEvent(new Event('sidebar-refresh'));
+        setModalOpen(false); // cerrar modal tras éxito
       } else {
         setError(json.error || 'Error al enviar solicitud');
       }
-    } catch {
-      setError('Error de conexión');
+    } catch (e: any) {
+      setError(e?.message || 'Error de conexi��n');
     } finally {
       setUploading(false);
     }
@@ -196,12 +224,12 @@ export default function VerificacionPanel() {
         <div className="flex items-center gap-4">
           {loading ? (
             <>
-              <div className="animate-pulse bg-gray-800 rounded-xl w-14 h-14" />
+              <Skeleton width={56} height={56} borderRadius="0.75rem" />
               <div className="flex-1 space-y-2">
-                <div className="animate-pulse bg-gray-800 rounded h-6 w-48" />
-                <div className="animate-pulse bg-gray-800 rounded h-4 w-72" />
+                <Skeleton height={24} width="12rem" borderRadius="0.25rem" />
+                <Skeleton height={16} width="18rem" borderRadius="0.25rem" />
               </div>
-              <div className="animate-pulse bg-gray-800 rounded-xl h-10 w-32 shrink-0" />
+              <Skeleton height={40} width={128} borderRadius="0.75rem" />
             </>
           ) : estadoUI && (
             <>
@@ -209,7 +237,7 @@ export default function VerificacionPanel() {
                 <i className={`fas ${estadoUI.icon} ${estadoUI.color} text-2xl`} />
               </div>
               <div className="flex-1">
-                <h3 className={`text-lg font-bold ${estadoUI.color}`}>{estadoUI.titulo}</h3>
+                <h3 className={`text-lg sm:text-xl font-extrabold bg-gradient-to-r ${estadoUI.color === 'text-blue-400' ? 'from-blue-300 to-blue-500' : estadoUI.color === 'text-amber-400' ? 'from-amber-300 to-amber-500' : estadoUI.color === 'text-green-400' ? 'from-emerald-300 to-emerald-500' : estadoUI.color === 'text-red-400' ? 'from-rose-300 to-rose-500' : 'from-gray-300 to-gray-500'} bg-clip-text text-transparent`}>{estadoUI.titulo}</h3>
                 <p className="text-gray-400 text-sm mt-1">{estadoUI.desc}</p>
                 {data?.revisado_en && (
                   <p className="text-gray-600 text-xs mt-2">
@@ -230,7 +258,7 @@ export default function VerificacionPanel() {
       </div>
 
       {data?.estado === 'aprobada' && (
-        <div className="bg-[#1a1a2e] border border-[#2d2d44] rounded-2xl p-6">
+      <div className="relative overflow-hidden bg-gradient-to-br from-[#18182e] via-[#14142e] to-[#121220] border border-white/[0.08] rounded-3xl p-6 shadow-2xl shadow-blue-900/10">
           <h3 className="text-white font-bold mb-4">Beneficios de tu verificación</h3>
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="flex items-start gap-3">
@@ -415,6 +443,7 @@ export default function VerificacionPanel() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

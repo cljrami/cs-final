@@ -2,8 +2,13 @@
 import Layout from '../layouts/Layout.astro';
 import CiudadEscorts from '../components/CiudadEscorts';
 ---
-<Layout title="Escorts por Ciudad">
+<Layout title="Escorts por Ciudad" robots="noindex, nofollow" description="Directorio de escorts en Chile. Elige tu ciudad y encuentra perfiles verificados.">
   <main class="min-h-screen bg-page">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+      <h1 class="text-2xl md:text-3xl font-bold text-ink flex items-center gap-3">
+        <i class="fas fa-map-marker-alt text-red-400"></i>Escorts por Ciudad
+      </h1>
+    </div>
     <CiudadEscorts client:only="react" />
   </main>
 </Layout>

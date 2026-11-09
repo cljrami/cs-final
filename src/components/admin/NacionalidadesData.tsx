@@ -82,6 +82,9 @@ export default function NacionalidadesData() {
 
   const [deleteConfirm, setDeleteConfirm] = useState<Nacionalidad | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [selected, setSelected] = useState<Set<string | number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkConfirm, setBulkConfirm] = useState<{ ids: (string | number)[]; message: string } | null>(null);
 
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initialLoadRef = useRef(false);
@@ -208,6 +211,7 @@ export default function NacionalidadesData() {
     finally { setDeleting(false); }
   };
 
+
   const handleDeleteCancel = () => {
     setDeleteConfirm(null);
   };
@@ -295,6 +299,39 @@ export default function NacionalidadesData() {
     { label: 'Eliminar', icon: 'fa-trash-alt', onClick: () => setDeleteConfirm(n) },
   ];
 
+  const handleBulkDelete = (sel: Set<string | number>) => {
+    if (sel.size === 0) return;
+    const seleccionados = nacionalidades.filter((it) => sel.has(it.id));
+    const bloqueados = seleccionados.filter((it) => (total_escorts ?? 0) > 0);
+    const eliminables = seleccionados.filter((it) => (total_escorts ?? 0) === 0);
+    if (eliminables.length === 0) {
+      setError('No se puede eliminar: los registros seleccionados tienen escorts asociadas. Reasigna o elimina esas escorts primero.');
+      return;
+    }
+    const aviso = bloqueados.length > 0
+      ? ` ${bloqueados.length} registro(s) tienen escorts asociadas y no se eliminaran.`
+      : '';
+    setBulkConfirm({
+      ids: eliminables.map((it) => it.id),
+      message: `Estas a punto de eliminar ${eliminables.length} nacionalidad(es) seleccionada(s).${aviso} Esta accion no se puede deshacer.`,
+    });
+  };
+
+  const confirmBulkDelete = async () => {
+    if (!bulkConfirm) return;
+    const ids = bulkConfirm.ids;
+    setBulkConfirm(null);
+    setBulkDeleting(true);
+    try {
+      for (const id of ids) {
+        await fetch(`${API_URL}?id=${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+      }
+      setSelected(new Set());
+      fetchNacionalidades(); window.dispatchEvent(new Event('counts-refresh'));
+    } catch (err: any) { setError(err.message); }
+    finally { setBulkDeleting(false); }
+  };
+
   return (
     <div className="space-y-6">
       {/* ═══ HEADER ═══ */}
@@ -355,7 +392,23 @@ export default function NacionalidadesData() {
         emptyMessage={search ? 'No se encontraron nacionalidades con esa búsqueda' : 'No hay nacionalidades registradas. Crea una nueva.'}
         emptyIcon="fa-globe"
         getRowKey={(n) => n.id}
+        selectable
+        selected={selected}
+        onSelectionChange={setSelected}
+        onBulkDelete={handleBulkDelete}
         getActions={getActions}
+      />
+
+      <ConfirmModal
+        isOpen={bulkConfirm !== null}
+        title="Eliminar seleccionados"
+        message={bulkConfirm?.message || ''}
+        confirmText={bulkDeleting ? 'Eliminando...' : 'Eliminar'}
+        cancelText="Cancelar"
+        variant="danger"
+        confirmDisabled={bulkDeleting}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkConfirm(null)}
       />
 
       {/* ═══ PAGINATION ═══ */}

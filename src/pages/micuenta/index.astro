@@ -1,13 +1,24 @@
 ---
 // src/pages/micuenta/index.astro
-// Redirige según estado de autenticación
+// Redirige según estado de autenticación. Nunca debe indexarse.
 ---
 
-<script>
-  const token = localStorage.getItem("escort_token");
-  if (!token) {
-    window.location.href = "/micuenta/login";
-  } else {
-    window.location.href = "/micuenta/resumen";
-  }
-</script>
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, follow" />
+    <title>CS Panel</title>
+  </head>
+  <body>
+    <script>
+      const token = localStorage.getItem("escort_token");
+      if (!token) {
+        window.location.href = "/micuenta/login";
+      } else {
+        window.location.href = "/micuenta/resumen";
+      }
+    </script>
+  </body>
+</html>

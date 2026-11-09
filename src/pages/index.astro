@@ -3,53 +3,68 @@
 import Layout from '../layouts/Layout.astro';
 import HomeEscorts from '../components/HomeEscorts';
 import MasValoradas from '../components/MasValoradas';
+import BlogHome from '../components/BlogHome';
 import CTASection from '../components/CTASection';
 import HeroContent from '../components/HeroContent';
 import HistoriasCiudad from '../components/HistoriasCiudad';
+import BannerSlot from '../components/BannerSlot';
+import CityEntryScreen from '../components/CityEntryScreen';
+import AgeGate from '../components/AgeGate';
 
-let heroCfg: Record<string, string> | null = null;
-try {
-  const res = await fetch("http://localhost/api/config/site.php");
-  const data = await res.json();
-  if (data.success) heroCfg = data.data;
-} catch (e) {}
-if (!heroCfg || !heroCfg.hero_titulo) {
-  try {
-    const res = await fetch("https://kimi.zona8.cl/api/config/site.php");
-    const data = await res.json();
-    if (data.success) heroCfg = data.data;
-  } catch (e) {}
-}
+// Home 100% dinámica: todos los textos se cargan en cliente
+const heroConfig = null;
+const escortsTexts = null;
+const valoradasTexts = null;
+const blogTexts = null;
+const ctaTexts = null;
+
+let escortsInitial: { escorts: any[]; total: number; hasMore: boolean } | null = null;
+let blogInitial: any[] | null = null;
 ---
 
-<Layout title="Inicio" page="inicio">
+<Layout title="Inicio" page="inicio" indexable>
+  <AgeGate client:load alwaysShow />
   <main class="min-h-screen bg-page">
     {/* Hero */}
     <section class="relative overflow-hidden">
       <div class="absolute inset-0 bg-gradient-to-b from-red-950/20 via-transparent to-transparent"></div>
       <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-red-500/5 rounded-full blur-3xl"></div>
       <div class="relative max-w-4xl mx-auto px-4 sm:px-6 pt-16 pb-10 text-center">
-        <HeroContent client:load initialCfg={heroCfg} />
+        <HeroContent client:idle initialConfig={heroConfig} />
       </div>
     </section>
+
+    {/* Banner superior (home_top) */}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <BannerSlot placement="home_top" client:idle />
+    </div>
 
     {/* Contenedor principal + sidebar */}
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row gap-6">
       <div class="flex-1 min-w-0">
         {/* Historias (todas) */}
-        <HistoriasCiudad client:load />
+        <HistoriasCiudad client:idle />
 
         {/* Escorts - React Component */}
-        <HomeEscorts client:load />
+        <HomeEscorts client:visible initialData={escortsInitial} initialTexts={escortsTexts} />
+
+        {/* Banner entre secciones */}
+        <div class="py-2">
+          <BannerSlot placement="home_entre_secciones" client:idle />
+        </div>
 
         {/* Más valoradas */}
-        <MasValoradas client:visible />
+        <MasValoradas client:visible initialTexts={valoradasTexts} />
+
+        {/* Blog / Artículos */}
+        <BlogHome client:visible initialArticles={blogInitial} initialTexts={blogTexts} />
 
         {/* CTA Publica tu anuncio */}
         <div class="py-8">
-          <CTASection client:visible />
+          <CTASection client:visible initialTexts={ctaTexts} />
         </div>
       </div>
+    </div>
 
     <div class="h-16"></div>
   </main>

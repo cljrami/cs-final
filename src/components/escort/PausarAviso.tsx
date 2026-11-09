@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Skeleton } from '../ui/Skeleton';
+import { showToast } from '../ui/Toast';
 
 interface PausaDetalleItem {
   inicio: string;
@@ -36,7 +37,8 @@ export default function PausarAviso() {
   const [loading, setLoading] = useState(true);
   const [pausando, setPausando] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [success] = useState('');
+  const setSuccess = (m: string) => showToast(m);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 

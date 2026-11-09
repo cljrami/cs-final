@@ -24,9 +24,18 @@ export function isUsuarioLoggedIn(): boolean {
 }
 
 export function logoutUsuario(): void {
-  localStorage.removeItem('usuario_token');
-  localStorage.removeItem('usuario_data');
-  window.location.href = '/ingresar';
+  const token = localStorage.getItem('usuario_token');
+  const salir = () => {
+    localStorage.removeItem('usuario_token');
+    localStorage.removeItem('usuario_data');
+    window.location.href = '/ingresar';
+  };
+  if (!token) { salir(); return; }
+  // Revocar en servidor (best-effort) para invalidar el token robado
+  fetch('/api/auth/logout.php', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token }
+  }).catch(() => {}).finally(salir);
 }
 
 export async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {

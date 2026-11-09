@@ -1,8 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Sortable from 'sortablejs';
 import ConfirmModal from '../ui/ConfirmModal';
+import { Skeleton } from '../ui/Skeleton';
 import { videoSrcToGif, uploadGifBlob } from '../../lib/gifUtils';
 import AudioUploader from './AudioUploader';
+import { showToast } from '../ui/Toast';
+import '@fancyapps/ui/dist/fancybox/fancybox.css';
 
 interface Foto {
   id: number;
@@ -38,12 +41,16 @@ export default function GaleriaManager() {
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+  const [successMsg] = useState('');
+  const setSuccessMsg = (m: string) => showToast(m);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [maxFotos, setMaxFotos] = useState(5);
+  const [maxVideos, setMaxVideos] = useState(0);
+  const [permiteAudio, setPermiteAudio] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [gifProgress, setGifProgress] = useState(0);
+  const [gifModalOpen, setGifModalOpen] = useState(false);
   const [currentAudioUrl, setCurrentAudioUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -89,6 +96,8 @@ export default function GaleriaManager() {
       ghostClass: 'sortable-ghost',
       chosenClass: 'sortable-chosen',
       dragClass: 'sortable-drag',
+      filter: '.no-drag',
+      preventOnFilter: true,
       onEnd: () => {
         if (!gridRef.current) return;
         const cards = Array.from(gridRef.current.querySelectorAll<HTMLElement>('.foto-card'));
@@ -128,6 +137,8 @@ export default function GaleriaManager() {
       if (!data.success) throw new Error(data.error);
       setFotos(data.fotos || []);
       if (data.maxFotos !== undefined) setMaxFotos(data.maxFotos);
+      if (data.maxVideos !== undefined) setMaxVideos(data.maxVideos);
+      if (data.permiteAudio !== undefined) setPermiteAudio(data.permiteAudio);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -158,8 +169,8 @@ export default function GaleriaManager() {
         if (e.lengthComputable) {
           const pct = Math.round((e.loaded / e.total) * 100);
           setUploads(prev => prev.map(u => u.tempId === tempId ? { ...u, progress: pct } : u));
-        }
-      };
+    }
+  };
 
       const result = await new Promise<any>((resolve, reject) => {
         xhr.onload = () => {
@@ -184,8 +195,31 @@ export default function GaleriaManager() {
       }
 
       if (result.fotos?.length) {
-        setFotos(prev => [...prev, ...result.fotos]);
-        setSuccessMsg(result.fotos[0].tipo === 'video' ? 'Video subido' : 'Foto subida');
+        const newFotos = result.fotos;
+        setFotos(prev => [...prev, ...newFotos]);
+        setSuccessMsg(newFotos[0].tipo === 'video' ? 'Video subido' : 'Foto subida');
+        // Generar GIF de preview automáticamente para videos
+        if (newFotos[0].tipo === 'video') {
+          const fotoVideo = newFotos[0];
+          (async () => {
+            try {
+              setGifProgress(10);
+              const gifResult = await videoSrcToGif(fotoVideo.url, 'gif_preview.gif', {
+                onProgress: (pct) => setGifProgress(pct)
+              });
+              setGifProgress(0);
+              const token = localStorage.getItem('escort_token') || '';
+              const uploadRes = await uploadGifBlob(gifResult.blob, token, fotoVideo.id);
+              if (uploadRes.success && uploadRes.url) {
+                setFotos(prev => prev.map(f => f.id === fotoVideo.id ? { ...f, gif_url: uploadRes.url } : f));
+              }
+              setTimeout(() => URL.revokeObjectURL(gifResult.url), 5000);
+            } catch (e) {
+              console.error('Error generando GIF preview', e);
+              setGifProgress(0);
+            }
+          })();
+        }
         setTimeout(() => setSuccessMsg(''), 2000);
       }
     } catch (err: any) {
@@ -194,15 +228,69 @@ export default function GaleriaManager() {
     }
   };
 
+  const fotosReales = fotos.filter(f => f.tipo === 'imagen');
+  const videosReales = fotos.filter(f => f.tipo === 'video');
+
+  const libreFotos = Math.max(0, maxFotos - fotosReales.length);
+  const libreVideos = maxVideos > 0 ? Math.max(0, maxVideos - videosReales.length) : 0;
+
+  const MAX_IMG_MB = 10;
+  const MAX_VIDEO_MB = 50;
+
   const handleFiles = (files: FileList) => {
-    const espacioLibre = maxFotos - fotos.length;
-    if (espacioLibre <= 0) {
-      setError(`Límite de ${maxFotos} archivos alcanzado. Actualiza tu plan.`);
-      return;
+    const items = Array.from(files);
+    const fotosSeleccionadas = items.filter(f => f.type.startsWith('image/'));
+    const videosSeleccionados = items.filter(f => f.type.startsWith('video/'));
+    const archivosInvalidos = items.filter(f => !f.type.startsWith('image/') && !f.type.startsWith('video/'));
+
+    let pendientes: File[] = [];
+
+    // Validar archivos con extensión/formato inválido
+    if (archivosInvalidos.length > 0) {
+      archivosInvalidos.forEach(f => {
+        showToast(`Formato no permitido: ${f.name}`, 'error');
+      });
     }
 
-    const toUpload = Array.from(files).slice(0, espacioLibre);
-    toUpload.forEach(f => uploadFile(f));
+    // Validar y filtrar fotos por tamaño y cupo
+    const fotosValidas: File[] = [];
+    if (fotosSeleccionadas.length > 0) {
+      if (libreFotos <= 0) {
+        showToast('Límite de fotos alcanzado. Actualiza tu plan.', 'error');
+      } else {
+        fotosSeleccionadas.slice(0, libreFotos).forEach(f => {
+          const maxBytes = MAX_IMG_MB * 1024 * 1024;
+          if (f.size > maxBytes) {
+            showToast(`La imagen supera los ${MAX_IMG_MB} MB: ${f.name}`, 'error');
+          } else {
+            fotosValidas.push(f);
+          }
+        });
+      }
+    }
+
+    // Validar y filtrar videos por tamaño y cupo
+    const videosValidos: File[] = [];
+    if (videosSeleccionados.length > 0) {
+      if (maxVideos <= 0) {
+        showToast('Tu plan no incluye videos.', 'error');
+      } else if (libreVideos <= 0) {
+        showToast('Límite de videos alcanzado. Actualiza tu plan.', 'error');
+      } else {
+        videosSeleccionados.slice(0, libreVideos).forEach(f => {
+          const maxBytes = MAX_VIDEO_MB * 1024 * 1024;
+          if (f.size > maxBytes) {
+            showToast(`El video supera los ${MAX_VIDEO_MB} MB: ${f.name}`, 'error');
+          } else {
+            videosValidos.push(f);
+          }
+        });
+      }
+    }
+
+    pendientes = [...fotosValidas, ...videosValidos];
+
+    if (pendientes.length) pendientes.forEach(f => uploadFile(f));
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -226,13 +314,14 @@ export default function GaleriaManager() {
     try {
       if (foto && foto.tipo === 'video') {
         setError('');
+        setGifModalOpen(true);
         setGifProgress(10);
         const gifResult = await videoSrcToGif(foto.url, 'gif_portada.gif', {
           onProgress: (pct) => setGifProgress(pct)
         });
-        setGifProgress(0);
+        setGifProgress(100);
         const token = localStorage.getItem('escort_token') || '';
-        const uploadRes = await uploadGifBlob(gifResult.blob, token);
+        const uploadRes = await uploadGifBlob(gifResult.blob, token, id);
         if (!uploadRes.success || !uploadRes.url) {
           throw new Error(uploadRes.error || 'Error subiendo GIF');
         }
@@ -251,6 +340,13 @@ export default function GaleriaManager() {
         },
         body: JSON.stringify(payload)
       });
+
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await res.text();
+        throw new Error(`Servidor error (${res.status}): ${text.slice(0, 200)}`);
+      }
+
       const data = await res.json();
       if (!data.success) throw new Error(data.error);
 
@@ -259,11 +355,13 @@ export default function GaleriaManager() {
         esPortada: f.id === id ? 1 : 0,
         gif_url: f.id === id ? (gifUrl || f.gif_url) : f.gif_url
       })));
-      setSuccessMsg(foto?.tipo === 'video' ? 'Portada GIF actualizada' : 'Portada actualizada');
-      setTimeout(() => { setSuccessMsg(''); setGifProgress(0); }, 2000);
+      fetchFotos();
+      setSuccessMsg(foto?.tipo === 'video' ? 'Portada animada actualizada' : 'Portada actualizada');
+      setTimeout(() => { setSuccessMsg(''); setGifProgress(0); setGifModalOpen(false); }, 1500);
     } catch (err: any) {
       setError(err.message);
       setGifProgress(0);
+      setGifModalOpen(false);
     }
   };
 
@@ -321,12 +419,14 @@ export default function GaleriaManager() {
 
   const openFancybox = (index: number) => {
     if (Fancybox && typeof window !== 'undefined') {
-      const items = fotos.map(f => ({ src: f.url }));
-      Fancybox.show(items, { startIndex: index, Thumbs: { autoStart: false } });
+      const items = fotos.map(f => ({
+        src: f.url,
+        type: f.tipo === 'video' ? 'video' : 'image',
+        poster: f.gif_url || undefined,
+      }));
+      Fancybox.show(items, { startIndex: index, Thumbs: false });
     }
   };
-
-  const espacioLibre = maxFotos - fotos.length;
 
   return (
     <div className="space-y-6" onDrop={handleDrop} onDragOver={(e) => e.preventDefault()}>
@@ -361,40 +461,39 @@ export default function GaleriaManager() {
         </div>
       )}
 
-      {gifProgress > 0 && gifProgress < 100 && (
-        <div className="bg-blue-500/10 border border-blue-500/30 text-blue-400 px-4 py-3 rounded-xl">
-          <div className="flex items-center gap-3">
-            <i className="fas fa-magic text-blue-400"></i>
-            <span>Generando portada animada (GIF)… {gifProgress}%</span>
-          </div>
-          <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden mt-2">
-            <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${gifProgress}%` }} />
-          </div>
-        </div>
-      )}
-
       {loading ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="aspect-3/4 rounded-2xl bg-gray-800 animate-pulse" />
+            <Skeleton key={i} borderRadius="1rem" />
           ))}
         </div>
       ) : (
         <div>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             <h3 className="text-white font-medium flex items-center gap-2">
               <i className="fas fa-layer-group text-red-400"></i>
-              {fotos.length} / {maxFotos}
+              Galería
             </h3>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept="image/jpeg,image/png,image/webp,image/avif,image/gif,image/bmp,video/mp4,video/webm,video/quicktime"
-              onChange={handleInputChange}
-              className="hidden"
-            />
+            <div className="flex items-center gap-4 text-sm">
+              <span className="text-gray-300">
+                <i className="fas fa-image text-gray-500 mr-1.5"></i>
+                {fotosReales.length} / {maxFotos} fotos
+              </span>
+              <span className="text-gray-300">
+                <i className="fas fa-video text-gray-500 mr-1.5"></i>
+                {videosReales.length} / {maxVideos || 0} videos
+              </span>
+            </div>
           </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/webp,image/avif,image/gif,image/bmp,video/mp4,video/webm,video/quicktime"
+            onChange={handleInputChange}
+            className="hidden"
+          />
 
           <div ref={gridRef} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {uploads.map((u) => (
@@ -424,28 +523,32 @@ export default function GaleriaManager() {
                   onDragLeave: handleDragLeave,
                   onDrop: (e) => handleDropReorder(e, foto.id)
                 } : {})}
-                className={`foto-card relative aspect-3/4 rounded-2xl overflow-hidden group cursor-move transition-all duration-300 ${
-                  !esTactil && draggingId === foto.id ? 'opacity-50 scale-95 rotate-2' : ''
+                className={`foto-card relative aspect-3/4 rounded-2xl overflow-hidden group transition-all duration-300 ${
+                  !esTactil ? 'cursor-move' : 'cursor-default'
+                } ${!esTactil && draggingId === foto.id ? 'opacity-50 scale-95 rotate-2' : ''
                 } ${!esTactil && dragOverId === foto.id && dragOverId !== draggingId ? 'scale-105 ring-2 ring-red-500' : ''} ${
                   foto.esPortada ? 'ring-2 ring-yellow-500' : ''
                 }`}
               >
                 {foto.tipo === 'video' ? (
-                  <video
-                    src={foto.url}
-                    className="w-full h-full object-cover"
-                    muted
-                    loop
-                    playsInline
-                    onMouseEnter={(e) => e.currentTarget.play()}
-                    onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
-                  />
+                  <div className="relative w-full h-full cursor-pointer" onClick={() => openFancybox(index)}>
+                    {foto.gif_url ? (
+                      <img src={foto.gif_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                        <i className="fas fa-play-circle text-white text-5xl opacity-60"></i>
+                      </div>
+                    )}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <i className="fas fa-play-circle text-white text-5xl drop-shadow-lg opacity-80"></i>
+                    </div>
+                  </div>
                 ) : (
                   <img
                     src={foto.url}
                     alt=""
-                    className="w-full h-full object-cover"
-                    {...(!esTactil ? { onClick: () => openFancybox(index) } : {})}
+                    className="w-full h-full object-cover cursor-pointer"
+                    onClick={() => openFancybox(index)}
                   />
                 )}
 
@@ -492,7 +595,7 @@ export default function GaleriaManager() {
               </div>
             ))}
 
-            {espacioLibre > 0 && (
+            {libreFotos > 0 && (
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="relative aspect-3/4 rounded-2xl border-2 border-dashed border-gray-700 hover:border-red-500/60 hover:bg-red-500/5 transition-all duration-300 flex flex-col items-center justify-center gap-2 group"
@@ -501,7 +604,9 @@ export default function GaleriaManager() {
                   <i className="fas fa-plus text-gray-500 group-hover:text-red-400 text-2xl transition-colors"></i>
                 </div>
                 <span className="text-gray-500 group-hover:text-gray-300 text-sm font-medium transition-colors">Agregar</span>
-                <span className="text-gray-600 text-xs">Fotos y videos</span>
+                <span className="text-gray-600 text-xs">
+                  {libreFotos} foto{libreFotos === 1 ? '' : 's'} · {maxVideos > 0 ? `${libreVideos} video${libreVideos === 1 ? '' : 's'}` : 'sin videos'}
+                </span>
               </button>
             )}
           </div>
@@ -527,13 +632,36 @@ export default function GaleriaManager() {
         onCancel={() => setDeleteId(null)}
       />
 
+      {gifModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70">
+          <div className="w-full max-w-md bg-[#1a1a24] border border-white/10 rounded-2xl p-6 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <i className="fas fa-magic text-blue-400 text-xl"></i>
+              <h3 className="text-lg font-semibold text-white">Generando portada animada</h3>
+            </div>
+            <p className="text-gray-300 mb-4">Generando portada animada (GIF)… {gifProgress}%</p>
+            <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${gifProgress}%` }} />
+            </div>
+            <p className="text-xs text-gray-500 mt-3">Espere, este proceso es obligatorio.</p>
+          </div>
+        </div>
+      )}
+
       <AudioUploader
         currentAudioUrl={currentAudioUrl}
         onAudioUpdate={(url) => {
           setCurrentAudioUrl(url);
           if (!url) fetchAudioPreview();
         }}
+        disabled={!permiteAudio}
       />
+      {!permiteAudio && (
+        <div className="mt-2 text-xs text-red-400/80 bg-red-500/5 border border-red-500/20 rounded-lg px-3 py-2 flex items-start gap-2">
+          <i className="fas fa-ban mt-0.5 flex-shrink-0" />
+          <span>Este plan no incluye audio de presentación. Contrata un plan que lo permita en <a href="/micuenta/mi-plan" className="text-red-300 underline decoration-red-400/50">Mi Plan</a>.</span>
+        </div>
+      )}
     </div>
   );
 }

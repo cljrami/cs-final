@@ -36,9 +36,18 @@ export function isLoggedIn(): boolean {
 }
 
 export function logout(): void {
-  localStorage.removeItem('escort_token');
-  localStorage.removeItem('escort_data');
-  window.location.href = '/micuenta/login';
+  const token = localStorage.getItem('escort_token');
+  const salir = () => {
+    localStorage.removeItem('escort_token');
+    localStorage.removeItem('escort_data');
+    window.location.href = '/micuenta/login';
+  };
+  if (!token) { salir(); return; }
+  // Revocar en servidor (best-effort) para invalidar el token robado
+  fetch('/api/auth/logout.php', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token }
+  }).catch(() => {}).finally(salir);
 }
 
 export function getEscortData(): Record<string, any> | null {

@@ -39,7 +39,7 @@ try {
 
     $pdo->beginTransaction();
 
-    // Verificar que la suscripciíƒÂ³n pertenece a un plan base (los extras se gestionan en Solicitudes Extras)
+    // Verificar que la suscripci?n pertenece a un plan base (los extras se gestionan en Solicitudes Extras)
     $stmtPlanCheck = $pdo->prepare("
         SELECT p.tipo
         FROM suscripciones s

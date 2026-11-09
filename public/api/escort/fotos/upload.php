@@ -28,7 +28,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || ($tokenData['exp'] ?? 0) < time()) {
         http_response_code(401);
@@ -48,9 +48,9 @@ try {
     $uploadDir = __DIR__ . '/../../../uploads/escorts/fotos/' . $escortId . '/';
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
 
-    // Obtener límite del plan activo
+    // Obtener límites del plan activo
     $planStmt = $pdo->prepare("
-        SELECT p.max_fotos, p.max_videos
+        SELECT p.max_fotos, p.max_videos, p.permite_audio
         FROM suscripciones s
         JOIN planes p ON p.id = s.plan_id
         WHERE s.escort_id = ? AND s.estado = 'activa' AND s.fecha_fin >= CURDATE()
@@ -59,16 +59,44 @@ try {
     $planStmt->execute([$escortId]);
     $plan = $planStmt->fetch(PDO::FETCH_ASSOC);
     $maxFotos = $plan ? (int)$plan['max_fotos'] : 5;
+    $maxVideos = $plan ? (int)$plan['max_videos'] : 0;
 
     $countStmt = $pdo->prepare("SELECT COUNT(*) FROM escort_fotos WHERE escort_id = ?");
     $countStmt->execute([$escortId]);
     $totalActual = (int)$countStmt->fetchColumn();
 
+    // Contar fotos y videos existentes por separado para aplicar límites por tipo
+    $countTiposStmt = $pdo->prepare("SELECT tipo, COUNT(*) FROM escort_fotos WHERE escort_id = ? GROUP BY tipo");
+    $countTiposStmt->execute([$escortId]);
+    $actualPorTipo = ['imagen' => 0, 'video' => 0];
+    foreach ($countTiposStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $actualPorTipo[$row['tipo']] = (int)$row['COUNT(*)'];
+    }
+
     $fileCount = is_array($files['tmp_name']) ? count($files['tmp_name']) : 1;
-    $espacioLibre = $maxFotos - $totalActual;
-    if ($espacioLibre <= 0) {
+
+    // Contabilizar cuántas fotos/videos vienen en este lote por tipo
+    $fotosEnLote = 0;
+    $videosEnLote = 0;
+    for ($c = 0; $c < $fileCount; $c++) {
+        $chkName = is_array($files['name']) ? $files['name'][$c] : $files['name'];
+        $chkExt = strtolower(pathinfo($chkName, PATHINFO_EXTENSION));
+        if (isset($formatosImg[$chkExt])) $fotosEnLote++;
+        elseif (isset($formatosVid[$chkExt])) $videosEnLote++;
+    }
+
+    $libreFotos = $maxFotos - ($actualPorTipo['imagen'] + $fotosEnLote);
+    $libreVideos = $maxVideos - ($actualPorTipo['video'] + $videosEnLote);
+
+    if ($libreFotos < 0 && $fotosEnLote > 0) {
         http_response_code(400);
-        echo json_encode(['success' => false, 'error' => "Límite de $maxFotos archivos alcanzado. Actualiza tu plan para subir más."]);
+        echo json_encode(['success' => false, 'error' => "Límite de $maxFotos fotos alcanzado. Actualiza tu plan para subir más."]);
+        exit;
+    }
+    if ($videosEnLote > 0 && ($maxVideos <= 0 || $libreVideos < 0)) {
+        $msg = $maxVideos <= 0 ? 'Tu plan no incluye videos.' : "Límite de $maxVideos videos alcanzado. Actualiza tu plan para subir más.";
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => $msg]);
         exit;
     }
 
@@ -95,9 +123,11 @@ try {
     $fotos = [];
     $duplicados = 0;
     $errores = [];
+    $subidasImagenes = 0;
+    $subidasVideos = 0;
     $checkHash = $pdo->prepare("SELECT id FROM escort_fotos WHERE escort_id = ? AND hash = ?");
 
-    for ($i = 0; $i < $fileCount && count($fotos) < $espacioLibre; $i++) {
+    for ($i = 0; $i < $fileCount; $i++) {
         $tmpName = is_array($files['tmp_name']) ? $files['tmp_name'][$i] : $files['tmp_name'];
         $name = is_array($files['name']) ? $files['name'][$i] : $files['name'];
         $error = is_array($files['error']) ? $files['error'][$i] : $files['error'];
@@ -118,6 +148,22 @@ try {
         $tipo = $esVideo ? 'video' : 'imagen';
         $size = is_array($files['size']) ? $files['size'][$i] : $files['size'];
         $maxSize = $tipo === 'video' ? $MAX_VID_SIZE : $MAX_IMG_SIZE;
+
+        // Respetar límites por tipo (fotos y videos cuentan por separado)
+        if ($tipo === 'imagen' && $subidasImagenes >= $maxFotos) {
+            $errores[] = "$name: límite de $maxFotos fotos del plan alcanzado";
+            continue;
+        }
+        if ($tipo === 'video') {
+            if ($maxVideos <= 0) {
+                $errores[] = "$name: tu plan no incluye videos";
+                continue;
+            }
+            if ($subidasVideos >= $maxVideos) {
+                $errores[] = "$name: límite de $maxVideos videos del plan alcanzado";
+                continue;
+            }
+        }
 
         if ($size > $maxSize) {
             $humanSize = $tipo === 'video' ? '50MB' : '10MB';
@@ -171,6 +217,9 @@ try {
                     continue;
                 }
             }
+
+            if ($tipo === 'imagen') $subidasImagenes++;
+            if ($tipo === 'video') $subidasVideos++;
 
             $url = '/uploads/escorts/fotos/' . $escortId . '/' . $newName;
 

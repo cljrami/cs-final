@@ -22,19 +22,23 @@ try {
     // Rate limit: máx 10 intentos por IP cada 15 minutos
     rateLimitLogin('login_usuario', 10, 15, strtolower($email));
 
-    $stmt = $pdo->prepare("SELECT id, nombre, email, password_hash, activo FROM usuarios WHERE email = ?");
+    compatEnsureTokenVersion();
+
+    $stmt = $pdo->prepare("SELECT id, nombre, email, password_hash, activo, token_version FROM usuarios WHERE email = ?");
     $stmt->execute([$email]);
     $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$usuario) {
+        // Hash dummy para igualar tiempos y no revelar si el email existe.
+        password_verify($password, '$2y$12$cqBFJdbT1wCVHlckB1Mz.uA8UUor2HjyinboWpzHNSt6Qf4pWagD');
         http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Email no registrado']);
+        echo json_encode(['success' => false, 'error' => 'Credenciales incorrectas']);
         exit;
     }
 
     if (!password_verify($password, $usuario['password_hash'])) {
         http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Contraseña incorrecta']);
+        echo json_encode(['success' => false, 'error' => 'Credenciales incorrectas']);
         exit;
     }
 
@@ -50,6 +54,7 @@ try {
         'id' => $usuario['id'],
         'email' => $usuario['email'],
         'tipo' => 'usuario',
+        'tv' => (int)($usuario['token_version'] ?? 0),
         'exp' => time() + (30 * 24 * 60 * 60)
     ];
     $token = signToken($tokenData);

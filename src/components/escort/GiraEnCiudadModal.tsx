@@ -125,7 +125,7 @@ export default function GiraEnCiudadModal({ ciudad, escortsEnGira, open, onClose
           {escortsEnGira.map((escort) => (
             <SwiperSlide key={escort.id}>
               <div className="flex items-start gap-4 mb-4">
-                <a href={`/${escort.id}`} className="flex-shrink-0 w-32 h-32 md:w-36 md:h-36 rounded-xl overflow-hidden border border-white/10" onClick={e => e.stopPropagation()}>
+                <a href={`/cs${escort.id}`} className="flex-shrink-0 w-32 h-32 md:w-36 md:h-36 rounded-xl overflow-hidden border border-white/10" onClick={e => e.stopPropagation()}>
                   <img src={escort.foto_principal} alt={escort.nombre} className="w-full h-full object-cover" />
                 </a>
                 <div className="flex-1 min-w-0">
@@ -146,12 +146,14 @@ export default function GiraEnCiudadModal({ ciudad, escortsEnGira, open, onClose
                   )}
                   <div className="mt-2 flex items-center gap-2 text-muted text-xs">
                     <span><i className="fas fa-birthday-cake mr-1"></i>{escort.edad} años</span>
-                    {escort.verificado === 1 && <span className="text-blue-400 flex items-center gap-1"><i className="fas fa-check-circle text-[0.55rem]"></i> Verificada</span>}
-                    {escort.vip === 1 && <span className="text-yellow-400 flex items-center gap-1"><i className="fas fa-crown text-[0.55rem]"></i> VIP</span>}
+                    {escort.verificado_vigente === 1 && <span className="text-blue-400 flex items-center gap-1"><i className="fas fa-check-circle text-[0.55rem]"></i> Verificada</span>}
+                    {escort.verificado === 1 && escort.verificado_vigente === 0 && <span className="text-amber-400 flex items-center gap-1"><i className="fas fa-exclamation-triangle text-[0.55rem]"></i> Verificada (expirada)</span>}
+                    {escort.vip_vigente === 1 && <span className="text-yellow-400 flex items-center gap-1"><i className="fas fa-crown text-[0.55rem]"></i> VIP</span>}
+                    {escort.vip === 1 && escort.vip_vigente === 0 && <span className="text-amber-400 flex items-center gap-1"><i className="fas fa-exclamation-triangle text-[0.55rem]"></i> VIP (expirado)</span>}
                   </div>
                 </div>
               </div>
-              <a href={`/${escort.id}`} className="block w-full py-3 bg-gradient-to-r from-purple-500 to-fuchsia-600 hover:opacity-90 text-white rounded-xl font-medium text-center text-sm transition-all">
+              <a href={`/cs${escort.id}`} className="block w-full py-3 bg-gradient-to-r from-purple-500 to-fuchsia-600 hover:opacity-90 text-white rounded-xl font-medium text-center text-sm transition-all">
                 Ver perfil
               </a>
             </SwiperSlide>

@@ -11,8 +11,8 @@ import AprobacionRequerida from "../../components/escort/AprobacionRequerida";
 
   <EscortAuthGuard client:load>
     <div class="w-full max-w-full">
-      <AprobacionRequerida client:load>
-        <ResumenData client:load />
+      <AprobacionRequerida client:only="react">
+        <ResumenData client:only="react" />
       </AprobacionRequerida>
     </div>
   </EscortAuthGuard>

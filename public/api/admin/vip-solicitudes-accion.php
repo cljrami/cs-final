@@ -16,12 +16,12 @@ try {
     requireAdminRole($tokenData);
     $adminId = $tokenData['id'] ?? 0;
     if ($adminId <= 0) {
-        throw new Exception('Token invíƒÂ¡lido');
+        throw new Exception('Token inv?lido');
     }
 
     $pdo = getDBConnection();
     if (!$pdo) {
-        throw new Exception('Error de conexiíƒÂ³n a la base de datos');
+        throw new Exception('Error de conexi?n a la base de datos');
     }
 
     $input = json_decode(file_get_contents('php://input'), true);
@@ -46,7 +46,7 @@ try {
         $stmtCheck->execute([$solicitudId]);
         $estadoSolicitud = $stmtCheck->fetchColumn();
 
-        // Eliminar fíƒÂ­sicamente la solicitud
+        // Eliminar f?sicamente la solicitud
         $stmt = $pdo->prepare("DELETE FROM escort_vip_solicitudes WHERE id = ?");
         $stmt->execute([$solicitudId]);
 
@@ -124,7 +124,7 @@ try {
 
         // Si se aprueba, activar VIP en escorts
         if ($accion === 'aprobar') {
-            // Obtener duraciíƒÂ³n del plan VIP
+            // Obtener duraci?n del plan VIP
             $stmtPlan = $pdo->prepare("SELECT plan FROM escort_vip_solicitudes WHERE id = ?");
             $stmtPlan->execute([$solicitudId]);
             $plan = $stmtPlan->fetchColumn();
@@ -147,10 +147,10 @@ try {
             ");
             $stmt->execute([$fechaExpira, $escortId]);
 
-            // Crear notificaciíƒÂ³n para la escort
+            // Crear notificaci?n para la escort
             $stmt = $pdo->prepare("
                 INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url, created_at) 
-                VALUES (?, 'vip_aprobado', 'í‚Â¡VIP Aprobado!', 'Tu solicitud VIP ha sido aprobada.', '/micuenta/vip', NOW())
+                VALUES (?, 'vip_aprobado', 'í‚¡VIP Aprobado!', 'Tu solicitud VIP ha sido aprobada.', '/micuenta/vip', NOW())
             ");
             $stmt->execute([$escortId]);
         } else {

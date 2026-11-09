@@ -1,5 +1,5 @@
 // src/hooks/useSkeleton.ts
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface UseSkeletonOptions<T> {
   fetcher: () => Promise<T>;
@@ -23,26 +23,33 @@ export function useSkeleton<T>({
   deps = [],
 }: UseSkeletonOptions<T>): UseSkeletonResult<T> {
   
-  const [data, setData] = useState<T | null>(initialData);
+  const hasDataRef = useRef(initialData !== null);
+  const [data, setDataState] = useState<T | null>(initialData);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const setData = useCallback((value: T | null) => {
+    hasDataRef.current = value !== null;
+    setDataState(value);
+  }, []);
+
   const fetchData = useCallback(async () => {
-    setLoading(true);
+    const hasData = hasDataRef.current;
+    if (!hasData) setLoading(true);
     setError(null);
-    
+
     const startTime = Date.now();
-    
+
     try {
       const result = await fetcher();
-      
+
       const elapsed = Date.now() - startTime;
-      const remaining = Math.max(0, delay - elapsed);
-      
+      const remaining = hasData ? 0 : Math.max(0, delay - elapsed);
+
       if (remaining > 0) {
         await new Promise(resolve => setTimeout(resolve, remaining));
       }
-      
+
       setData(result);
     } catch (err: any) {
       setError(err.message || 'Error al cargar datos');

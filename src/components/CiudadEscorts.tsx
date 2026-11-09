@@ -5,10 +5,12 @@ import 'swiper/css';
 import 'swiper/css/navigation';
 import { Skeleton } from './ui/Skeleton';
 import EscortCard from './EscortCard';
+import EscortCircleCard from './EscortCircleCard';
 import CiudadCarousel from './CiudadCarousel';
 import HistoriasCiudad from './HistoriasCiudad';
 import GiraEnCiudadModal from './escort/GiraEnCiudadModal';
 import { useSiteTexts } from '../hooks/useSiteTexts';
+import BannerSlot from './BannerSlot';
 import { AVISOS_CAROUSEL } from '../lib/carousel';
 import type { Escort, Filters } from '../types/escort';
 
@@ -43,28 +45,24 @@ function CiudadSeccion({ ciudad, disponible = false, limit = 6 }: { ciudad: stri
   if (!loading && escorts.length === 0) return null;
 
   const plantilla = disponible
-    ? (texts.seccion_ciudad_disponibles_titulo || 'Disponibles ahora en {ciudad}')
-    : (texts.seccion_ciudad_nuevas_titulo || 'Nuevas en {ciudad}');
+    ? (texts?.seccion_ciudad_disponibles_titulo || 'Disponibles ahora en {ciudad}')
+    : (texts?.seccion_ciudad_nuevas_titulo || 'Nuevas en {ciudad}');
   const titulo = plantilla.replace('{ciudad}', ciudad);
 
   return (
     <section className="py-8">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between mb-6">
         <h2 className="text-ink font-bold text-lg flex items-center gap-2">
-          <i className={`${disponible ? 'fas fa-fire text-red-500' : 'fas fa-bolt text-red-400'}`}></i> {titulo}
+          <i className={`${disponible ? 'fas fa-fire text-red-500' : 'fas fa-bolt text-red-400'}`}></i> {texts ? titulo : <Skeleton width={140} height={18} inline />}
         </h2>
-        {!loading && <span className="text-muted text-sm">{escorts.length} {disponible ? 'disponibles' : 'nuevas'}</span>}
+        {!loading && <span className="text-muted text-sm">{disponible
+                  ? (texts?.contador_disponibles || '{cantidad} disponibles').replace('{cantidad}', String(escorts.length))
+                  : (texts?.contador_nuevas || '{cantidad} nuevas').replace('{cantidad}', String(escorts.length))}</span>}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
         {loading ? (
           Array.from({ length: limit }).map((_, i) => (
-            <div key={i} className="bg-surface rounded-xl overflow-hidden border border-white/5 animate-pulse">
-              <Skeleton className="aspect-[3/4] w-full !rounded-none" />
-              <div className="p-2.5 space-y-2">
-                <Skeleton className="w-2/3 h-3 !rounded-md" />
-                <Skeleton className="w-1/2 h-2.5 !rounded-md" />
-              </div>
-            </div>
+            <EscortCard key={i} escort={{} as Escort} skeleton />
           ))
         ) : (
           escorts.map(e => <EscortCard key={e.id} escort={e} />)
@@ -267,22 +265,14 @@ export default function CiudadEscorts({ ciudadInicial = '' }: Props) {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <nav className="flex items-center gap-3 mb-8">
-        <a href="/" className="text-muted hover:text-ink text-sm transition-colors">
-          <i className="fas fa-arrow-left mr-1"></i>Inicio
-        </a>
-        <span className="text-gray-700 text-sm">/</span>
-        <span className="text-muted text-sm">Escorts en {ciudad}</span>
-      </nav>
-
-      <div className="mb-8 text-center">
-        <h1 className="text-2xl md:text-3xl font-bold text-ink flex flex-col items-center gap-1 sm:flex-row sm:items-center sm:gap-3 sm:justify-center">
-          <i className="fas fa-map-marker-alt text-red-400"></i>
-          {(texts.seo_ciudad_h1 || 'Escorts en {ciudad}').replace('{ciudad}', ciudad)}
-          {total > 0 && (
-            <span className="text-lg font-normal text-muted">({total} resultado{total !== 1 ? 's' : ''})</span>
-          )}
-        </h1>
+      <div className="mb-6 text-center">
+        {/* El H1 (título de la ciudad) lo imprime el HTML estático de la página.
+            Aquí solo queda el contador de resultados. */}
+        {total > 0 && (
+          <p className="text-lg text-muted">
+            {(texts?.ciudad_contador_resultados || '{cantidad} resultados').replace('{cantidad}', String(total))}
+          </p>
+        )}
       </div>
 
       {/* Search Bar */}
@@ -326,6 +316,11 @@ export default function CiudadEscorts({ ciudadInicial = '' }: Props) {
         )}
       </div>
 
+      {/* Banner superior de ciudad (ciudad_top) */}
+      <div className="mb-6">
+        <BannerSlot placement="ciudad_top" ciudad={ciudad} />
+      </div>
+
       {/* Historias (solo si hay y no se está buscando) */}
       {!hasSearched && <HistoriasCiudad ciudad={ciudad} />}
 
@@ -336,18 +331,12 @@ export default function CiudadEscorts({ ciudadInicial = '' }: Props) {
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="flex-1 min-w-0">
             <h2 className="text-ink font-bold text-lg flex items-center gap-2 mb-4">
-            <i className="fas fa-th-large text-red-500"></i> {hasSearched ? `Resultados en ${ciudad}` : `Escorts en ${ciudad}`}
+            <i className="fas fa-th-large text-red-500"></i> {`Resultados en ${ciudad}`}
           </h2>
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
               {Array.from({ length: skeletonCount }).map((_, i) => (
-                <div key={i} className="bg-surface rounded-xl overflow-hidden border border-white/5">
-                  <Skeleton className="aspect-[3/4] w-full !rounded-none" />
-                  <div className="p-2.5 space-y-2">
-                    <Skeleton className="w-2/3 h-3 !rounded-md" />
-                    <Skeleton className="w-1/2 h-2.5 !rounded-md" />
-                  </div>
-                </div>
+                <EscortCard key={i} escort={{} as Escort} skeleton />
               ))}
             </div>
           ) : error ? (
@@ -367,15 +356,15 @@ export default function CiudadEscorts({ ciudadInicial = '' }: Props) {
               </div>
               <p className="text-muted font-medium">
                 {hasSearched
-                  ? <>Sin resultados{filters.vip || filters.verificado ? <> con esos filtros</> : ''}</>
-                  : <>No hay escorts en {ciudad} por ahora</>}
+                  ? <>{texts?.ciudad_sin_resultados || 'Sin resultados'}{filters.vip || filters.verificado ? <>{texts?.ciudad_sin_resultados_filtros || ' con esos filtros'}</> : ''}</>
+                  : <>{(texts?.ciudad_sin_escorts || 'No hay escorts en {ciudad} por ahora').replace('{ciudad}', ciudad)}</>}
               </p>
               <p className="text-muted text-sm mt-1">
-                {hasSearched ? 'Prueba con otros filtros o término de búsqueda' : 'Vuelve más tarde para ver nuevas publicaciones'}
+                {hasSearched ? (texts?.ciudad_hint_filtros || 'Prueba con otros filtros o término de búsqueda') : (texts?.ciudad_hint_vuelve || 'Vuelve más tarde para ver nuevas publicaciones')}
               </p>
               {hasSearched && hasActiveFilters && (
                 <button onClick={handleClear} className="inline-flex items-center gap-1.5 mt-4 text-sm text-red-400 hover:text-red-300 transition-colors">
-                  <i className="fas fa-undo"></i>Limpiar filtros
+                  <i className="fas fa-undo"></i>{texts?.ciudad_limpiar_filtros || 'Limpiar filtros'}
                 </button>
               )}
             </div>
@@ -390,7 +379,7 @@ export default function CiudadEscorts({ ciudadInicial = '' }: Props) {
                   {loadingMore ? (
                     <div className="flex items-center gap-2 text-muted">
                       <i className="fas fa-circle-notch fa-spin text-red-500"></i>
-                      Cargando más...
+                      {texts?.seccion_cargando_mas || 'Cargando más...'}
                     </div>
                   ) : (
                     <button
@@ -423,7 +412,7 @@ export default function CiudadEscorts({ ciudadInicial = '' }: Props) {
                   >
                     {escorts.map((e) => (
                       <SwiperSlide key={e.id}>
-                        <EscortCard escort={e} />
+                        <EscortCircleCard escort={e} />
                       </SwiperSlide>
                     ))}
                   </Swiper>

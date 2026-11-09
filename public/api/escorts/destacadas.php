@@ -15,6 +15,8 @@ try {
             COALESCE(NULLIF(e.foto_principal, ''), pf.url) as foto_principal,
             e.vip,
             e.verificado,
+            e.verificado AS verificado_vigente,
+            CASE WHEN e.vip = 1 AND (e.fecha_vip_expira IS NULL OR e.fecha_vip_expira >= NOW()) THEN 1 ELSE 0 END AS vip_vigente,
             e.destacado,
             e.sticky,
             e.estado,

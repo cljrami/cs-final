@@ -150,7 +150,7 @@ try {
 
         if ($id <= 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID de idioma no víƒÂ¡lido']);
+            echo json_encode(['success' => false, 'error' => 'ID de idioma no v?lido']);
             exit;
         }
 
@@ -169,7 +169,7 @@ try {
         if (isset($input['nombre'])) {
             $nombre = trim($input['nombre']);
             if (empty($nombre)) {
-                $fieldErrors['nombre'] = 'El nombre no puede estar vacíƒÂ­o';
+                $fieldErrors['nombre'] = 'El nombre no puede estar vac?o';
             } elseif (strlen($nombre) < 2) {
                 $fieldErrors['nombre'] = 'El nombre debe tener al menos 2 caracteres';
             } elseif (strlen($nombre) > 50) {
@@ -236,7 +236,7 @@ try {
 
         if ($id <= 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID de idioma no víƒÂ¡lido']);
+            echo json_encode(['success' => false, 'error' => 'ID de idioma no v?lido']);
             exit;
         }
 
@@ -259,7 +259,7 @@ try {
             http_response_code(409);
             echo json_encode([
                 'success' => false,
-                'error' => ($usageCount === 1 ? "No se puede eliminar el idioma porque estíƒÂ¡ siendo usado por {$usageCount} escort" : "No se puede eliminar el idioma porque estíƒÂ¡ siendo usado por {$usageCount} escorts")
+                'error' => ($usageCount === 1 ? "No se puede eliminar el idioma porque est? siendo usado por {$usageCount} escort" : "No se puede eliminar el idioma porque est? siendo usado por {$usageCount} escorts")
             ]);
             exit;
         }
@@ -275,7 +275,7 @@ try {
     }
 
     http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'MíƒÂ©todo no permitido']);
+    echo json_encode(['success' => false, 'error' => 'M?todo no permitido']);
 } catch (PDOException $e) {
     error_log("Error idiomas.php PDO: " . $e->getMessage());
     http_response_code(500);

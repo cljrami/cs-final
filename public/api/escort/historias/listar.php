@@ -28,7 +28,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || ($tokenData['exp'] ?? 0) < time()) {
         http_response_code(401);
@@ -60,7 +60,7 @@ try {
 
     // Límite del plan activo
     $planStmt = $pdo->prepare("
-        SELECT p.max_videos
+        SELECT p.max_videos, p.permite_historias
         FROM suscripciones s
         JOIN planes p ON p.id = s.plan_id
         WHERE s.escort_id = ? AND s.estado = 'activa' AND s.fecha_fin >= CURDATE()
@@ -69,8 +69,9 @@ try {
     $planStmt->execute([$escortId]);
     $plan = $planStmt->fetch(PDO::FETCH_ASSOC);
     $maxVideos = $plan ? (int)$plan['max_videos'] : 0;
+    $permiteHistorias = $plan ? (int)$plan['permite_historias'] : 0;
 
-    echo json_encode(['success' => true, 'historias' => $historias, 'maxVideos' => $maxVideos]);
+    echo json_encode(['success' => true, 'historias' => $historias, 'maxVideos' => $maxVideos, 'permiteHistorias' => (bool)$permiteHistorias]);
 } catch (Throwable $e) {
     error_log("Error historias/listar.php: " . $e->getMessage());
     http_response_code(500);

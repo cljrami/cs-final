@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Skeleton } from '../ui/Skeleton';
+import ComprobanteThumb from '../ui/ComprobanteThumb';
 
 interface Pago {
   id: number;
@@ -162,25 +163,7 @@ export default function HistorialPagos() {
                          </span>
                        </td>
                        <td className="px-3 sm:px-5 py-3 sm:py-4">
-                          {pago.comprobante_url ? (
-                            <div className="flex items-center justify-center gap-1.5">
-                              <a
-                                href={pago.comprobante_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-400 hover:text-blue-300 text-[10px] sm:text-xs"
-                                title="Comprobante de pago"
-                              >
-                                {pago.comprobante_url.match(/\.pdf$/i) ? (
-                                  <i className="fas fa-file-pdf text-red-400"></i>
-                                ) : (
-                                  <i className="fas fa-file-image"></i>
-                                )}
-                              </a>
-                            </div>
-                          ) : (
-                            <span className="text-gray-600 text-[10px] sm:text-xs">—</span>
-                          )}
+                          <ComprobanteThumb url={pago.comprobante_url} scope="escort" />
                         </td>
                     </tr>
                   );

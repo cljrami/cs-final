@@ -100,6 +100,25 @@ try {
                 gira_ciudad_id = NULL,
                 gira_fecha_inicio = NULL,
                 gira_fecha_fin = NULL,
+                nombre = '',
+                foto_principal = NULL,
+                edad = 0,
+                ciudad = NULL,
+                telefono = NULL,
+                whatsapp = NULL,
+                descripcion_corta = NULL,
+                descripcion_larga = NULL,
+                altura = NULL,
+                peso = NULL,
+                medidas = NULL,
+                categoria_id = NULL,
+                nacionalidad = NULL,
+                etnia = NULL,
+                color_ojos = NULL,
+                color_pelo = NULL,
+                orientacion = NULL,
+                estilo = NULL,
+                privacidad = NULL,
                 password_hash = ?,
                 updated_at = NOW()
             WHERE id = ?
@@ -109,6 +128,11 @@ try {
         // Red de seguridad: cancelar planes activos/pendientes heredados del registro
         // anterior. El plan gratuito queda bloqueado por email y deberá contratar uno de pago.
         $pdo->prepare("UPDATE suscripciones SET estado = 'cancelada', actualizado_en = NOW() WHERE escort_id = ? AND estado IN ('activa', 'pendiente_aprobacion')")->execute([$reactivarId]);
+
+        $pdo->prepare("DELETE FROM escort_fotos WHERE escort_id = ?")->execute([$reactivarId]);
+        $pdo->prepare("DELETE FROM escort_historias WHERE escort_id = ?")->execute([$reactivarId]);
+        $pdo->prepare("DELETE FROM escort_idiomas WHERE escort_id = ?")->execute([$reactivarId]);
+        $pdo->prepare("DELETE FROM escort_servicios WHERE escort_id = ?")->execute([$reactivarId]);
 
         // Invalidar la verificación de identidad previa: al volver debe re-solicitarla
         // con una selfie/documento nuevos. Se conserva el historial (verificaciones) para auditoría.
@@ -140,10 +164,12 @@ try {
         $esReactivacion = false;
     }
 
+    compatEnsureTokenVersion();
     $tokenData = [
         'id' => $newId,
         'usuario' => $usuario,
         'tipo' => 'escort',
+        'tv' => (int)getTokenVersion($pdo, 'escorts', (int)$newId) ?? 0,
         'exp' => time() + (7 * 24 * 60 * 60)
     ];
     $token = signToken($tokenData);

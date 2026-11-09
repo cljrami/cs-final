@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { Skeleton } from '../ui/Skeleton';
 
 interface StatCardProps {
@@ -10,6 +11,13 @@ interface StatCardProps {
 }
 
 export default function StatCard({ icon, value, label, color, loading, href }: StatCardProps) {
+  const hasRealValue = useRef(false);
+  useEffect(() => {
+    if (!loading) hasRealValue.current = true;
+  }, [loading]);
+
+  const showSkeleton = loading && !hasRealValue.current;
+
   const content = (
     <>
       <div 
@@ -20,7 +28,7 @@ export default function StatCard({ icon, value, label, color, loading, href }: S
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-xl md:text-2xl font-bold leading-none">
-          {loading ? <Skeleton width={50} height={28} /> : value}
+          {showSkeleton ? <Skeleton width={50} height={28} /> : value}
         </div>
         <div className="text-xs md:text-sm text-admin-muted mt-1 truncate">{label}</div>
       </div>

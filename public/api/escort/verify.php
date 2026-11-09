@@ -21,7 +21,7 @@ $pdo = getDBConnection();
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || ($tokenData['exp'] ?? 0) < time()) {
         http_response_code(401);
@@ -34,9 +34,21 @@ $pdo = getDBConnection();
     $stmt->execute([$tokenData['id']]);
     $escort = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$escort || (int)$escort['activa'] !== 1) {
+    if (!$escort) {
         http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Cuenta inactiva']);
+        echo json_encode(['success' => false, 'error' => 'Cuenta no encontrada']);
+        exit;
+    }
+
+    if ((int)$escort['eliminada'] === 1) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Cuenta eliminada', 'mensaje' => 'Tu cuenta fue eliminada. Si deseas publicar de nuevo, regístrate con el mismo email: se reactivará automáticamente y deberás elegir un plan de pago.']);
+        exit;
+    }
+
+    if ((int)$escort['activa'] !== 1) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Cuenta inactiva', 'mensaje' => 'Tu cuenta esta inactiva. Contacta al soporte.']);
         exit;
     }
 

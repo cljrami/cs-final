@@ -181,7 +181,7 @@ export default function PlanModal({ isOpen, onClose, plan, onSave }: PlanModalPr
                   setValor(e.target.value);
                   if (errors.valor) setErrors((prev) => ({ ...prev, valor: '' }));
                 }}
-                placeholder={tipo === 'int' ? 'ej: 50000' : 'ej: Kimi'}
+                placeholder={tipo === 'int' ? 'ej: 50000' : 'ej: ConsexVIP'}
                 className={`w-full px-3 py-2 rounded-lg border text-sm transition-all focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white ${
                   errors.valor
                     ? 'border-red-500 focus:ring-red-500 focus:border-red-500'

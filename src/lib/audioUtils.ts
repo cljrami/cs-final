@@ -25,6 +25,11 @@ export async function uploadAudioPreview(
     };
 
     xhr.onload = () => {
+      const contentType = xhr.getResponseHeader('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        resolve({ success: false, error: `Servidor error (${xhr.status}): ${xhr.responseText.slice(0, 200)}` });
+        return;
+      }
       try {
         const data = JSON.parse(xhr.responseText);
         if (data.success) {
@@ -33,7 +38,7 @@ export async function uploadAudioPreview(
           resolve({ success: false, error: data.error || 'Error al subir audio' });
         }
       } catch {
-        resolve({ success: false, error: 'Error de conexión' });
+        resolve({ success: false, error: 'Respuesta inválida del servidor' });
       }
     };
 
@@ -49,10 +54,18 @@ export async function deleteAudioPreview(
   token: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await fetch(`${API_BASE}/upload-audio.php`, {
-      method: 'DELETE',
+    const res = await fetch(`${API_BASE}/upload-audio.php?_method=delete`, {
+      method: 'POST',
       headers: { 'Authorization': `Bearer ${token}` },
+      body: new URLSearchParams({ _method: 'delete' }),
     });
+
+    const contentType = res.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await res.text();
+      return { success: false, error: `Servidor error (${res.status}): ${text.slice(0, 200)}` };
+    }
+
     const data = await res.json();
     return { success: data.success, error: data.error };
   } catch (err: any) {

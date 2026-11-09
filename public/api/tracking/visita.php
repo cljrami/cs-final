@@ -36,7 +36,7 @@ try {
             VALUES (?, CURDATE(), 1)
             ON DUPLICATE KEY UPDATE visitas = visitas + 1
         ")->execute([$escortId]);
-        setcookie($cookieName, '1', time() + 21600, '/', '', false, true);
+        setcookie($cookieName, '1', ['expires' => time() + 21600, 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
     }
 
     echo json_encode(['success' => true]);

@@ -54,7 +54,7 @@ try {
         SELECT id, url, tipo, es_portada
         FROM escort_fotos
         WHERE escort_id = ?
-        ORDER BY es_portada DESC, orden ASC
+        ORDER BY orden ASC, id ASC
     ");
     $stmtFotos->execute(array($id));
     $fotosRows = $stmtFotos->fetchAll(PDO::FETCH_ASSOC);

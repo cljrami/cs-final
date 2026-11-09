@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // public/escort.php - Perfil de escort con UI premium
 
 ini_set('display_errors', 0);
@@ -17,7 +17,7 @@ try {
     $pdo = getDBConnection();
     limpiar_gira_vencida($pdo);
 
-    // Configuración del sitio (textos/SEO editables desde "Contenido del sitio")
+    // Configuraci├│n del sitio (textos/SEO editables desde "Contenido del sitio")
     $cfg = [];
     try {
         $cStmt = $pdo->query("SELECT clave, valor FROM configuracion");
@@ -42,7 +42,7 @@ try {
         'mi_cuenta'    => $cfg['nav_mi_cuenta'] ?? 'Mi Cuenta',
         'mis_favoritos' => $cfg['nav_mis_favoritos'] ?? 'Mis Favoritos',
         'mi_perfil'    => $cfg['nav_mi_perfil'] ?? 'Mi Perfil',
-        'cerrar_sesion' => $cfg['nav_cerrar_sesion'] ?? 'Cerrar sesión',
+        'cerrar_sesion' => $cfg['nav_cerrar_sesion'] ?? 'Cerrar sesi├│n',
     ];
     $navJS = json_encode($nav, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 
@@ -59,7 +59,7 @@ try {
     }
 
     if ($id <= 0) {
-        showNotFound('ID inválido');
+        showNotFound('ID inv├ílido');
         exit;
     }
 
@@ -81,10 +81,10 @@ try {
         exit;
     }
 
-    // Ciudad efectiva (en gira) — para recomendaciones
+    // Ciudad efectiva (en gira) ÔÇö para recomendaciones
     $ciudadEfectiva = ($escort['gira_activa'] == 1 && !empty($escort['gira_ciudad'])) ? $escort['gira_ciudad'] : ($escort['ciudad'] ?? '');
 
-    // Si existe pero no está activa o su último plan base está pausado
+    // Si existe pero no est├í activa o su ├║ltimo plan base est├í pausado
     $subEstado = $pdo->prepare("SELECT COALESCE(s.estado,'') FROM suscripciones s JOIN planes p ON p.id = s.plan_id AND p.extra_tipo IS NULL WHERE s.escort_id = ? ORDER BY s.id DESC LIMIT 1");
     $subEstado->execute([$id]);
     $ultimoEstadoSub = $subEstado->fetchColumn();
@@ -105,29 +105,46 @@ try {
             setcookie($cookieName, '1', time() + 21600, '/', '', false, true);
         }
     } catch (Exception $e) {
-        // No crítico
+        // No cr├¡tico
     }
 
     // === ESCORT ACTIVA - Cargar datos completos ===
 
     // Fotos
     $stmtFotos = $pdo->prepare("
-        SELECT url FROM escort_fotos 
+        SELECT url, tipo, gif_url, es_portada FROM escort_fotos 
         WHERE escort_id = ? AND (visibilidad = 'publica' OR visibilidad IS NULL)
-        ORDER BY es_portada DESC, orden ASC, created_at ASC
+        ORDER BY orden ASC, created_at ASC
     ");
     $stmtFotos->execute([$id]);
-    $fotos = $stmtFotos->fetchAll(PDO::FETCH_COLUMN);
+    $fotos = $stmtFotos->fetchAll(PDO::FETCH_ASSOC);
 
-    // Si no hay foto_principal, usar la primera foto de la galería (portada)
+    // Si no hay foto_principal, usar la primera foto de la galer├¡a (portada)
     if (empty($escort['foto_principal']) && !empty($fotos)) {
-        $escort['foto_principal'] = $fotos[0];
+        $escort['foto_principal'] = is_array($fotos[0]) ? $fotos[0]['url'] : $fotos[0];
     }
 
-    // Incluir foto_principal al inicio de la galería si no está ya
-    if (!empty($escort['foto_principal']) && !in_array($escort['foto_principal'], $fotos)) {
-        array_unshift($fotos, $escort['foto_principal']);
+    // Avatar: usar GIF si la portada es video
+    $avatarSrc = $escort['foto_principal'];
+    if (!empty($fotos)) {
+        $portada = null;
+        foreach ($fotos as $f) {
+            if (!empty($f['es_portada'])) { $portada = $f; break; }
+        }
+        $portada = $portada ?? $fotos[0];
+        if (!empty($portada)) {
+            if (!empty($portada['tipo']) && $portada['tipo'] === 'video' && !empty($portada['gif_url'])) {
+                $avatarSrc = $portada['gif_url'];
+            } elseif (!empty($portada['url'])) {
+                $avatarSrc = $portada['url'];
+            }
+        }
     }
+
+    // No forzar foto_principal al inicio para respetar el orden definido por la escort
+    // if (!empty($escort['foto_principal']) && !in_array($escort['foto_principal'], $fotos)) {
+    //     array_unshift($fotos, $escort['foto_principal']);
+    // }
 
     // Servicios incluidos
     $serviciosIncluidos = [];
@@ -175,11 +192,11 @@ try {
         if (is_array($decoded)) $ocultos = $decoded;
     }
 
-    // Atributos (label => valor) - solo los que existen y no están ocultos
+    // Atributos (label => valor) - solo los que existen y no est├ín ocultos
     $atributos = [];
-    if (!empty($escort['edad']))         $atributos[] = ['icon' => 'fa-birthday-cake', 'label' => 'Edad',        'valor' => $escort['edad'] . ' años'];
-    if (!empty($escort['altura']))       $atributos[] = ['icon' => 'fa-ruler-vertical','label' => 'Altura',      'valor' => $escort['altura'] . ' cm'];
-    if (!empty($escort['peso']))         $atributos[] = ['icon' => 'fa-weight-scale',  'label' => 'Peso',        'valor' => $escort['peso'] . ' kg'];
+    if (!empty($escort['edad']))         $atributos[] = ['icon' => 'fa-birthday-cake', 'label' => 'Edad',        'valor' => $escort['edad'] . ' Años'];
+    if (!empty($escort['altura']))       $atributos[] = ['icon' => 'fa-ruler-vertical','label' => 'Altura',      'valor' => $escort['altura'] . ' Cm'];
+    if (!empty($escort['peso']))         $atributos[] = ['icon' => 'fa-weight-scale',  'label' => 'Peso',        'valor' => $escort['peso'] . ' Kg'];
     if (!empty($escort['medidas']) && !in_array('medidas', $ocultos))      $atributos[] = ['icon' => 'fa-vector-square',  'label' => 'Medidas',     'valor' => $escort['medidas']];
     if (!empty($escort['nacionalidad']) && !in_array('nacionalidad', $ocultos)) $atributos[] = ['icon' => 'fa-flag',           'label' => 'Nacionalidad','valor' => $escort['nacionalidad']];
     if (!empty($escort['etnia']) && !in_array('etnia', $ocultos))        $atributos[] = ['icon' => 'fa-user',           'label' => 'Etnia',       'valor' => $escort['etnia']];
@@ -214,7 +231,7 @@ try {
         if (!empty($escort['tarifa_noche'])) $tarifas['noche'] = (int)$escort['tarifa_noche'];
     }
 
-    // Teléfono formateado
+    // Tel├®fono formateado
     $telefonoFormateado = '';
     if ($escort['telefono']) {
         $cleaned = preg_replace('/\D/', '', $escort['telefono']);
@@ -230,7 +247,7 @@ try {
     if ($escort['telefono']) {
         $waNum = preg_replace('/\D/', '', $escort['telefono']);
         $waNum = strpos($waNum, '56') === 0 ? $waNum : '56' . $waNum;
-        $msg = urlencode("Hola {$escort['nombre']}!, vi tu perfil en Kimi y me gustaría contactarte.");
+        $msg = urlencode("Hola {$escort['nombre']}!, vi tu perfil en Kimi y me gustar├¡a contactarte.");
         $waLink = 'https://wa.me/' . $waNum . '?text=' . $msg;
     }
 
@@ -278,16 +295,16 @@ function e($str)
 function entradaSlug($nombre)
 {
     $mapa = [
-        'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u',
-        'ñ' => 'n', 'ü' => 'u', 'Á' => 'a', 'É' => 'e', 'Í' => 'i',
-        'Ó' => 'o', 'Ú' => 'u', 'Ñ' => 'n', 'Ü' => 'u',
+        '├í' => 'a', '├®' => 'e', '├¡' => 'i', '├│' => 'o', '├║' => 'u',
+        '├▒' => 'n', '├╝' => 'u', '├ü' => 'a', '├ë' => 'e', '├ì' => 'i',
+        '├ô' => 'o', '├Ü' => 'u', '├æ' => 'n', '├£' => 'u',
     ];
     $nombre = strtr((string) $nombre, $mapa);
     $s = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', $nombre));
     return trim($s, '-');
 }
 
-// === PÍGINA: Escort no encontrada ===
+// === P├ì┬üGINA: Escort no encontrada ===
 function showNotFound($mensaje = 'Escort no encontrada')
 {
 ?>
@@ -325,9 +342,9 @@ function showNotFound($mensaje = 'Escort no encontrada')
             </a>
             <div class="mt-8 flex justify-center gap-4 text-sm text-muted">
                 <a href="/" class="hover:text-red-400 transition-colors"><?= htmlspecialchars($nav['inicio'], ENT_QUOTES, 'UTF-8') ?></a>
-                <span>â€¢</span>
+                <span>├óÔé¼┬ó</span>
                 <a href="#" class="hover:text-red-400 transition-colors"><?= htmlspecialchars($nav['ciudades'], ENT_QUOTES, 'UTF-8') ?></a>
-                <span>â€¢</span>
+                <span>├óÔé¼┬ó</span>
                 <a href="/panel" class="hover:text-red-400 transition-colors">Panel Escort</a>
             </div>
         </div>
@@ -337,9 +354,10 @@ function showNotFound($mensaje = 'Escort no encontrada')
 <?php
 }
 
-// === PÍGINA: Escort no disponible (existe pero inactiva) ===
+// === P├ì┬üGINA: Escort no disponible (existe pero inactiva) ===
 function showNotAvailable($escort)
 {
+    $ciudadEfectiva = ($escort['gira_activa'] == 1 && !empty($escort['gira_ciudad'])) ? $escort['gira_ciudad'] : ($escort['ciudad'] ?? '');
 ?>
     <!DOCTYPE html>
     <html lang="es">
@@ -348,6 +366,7 @@ function showNotAvailable($escort)
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>No disponible - <?= e($escort['nombre']) ?> - CSEscorts</title>
+        <link rel="icon" href="/favicon.ico">
         <link rel="stylesheet" href="/_astro/escort-profile.css?v=<?= $escortCssV ?>">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -368,8 +387,8 @@ function showNotAvailable($escort)
             <!-- Avatar borroso/gris -->
             <div class="relative w-32 h-32 mx-auto mb-6">
                 <div class="w-full h-full rounded-full bg-gray-700 flex items-center justify-center overflow-hidden border-2 border-gray-600">
-                    <?php if ($escort['foto_principal']): ?>
-                        <img src="<?= e($escort['foto_principal']) ?>" alt="" class="w-full h-full object-cover opacity-30 grayscale">
+                    <?php if (!empty($avatarSrc)): ?>
+                        <img src="<?= e($avatarSrc) ?>" alt="" class="w-full h-full object-cover opacity-30 grayscale">
                     <?php else: ?>
                         <i class="fas fa-user text-muted text-4xl"></i>
                     <?php endif; ?>
@@ -380,7 +399,7 @@ function showNotAvailable($escort)
             </div>
 
             <h1 class="text-2xl font-bold text-ink mb-1"><?= e($escort['nombre']) ?></h1>
-            <p class="text-muted text-sm mb-6"><?= $escort['edad'] ?> años â€¢ <?= e($ciudadEfectiva) ?></p>
+            <p class="text-muted text-sm mb-6"><?= $escort['edad'] ?> a&ntilde;os &bull; <?= e($ciudadEfectiva) ?></p>
 
             <div class="bg-surface border border-white/10 rounded-xl p-6 mb-8">
                 <div class="w-12 h-12 mx-auto mb-4 rounded-full bg-yellow-500/10 flex items-center justify-center">
@@ -394,20 +413,9 @@ function showNotAvailable($escort)
             </div>
 
             <div class="flex flex-col sm:flex-row gap-3 justify-center">
-                <a href="/" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-all">
-                    <i class="fas fa-fire"></i> Ver escorts activas
+                <a href="javascript:history.back()" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-surface hover:bg-surface2 text-ink border border-white/10 rounded-lg font-medium transition-all">
+                    <i class="fas fa-arrow-left"></i> Volver
                 </a>
-                <a href="/" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-surface hover:bg-surface2 text-ink border border-white/10 rounded-lg font-medium transition-all">
-                    <i class="fas fa-arrow-left"></i> Volver al inicio
-                </a>
-            </div>
-
-            <div class="mt-8 flex justify-center gap-4 text-sm text-muted">
-                <a href="/" class="hover:text-red-400 transition-colors"><?= htmlspecialchars($nav['inicio'], ENT_QUOTES, 'UTF-8') ?></a>
-                <span>â€¢</span>
-                <a href="#" class="hover:text-red-400 transition-colors"><?= htmlspecialchars($nav['ciudades'], ENT_QUOTES, 'UTF-8') ?></a>
-                <span>â€¢</span>
-                <a href="/panel" class="hover:text-red-400 transition-colors"><?= htmlspecialchars($nav['publicar'], ENT_QUOTES, 'UTF-8') ?></a>
             </div>
         </div>
     </body>
@@ -422,6 +430,7 @@ function showNotAvailable($escort)
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/favicon.ico">
     <script>
         (function () {
             var t, m;
@@ -464,7 +473,14 @@ function showNotAvailable($escort)
     if ($seoEscortOgDesc === '') $seoEscortOgDesc = $descCortaSEO !== '' ? $descCortaSEO : ('Perfil verificado de ' . $escort['nombre'] . ' en ' . $ciudadEfectiva);
 
     $ogImage = '';
-    if (!empty($escort['foto_principal'])) {
+    $avatarSrcForOg = $avatarSrc ?? $escort['foto_principal'];
+    // Para Open Graph usar imagen estática si el avatar es un GIF derivado de video
+    if (!empty($portada) && !empty($portada['tipo']) && $portada['tipo'] === 'video' && !empty($portada['gif_url']) && $avatarSrcForOg === $portada['gif_url'] && !empty($portada['url'])) {
+        $avatarSrcForOg = $portada['url'];
+    }
+    if (!empty($avatarSrcForOg)) {
+        $ogImage = strpos($avatarSrcForOg, 'http') === 0 ? $avatarSrcForOg : $baseURL . $avatarSrcForOg;
+    } elseif (!empty($escort['foto_principal'])) {
         $fp = $escort['foto_principal'];
         $ogImage = strpos($fp, 'http') === 0 ? $fp : $baseURL . $fp;
     }
@@ -473,13 +489,13 @@ function showNotAvailable($escort)
     ?>
     <title><?= e($seoEscortTitulo) ?></title>
     <meta name="description" content="<?= e($seoEscortDesc) ?>">
-    <link rel="canonical" href="<?= $baseURL ?>/<?= $id ?>">
+    <link rel="canonical" href="<?= $baseURL ?>/cs<?= $id ?>">
     <meta property="og:title" content="<?= e($seoEscortOgTitulo) ?>">
     <meta property="og:description" content="<?= e($seoEscortOgDesc) ?>">
     <?php if ($ogImage): ?>
     <meta property="og:image" content="<?= e($ogImage) ?>">
     <?php endif; ?>
-    <meta property="og:url" content="<?= $baseURL ?>/<?= $id ?>">
+    <meta property="og:url" content="<?= $baseURL ?>/cs<?= $id ?>">
     <meta property="og:type" content="profile">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="<?= e($seoEscortOgTitulo) ?>">
@@ -711,7 +727,7 @@ function showNotAvailable($escort)
                 </div>
 
                 <!-- Mobile menu button + theme toggle -->
-                <button id="menu-toggle-mobile" aria-label="Abrir menú" class="md:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-white/5">
+                <button id="menu-toggle-mobile" aria-label="Abrir men├║" class="md:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-white/5">
                     <i class="fas fa-bars"></i>
                 </button>
                 <button id="theme-toggle-mobile" aria-label="Cambiar tema" class="md:hidden p-2 rounded-lg text-muted hover:text-ink hover:bg-white/5">
@@ -904,7 +920,7 @@ function showNotAvailable($escort)
                     list.innerHTML = '<div class="text-center text-red-400 py-8">Error al cargar</div>';
                 }
             } catch (e) {
-                list.innerHTML = '<div class="text-center text-red-400 py-8">Error de conexión</div>';
+                list.innerHTML = '<div class="text-center text-red-400 py-8">Error de conexi├│n</div>';
             }
         }
 
@@ -970,8 +986,8 @@ function showNotAvailable($escort)
                 <div class="shrink-0">
                     <div class="relative inline-block">
                         <div class="w-44 h-44 rounded-full overflow-hidden bg-surface border-2 border-white/10">
-                            <?php if ($escort['foto_principal']): ?>
-                                <img src="<?= e($escort['foto_principal']) ?>" alt="<?= e($escort['nombre']) ?>" class="w-full h-full object-cover">
+                            <?php if (!empty($avatarSrc)): ?>
+                                <img src="<?= e($avatarSrc) ?>" alt="<?= e($escort['nombre']) ?>" class="w-full h-full object-cover">
                             <?php else: ?>
                                 <div class="w-full h-full flex items-center justify-center"><i class="fas fa-user text-muted text-4xl"></i></div>
                             <?php endif; ?>
@@ -1000,7 +1016,9 @@ function showNotAvailable($escort)
                         <span class="text-muted text-lg">, <?= $escort['edad'] ?> Años</span>
                     </div>
 
-                    <?php if ($totalValoraciones > 0): ?>
+                    <?php if ($escort['verificado'] != 1): ?>
+                    <p class="text-yellow-400 text-sm mb-2">Fotografías sin verificar</p>
+                    <?php endif; ?>
                     <div class="flex items-center gap-2 mb-3">
                         <div class="flex items-center gap-0.5">
                             <?php for ($n = 1; $n <= 5; $n++): ?>
@@ -1010,7 +1028,6 @@ function showNotAvailable($escort)
                         <span class="text-ink text-sm font-medium"><?= number_format($ratingReal, 1) ?></span>
                         <span class="text-muted text-xs">(<?= $totalValoraciones ?>)</span>
                     </div>
-                    <?php endif; ?>
 
                     <?php if ($telefonoFormateado): ?>
                         <a href="tel:<?= preg_replace('/\D/', '', $escort['telefono']) ?>" class="inline-block text-green-400 text-lg font-semibold hover:text-green-300 transition-colors">
@@ -1043,7 +1060,7 @@ function showNotAvailable($escort)
                         <?php endif; ?>
                         <?php if ($waLink): ?>
                             <a href="<?= $waLink ?>" target="_blank" onclick="trackContacto(<?= $id ?>, 'whatsapp')" class="flex items-center gap-2 px-5 py-2.5 rounded-lg btn-green text-ink font-medium text-sm shadow-lg shadow-green-500/20">
-                                <i class="fab fa-whatsapp"></i> Contáctame
+                                <i class="fab fa-whatsapp"></i> Cont├íctame
                             </a>
                         <?php endif; ?>
                         <button onclick="compartir()" class="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-500/80 hover:bg-red-500 text-white font-medium text-sm transition-all">
@@ -1062,7 +1079,7 @@ function showNotAvailable($escort)
                 </div>
             </div>
 
-            <!-- DESCRIPCIÍ“N -->
+            <!-- DESCRIPCIÓN -->
             <?php if ($escort['descripcion_corta'] || $escort['descripcion_larga']): ?>
                 <div class="mb-8">
                     <?php if (!empty($escort['descripcion_corta'])): ?>
@@ -1074,18 +1091,15 @@ function showNotAvailable($escort)
                 </div>
             <?php endif; ?>
 
-            <!-- DETALLES / CARACTERÍSTICAS -->
+            <!-- DETALLES / CARACTERÍSTICAS -->
             <?php if (!empty($atributos)): ?>
                 <div class="mb-8">
                     <h2 class="text-ink text-lg font-bold mb-5 flex items-center gap-2"><i class="fas fa-clipboard-list text-muted"></i> Detalles</h2>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-3">
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
                         <?php foreach ($atributos as $attr): ?>
-                            <div class="flex items-start gap-2.5">
-                                <i class="fas <?= e($attr['icon']) ?> text-muted mt-0.5 text-xs w-3.5 shrink-0"></i>
-                                <div class="min-w-0">
-                                    <div class="text-muted text-[0.6rem] uppercase tracking-widest"><?= e($attr['label']) ?></div>
-                                    <div class="text-muted text-sm capitalize truncate"><?= e($attr['valor']) ?></div>
-                                </div>
+                            <div class="bg-gray-900/40 rounded p-3">
+                                <div class="text-gray-400 text-xs uppercase"><?= e($attr['label']) ?></div>
+                                <div class="text-white"><?= e($attr['valor']) ?></div>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -1149,10 +1163,10 @@ function showNotAvailable($escort)
                 </div>
             <?php endif; ?>
 
-            <!-- GALERÍA -->
+            <!-- GALERÍA -->
             <?php if (!empty($fotos)): ?>
                 <div class="mb-10">
-                    <h2 class="text-ink text-lg font-bold mb-4 flex items-center gap-2"><i class="fas fa-images text-red-500"></i> Galería</h2>
+                    <h2 class="text-ink text-lg font-bold mb-4 flex items-center gap-2"><i class="fas fa-images text-red-500"></i> Galer├¡a</h2>
 
                     <div class="flex flex-wrap items-center gap-3 mb-6">
                         <?php if ($escort['verificado'] == 1): ?>
@@ -1175,12 +1189,12 @@ function showNotAvailable($escort)
 
                     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                         <?php foreach ($fotos as $i => $foto): ?>
-                            <?php $isVideo = preg_match('/\.(mp4|webm|mov)$/i', $foto); ?>
-                            <a href="<?= e($foto) ?>" data-fancybox="gallery" class="gallery-item aspect-[3/4] bg-surface border border-white/10 hover:border-red-500/50 hover:shadow-lg hover:shadow-red-500/10 transition-all rounded-xl overflow-hidden group">
+                            <?php $isVideo = ($foto['tipo'] ?? '') === 'video'; $thumb = $isVideo && !empty($foto['gif_url']) ? $foto['gif_url'] : $foto['url']; ?>
+                            <a href="<?= e($foto['url']) ?>" data-fancybox="gallery" data-type="<?= $isVideo ? 'video' : 'image' ?>" class="gallery-item aspect-[3/4] bg-surface border border-white/10 hover:border-red-500/50 hover:shadow-lg hover:shadow-red-500/10 transition-all rounded-xl overflow-hidden group relative">
                                 <?php if ($isVideo): ?>
-                                <video src="<?= e($foto) ?>" preload="metadata" muted playsinline class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"></video>
+                                <img src="<?= e($thumb) ?>" alt="<?= e($escort['nombre']) ?> - <?= $i + 1 ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="<?= $i < 4 ? 'eager' : 'lazy' ?>" decoding="async">
                                 <?php else: ?>
-                                <img src="<?= e($foto) ?>" alt="<?= e($escort['nombre']) ?> - <?= $i + 1 ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="<?= $i < 4 ? 'eager' : 'lazy' ?>" decoding="async">
+                                <img src="<?= e($foto['url']) ?>" alt="<?= e($escort['nombre']) ?> - <?= $i + 1 ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="<?= $i < 4 ? 'eager' : 'lazy' ?>" decoding="async">
                                 <?php endif; ?>
                                 <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
                                     <i class="fas fa-expand-alt text-white/0 group-hover:text-white/80 text-xl transition-all"></i>
@@ -1218,7 +1232,7 @@ function showNotAvailable($escort)
                             <label class="text-muted text-xs block mb-1.5">
                                 <i class="fas fa-check-circle text-green-400 mr-1"></i>Código de verificación <span class="text-red-400">*</span>
                             </label>
-                            <input type="text" id="comentario-codigo" maxlength="6" autocomplete="off" placeholder="Código entregado por la escort (ej: A1B2C3)" class="w-full bg-surface2 border border-edge rounded-lg px-4 py-2.5 text-ink text-sm uppercase tracking-widest placeholder-gray-600 placeholder:normal-case placeholder:tracking-normal outline-none focus:border-green-500/50 transition-colors" />
+                            <input type="text" id="comentario-codigo" maxlength="6" autocomplete="off" placeholder="Código entregado por la escort (ej: A1B2C3)" class="w-full bg-surface2 border border-edge rounded-lg px-4 py-2.5 text-ink text-sm uppercase tracking-widest placeholder-gray-600 placeholder:normal-case placeholder:tracking-normal outline-none focus:border-red-500/50 transition-colors" />
                             <p class="text-muted text-xs mt-1">La escort te entrega este código tras confirmar tu cita. Es obligatorio para comentar.</p>
                         </div>
                         <div class="flex items-center justify-between">
@@ -1257,7 +1271,7 @@ function showNotAvailable($escort)
                 <div id="comentarios-empty" class="hidden">
                     <div class="text-center py-8">
                         <i class="fas fa-comment-slash text-muted text-2xl mb-2"></i>
-                        <p class="text-muted text-sm">No hay comentarios aún. Â¡Sé el primero!</p>
+                        <p class="text-muted text-sm">No hay comentarios aún. ¡Sé el primero!</p>
                     </div>
                 </div>
             </div>
@@ -1298,7 +1312,7 @@ function showNotAvailable($escort)
                 fetch('/api/comentarios/listar.php?escort_id=<?= $id ?>')
                     .then(function(r) {
                         if (!r.headers.get('content-type') || !r.headers.get('content-type').includes('application/json')) {
-                            throw new Error('Respuesta inválida del servidor');
+                            throw new Error('Respuesta inv├ílida del servidor');
                         }
                         return r.json();
                     })
@@ -1364,7 +1378,7 @@ function showNotAvailable($escort)
                 })
                  .then(function(r) {
                      if (!r.headers.get('content-type') || !r.headers.get('content-type').includes('application/json')) {
-                         throw new Error('Respuesta inválida del servidor');
+                         throw new Error('Respuesta inv├ílida del servidor');
                      }
                      return r.json();
                  })
@@ -1375,7 +1389,7 @@ function showNotAvailable($escort)
                          setPuntuacion(0);
                          errorEl.classList.remove('hidden');
                          errorEl.classList.add('text-green-400');
-                         errorEl.textContent = 'Comentario enviado. Será revisado antes de publicarse.';
+                         errorEl.textContent = 'Comentario enviado. Ser├í revisado antes de publicarse.';
                          setTimeout(function() { errorEl.classList.add('hidden'); }, 5000);
                      } else {
                          if (data.fieldErrors && (data.fieldErrors.comentario || data.fieldErrors.codigo_verificacion)) {
@@ -1387,7 +1401,7 @@ function showNotAvailable($escort)
                      }
                  })
                  .catch(function(err) {
-                     errorEl.textContent = err.message || 'Error de conexión';
+                     errorEl.textContent = err.message || 'Error de conexi├│n';
                      errorEl.classList.remove('hidden');
                  })
                 .finally(function() {
@@ -1420,10 +1434,10 @@ function showNotAvailable($escort)
             </h3>
             <p class="text-muted text-sm mb-4">Selecciona el motivo del reporte:</p>
             <div class="space-y-2 mb-4">
-                <button data-motivo="fotos engañosas" onclick="selectReportMotivo('fotos engañosas')" class="report-motivo-btn w-full text-left px-3 py-2 bg-surface2 hover:bg-raised text-muted hover:text-ink rounded-lg text-sm transition-all border border-transparent"><i class="fas fa-check text-red-400 mr-2 report-check hidden"></i>Fotos engañosas o editadas</button>
+                <button data-motivo="fotos enga├▒osas" onclick="selectReportMotivo('fotos enga├▒osas')" class="report-motivo-btn w-full text-left px-3 py-2 bg-surface2 hover:bg-raised text-muted hover:text-ink rounded-lg text-sm transition-all border border-transparent"><i class="fas fa-check text-red-400 mr-2 report-check hidden"></i>Fotos enga├▒osas o editadas</button>
                 <button data-motivo="contenido inapropiado" onclick="selectReportMotivo('contenido inapropiado')" class="report-motivo-btn w-full text-left px-3 py-2 bg-surface2 hover:bg-raised text-muted hover:text-ink rounded-lg text-sm transition-all border border-transparent"><i class="fas fa-check text-red-400 mr-2 report-check hidden"></i>Contenido inapropiado</button>
                 <button data-motivo="acoso o amenazas" onclick="selectReportMotivo('acoso o amenazas')" class="report-motivo-btn w-full text-left px-3 py-2 bg-surface2 hover:bg-raised text-muted hover:text-ink rounded-lg text-sm transition-all border border-transparent"><i class="fas fa-check text-red-400 mr-2 report-check hidden"></i>Acoso o amenazas</button>
-                <button data-motivo="información falsa" onclick="selectReportMotivo('información falsa')" class="report-motivo-btn w-full text-left px-3 py-2 bg-surface2 hover:bg-raised text-muted hover:text-ink rounded-lg text-sm transition-all border border-transparent"><i class="fas fa-check text-red-400 mr-2 report-check hidden"></i>Información falsa</button>
+                <button data-motivo="informaci├│n falsa" onclick="selectReportMotivo('informaci├│n falsa')" class="report-motivo-btn w-full text-left px-3 py-2 bg-surface2 hover:bg-raised text-muted hover:text-ink rounded-lg text-sm transition-all border border-transparent"><i class="fas fa-check text-red-400 mr-2 report-check hidden"></i>Informaci├│n falsa</button>
                 <button data-motivo="otro" onclick="selectReportMotivo('otro')" class="report-motivo-btn w-full text-left px-3 py-2 bg-surface2 hover:bg-raised text-muted hover:text-ink rounded-lg text-sm transition-all border border-transparent"><i class="fas fa-check text-red-400 mr-2 report-check hidden"></i>Otro motivo</button>
             </div>
             <div id="report-detalle-container" class="hidden mb-4">
@@ -1537,7 +1551,7 @@ function showNotAvailable($escort)
         }
     </script>
 
-    <!-- TE PODRÍA GUSTAR -->
+    <!-- TE PODRÍA GUSTAR -->
     <?php
     $recomendados = [];
     try {
@@ -1573,13 +1587,13 @@ function showNotAvailable($escort)
     <?php if (!empty($recomendados)): ?>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-16">
         <h2 class="text-ink text-lg font-bold mb-6 flex items-center gap-2">
-            <i class="fas fa-thumbs-up text-red-500"></i> Te podría gustar
+            <i class="fas fa-thumbs-up text-red-500"></i> Te podr├¡a gustar
         </h2>
         <div class="relative pb-2 recomendados-swiper">
             <div class="swiper-wrapper">
             <?php foreach ($recomendados as $rec): ?>
             <div class="swiper-slide h-auto">
-            <a href="/<?= $rec['id'] ?>" class="group block bg-surface rounded-xl overflow-hidden border border-white/5 hover:border-red-500/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-red-500/5">
+            <a href="/cs<?= $rec['id'] ?>" class="group block bg-surface rounded-xl overflow-hidden border border-white/5 hover:border-red-500/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-red-500/5">
                 <div class="relative aspect-[3/4] bg-gradient-to-b from-raised to-surface overflow-hidden">
                     <?php if ($rec['foto_principal']): ?>
                     <img src="<?= e($rec['foto_principal']) ?>" alt="<?= e($rec['nombre']) ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy">
@@ -1615,8 +1629,8 @@ function showNotAvailable($escort)
                     <div class="flex items-center gap-1.5 text-xs text-muted">
                         <i class="fas fa-map-marker-alt text-[0.55rem] flex-shrink-0"></i>
                         <span class="truncate"><?= e($rec['ciudad']) ?></span>
-                        <span class="text-muted">â€¢</span>
-                        <span class="text-red-400"><?= $rec['edad'] ?> años</span>
+                        <span class="text-muted">├óÔé¼┬ó</span>
+                        <span class="text-red-400"><?= $rec['edad'] ?> a├▒os</span>
                     </div>
                 </div>
             </a>
@@ -1681,8 +1695,8 @@ function showNotAvailable($escort)
                 <span class="text-red-500 font-bold">CS</span>
                 <span class="text-ink font-semibold">ESCORTS</span>
             </div>
-            <p class="text-muted text-xs">Â© <?= date('Y') ?> cseescorts.cl - Todos los derechos reservados.</p>
-            <p class="text-muted text-xs mt-1">Solo para mayores de 18 años.</p>
+            <p class="text-muted text-xs">├é┬® <?= date('Y') ?> cseescorts.cl - Todos los derechos reservados.</p>
+            <p class="text-muted text-xs mt-1">Solo para mayores de 18 a├▒os.</p>
         </div>
     </footer>
 
@@ -1690,13 +1704,13 @@ function showNotAvailable($escort)
     <script src="https://cdn.jsdelivr.net/npm/swiper@14/swiper-bundle.min.js"></script>
     <script>
         Fancybox.bind('[data-fancybox="gallery"]', {
-            animated: true,
-            showClass: 'f-fadeIn',
-            hideClass: 'f-fadeOut',
+            animated: false,
+            showClass: '',
+            hideClass: '',
             dragToClose: true,
             Toolbar: false,
             Thumbs: false,
-            Image: { zoom: true }
+            Image: { zoom: false, fit: 'contain' }
         });
 
         function compartir() { openShareModal(); }
@@ -1743,7 +1757,7 @@ function showNotAvailable($escort)
             navigator.clipboard.writeText(window.location.href).then(function() {
                 var orig = btn.innerHTML;
                 var origClass = btn.className;
-                btn.innerHTML = '<i class="fas fa-check"></i> ¡Enlace copiado!';
+                btn.innerHTML = '<i class="fas fa-check"></i> ┬íEnlace copiado!';
                 btn.className = btn.className.replace('bg-red-500', 'bg-green-500').replace('hover:bg-red-600', 'hover:bg-green-600');
                 setTimeout(function() { btn.innerHTML = orig; btn.className = origClass; }, 2000);
             }).catch(function(e) {});
@@ -1765,7 +1779,7 @@ function showNotAvailable($escort)
              fetch('/api/escorts/favorito.php?id=<?= $id ?>', { headers: getAuthHeaders() })
                  .then(function(r) {
                      if (!r.headers.get('content-type') || !r.headers.get('content-type').includes('application/json')) {
-                         throw new Error('Respuesta inválida');
+                         throw new Error('Respuesta inv├ílida');
                      }
                      return r.json();
                  })
@@ -1791,7 +1805,7 @@ function showNotAvailable($escort)
              fetch('/api/escorts/favorito.php?id=<?= $id ?>', { method: liked ? 'DELETE' : 'POST', headers: getAuthHeaders() })
                  .then(function(r) {
                      if (!r.headers.get('content-type') || !r.headers.get('content-type').includes('application/json')) {
-                         throw new Error('Respuesta inválida');
+                         throw new Error('Respuesta inv├ílida');
                      }
                      return r.json();
                  })
@@ -1892,7 +1906,7 @@ function showNotAvailable($escort)
         function openReportModal() {
             var token = getUsuarioToken();
             if (!token) {
-                showConfirm('Debes iniciar sesión para reportar un perfil. Â¿Quieres ir a la página de acceso?', function() {
+                showConfirm('Debes iniciar sesi├│n para reportar un perfil. ├é┬┐Quieres ir a la p├ígina de acceso?', function() {
                     window.location.href = '/ingresar';
                 });
                 return;
@@ -1969,20 +1983,20 @@ function showNotAvailable($escort)
             })
              .then(function(r) {
                  if (!r.headers.get('content-type') || !r.headers.get('content-type').includes('application/json')) {
-                     throw new Error('Respuesta inválida del servidor');
+                     throw new Error('Respuesta inv├ílida del servidor');
                  }
                  return r.json();
              })
              .then(function(d) {
                  if (d.success) {
-                     showToast('Reporte enviado correctamente. Nuestro equipo lo revisará pronto.', 'success');
+                     showToast('Reporte enviado correctamente. Nuestro equipo lo revisar├í pronto.', 'success');
                      closeReportModal();
                  } else {
                      showToast(d.error || 'Error al enviar reporte', 'error');
                  }
              })
              .catch(function(err) {
-                 showToast(err.message || 'Error de conexión', 'error');
+                 showToast(err.message || 'Error de conexi├│n', 'error');
              })
             .finally(function() {
                 btn.disabled = false;
@@ -1993,5 +2007,6 @@ function showNotAvailable($escort)
 </body>
 
 </html>
+
 
 

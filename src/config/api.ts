@@ -1,5 +1,5 @@
 // ============================================
-// CONFIGURACION API - KIMI
+// CONFIGURACION API - CONSEXVIP
 // ============================================
 
 const isDev = import.meta.env.DEV;

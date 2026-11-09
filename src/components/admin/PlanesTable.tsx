@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Skeleton } from '../ui/Skeleton';
+import ConfirmModal from '../ui/ConfirmModal';
 import SearchFilters from './SearchFilters';
 
 interface Plan {
@@ -16,6 +17,9 @@ interface Plan {
   max_pausas_permitidas: number;
   permite_vip: number;
   permite_destacado: number;
+  permite_historias?: number;
+  permite_verificacion?: number;
+  permite_audio?: number;
   uso_unico: number;
   badge: string;
   color_badge: string;
@@ -47,6 +51,9 @@ export default function PlanesTable({ planes, loading, onRefresh }: Props) {
   const [search, setSearch] = useState('');
   const [estado, setEstado] = useState('todos');
   const [tipoFilter, setTipoFilter] = useState('todos');
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkConfirm, setBulkConfirm] = useState<{ ids: number[]; message: string } | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const [formData, setFormData] = useState({
     nombre: '',
@@ -60,6 +67,9 @@ export default function PlanesTable({ planes, loading, onRefresh }: Props) {
     max_videos: 0,
     permite_vip: 0,
     permite_destacado: 0,
+    permite_historias: 0,
+    permite_verificacion: 0,
+    permite_audio: 0,
     uso_unico: 0,
     max_pausas_permitidas: 3,
     badge: '',
@@ -72,7 +82,7 @@ export default function PlanesTable({ planes, loading, onRefresh }: Props) {
     setFormData({
       nombre: '', slug: '', descripcion: '', tipo: 'base', duracion_dias: 30,
       precio: 0, moneda: 'CLP', max_fotos: 5, max_videos: 0,
-      permite_vip: 0, permite_destacado: 0,
+      permite_vip: 0, permite_destacado: 0, permite_historias: 0, permite_verificacion: 0, permite_audio: 0,
       uso_unico: 0, max_pausas_permitidas: 3, badge: '', color_badge: '#6b7280', orden: 0, activo: 1,
     });
     setFieldErrors({});
@@ -91,6 +101,8 @@ export default function PlanesTable({ planes, loading, onRefresh }: Props) {
       tipo: plan.tipo, duracion_dias: plan.duracion_dias, precio: plan.precio,
       moneda: plan.moneda, max_fotos: plan.max_fotos, max_videos: plan.max_videos,
       permite_vip: plan.permite_vip, permite_destacado: plan.permite_destacado,
+      permite_historias: plan.permite_historias ?? 0, permite_verificacion: plan.permite_verificacion ?? 0,
+      permite_audio: plan.permite_audio ?? 0,
       uso_unico: plan.uso_unico, max_pausas_permitidas: plan.max_pausas_permitidas,
       badge: plan.badge || '', color_badge: plan.color_badge || '#6b7280',
       orden: plan.orden, activo: plan.activo,
@@ -170,6 +182,63 @@ export default function PlanesTable({ planes, loading, onRefresh }: Props) {
     }
   };
 
+  const handleBulkDelete = (sel: Set<number>) => {
+    if (sel.size === 0) return;
+    setBulkConfirm({
+      ids: Array.from(sel),
+      message: `Estás a punto de eliminar ${sel.size} plan(es) seleccionado(s). Los planes con suscripciones activas no se podrán eliminar. Esta acción no se puede deshacer.`,
+    });
+  };
+
+  const confirmBulkDelete = async () => {
+    if (!bulkConfirm) return;
+    const ids = bulkConfirm.ids;
+    setBulkConfirm(null);
+    setBulkDeleting(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const fallos: string[] = [];
+      for (const id of ids) {
+        const res = await fetch(`/api/admin/planes.php?id=${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + token },
+        });
+        const data = await res.json().catch(() => ({ success: false, error: 'Error de conexión' }));
+        if (!data.success) fallos.push(`#${id}: ${data.error || 'Error'}`);
+      }
+      if (fallos.length > 0) {
+        setErrorMsg(`No se pudieron eliminar ${fallos.length} plan(es): ${fallos.slice(0, 3).join(' | ')}`);
+      }
+      setSelected(new Set());
+      onRefresh();
+    } catch (err) {
+      setErrorMsg('Error de conexión');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const toggleAllSelected = () => {
+    setSelected(prev => {
+      const allSelected = filteredPlanes.length > 0 && filteredPlanes.every(p => prev.has(p.id));
+      const next = new Set(prev);
+      if (allSelected) {
+        next.clear();
+      } else {
+        filteredPlanes.forEach(p => next.add(p.id));
+      }
+      return next;
+    });
+  };
+
+  const toggleRowSelected = (id: number) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   const formatPrice = (price: number, moneda: string) => {
     if (price === 0) return 'Gratis';
     return new Intl.NumberFormat('es-CL', { style: 'currency', currency: moneda, minimumFractionDigits: 0 }).format(price);
@@ -188,7 +257,7 @@ export default function PlanesTable({ planes, loading, onRefresh }: Props) {
 
   return (
     <div>
-      <div className="flex items-start gap-4 mb-6">
+      <div className="flex items-center gap-3 mb-6">
         <div className="flex-1">
           <SearchFilters
             search={search}
@@ -221,12 +290,26 @@ export default function PlanesTable({ planes, loading, onRefresh }: Props) {
         </button>
       </div>
 
+      {selected.size > 0 && (
+        <div className="flex items-center justify-between px-4 py-3 mb-4 border border-[#2a2a3e] rounded-xl bg-red-500/5">
+          <span className="text-sm text-gray-300"><span className="font-semibold text-white">{selected.size}</span> seleccionado(s)</span>
+          <button type="button" onClick={() => handleBulkDelete(selected)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg text-sm transition-colors">
+            <i className="fas fa-trash-alt"></i> Eliminar seleccionados
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-[#1a1a2e] border border-[#2a2a3e] rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#2a2a3e] text-left text-xs text-gray-400 uppercase">
+                <th className="px-4 py-3 w-10">
+                  <input type="checkbox" checked={filteredPlanes.length > 0 && filteredPlanes.every(p => selected.has(p.id))}
+                    onChange={toggleAllSelected} className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" aria-label="Seleccionar todo" />
+                </th>
                 <th className="px-4 py-3">Plan</th>
                 <th className="px-4 py-3">Tipo</th>
                 <th className="px-4 py-3">Duración</th>
@@ -240,6 +323,7 @@ export default function PlanesTable({ planes, loading, onRefresh }: Props) {
               {loading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i} className="border-b border-[#2a2a3e]">
+                    <td className="px-4 py-3"><Skeleton width={16} height={16} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <Skeleton width={24} height={24} borderRadius={9999} />
@@ -259,7 +343,7 @@ export default function PlanesTable({ planes, loading, onRefresh }: Props) {
                 ))
               ) : filteredPlanes.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-12 text-center">
+                  <td colSpan={8} className="p-12 text-center">
                     <i className="fas fa-crown text-4xl text-gray-600 mb-4"></i>
                     <p className="text-gray-400 mb-4">No hay planes</p>
                     <button onClick={openCreate} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
@@ -269,7 +353,11 @@ export default function PlanesTable({ planes, loading, onRefresh }: Props) {
                 </tr>
               ) : (
                 filteredPlanes.map((plan) => (
-                  <tr key={plan.id} className={`border-b border-[#2a2a3e] last:border-0 hover:bg-[#252538] transition-colors ${plan.activo === 0 ? 'opacity-50' : ''}`}>
+                  <tr key={plan.id} className={`border-b border-[#2a2a3e] last:border-0 hover:bg-[#252538] transition-colors ${plan.activo === 0 ? 'opacity-50' : ''} ${selected.has(plan.id) ? 'bg-blue-500/10' : ''}`}>
+                    <td className="px-4 py-3">
+                      <input type="checkbox" checked={selected.has(plan.id)} onChange={() => toggleRowSelected(plan.id)}
+                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500" aria-label={`Seleccionar ${plan.nombre}`} />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         {plan.badge && (
@@ -392,12 +480,6 @@ export default function PlanesTable({ planes, loading, onRefresh }: Props) {
                   {fieldErrors.precio && <p className="text-red-400 text-xs">{fieldErrors.precio}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">Pausas máx.</label>
-                  <input type="number" min={0} value={formData.max_pausas_permitidas} onChange={(e) => setFormData({ ...formData, max_pausas_permitidas: parseInt(e.target.value) || 0 })}
-                    className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500" />
-                  <p className="text-gray-500 text-xs">0 = No puede pausar</p>
-                </div>
-                <div>
                   <label className="block text-sm text-gray-400 mb-1">Moneda</label>
                   <select value={formData.moneda} onChange={(e) => setFormData({ ...formData, moneda: e.target.value })}
                     className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
@@ -452,8 +534,11 @@ export default function PlanesTable({ planes, loading, onRefresh }: Props) {
                 <p className="text-sm text-gray-400 font-medium">Permisos y opciones</p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {[
-                    { key: 'permite_vip', label: 'Permite VIP', icon: 'fa-crown' },
-                    { key: 'permite_destacado', label: 'Permite Destacado', icon: 'fa-star' },
+                    { key: 'permite_vip', label: 'Solicitud VIP', icon: 'fa-crown' },
+                    { key: 'permite_destacado', label: 'Destacado', icon: 'fa-star' },
+                    { key: 'permite_historias', label: 'Historias 24h', icon: 'fa-clock' },
+                    { key: 'permite_verificacion', label: 'Verificación', icon: 'fa-shield-check' },
+                    { key: 'permite_audio', label: 'Audio de saludo', icon: 'fa-microphone' },
                     { key: 'uso_unico', label: 'Uso único por email', icon: 'fa-fingerprint' },
                     { key: 'activo', label: 'Activo', icon: 'fa-power-off' },
                   ].map((item) => (
@@ -466,6 +551,13 @@ export default function PlanesTable({ planes, loading, onRefresh }: Props) {
                       </span>
                     </label>
                   ))}
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Pausar aviso (máx. pausas)</label>
+                  <input type="number" min={0} value={formData.max_pausas_permitidas} onChange={(e) => setFormData({ ...formData, max_pausas_permitidas: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-[#252538] border border-[#2a2a3e] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500" />
+                  <p className="text-gray-500 text-xs">Cuántas veces se puede pausar el plan. 0 = No puede pausar aviso.</p>
                 </div>
               </div>
 
@@ -521,6 +613,19 @@ export default function PlanesTable({ planes, loading, onRefresh }: Props) {
           </div>
         </div>
       )}
+
+      {/* Modal Eliminar en lote */}
+      <ConfirmModal
+        isOpen={bulkConfirm !== null}
+        title="Eliminar seleccionados"
+        message={bulkConfirm?.message || ''}
+        confirmText={bulkDeleting ? 'Eliminando...' : 'Eliminar'}
+        cancelText="Cancelar"
+        variant="danger"
+        confirmDisabled={bulkDeleting}
+        onConfirm={confirmBulkDelete}
+        onCancel={() => setBulkConfirm(null)}
+      />
     </div>
   );
 }

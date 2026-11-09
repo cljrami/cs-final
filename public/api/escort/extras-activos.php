@@ -27,7 +27,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || !isset($tokenData['exp']) || $tokenData['exp'] < time()) {
         http_response_code(401);
@@ -95,7 +95,7 @@ try {
             'estado_raw' => $extra['estado'],
             'dias_restantes' => max(0, (int)$extra['dias_restantes']),
             'pendiente_aprobacion' => $extra['fecha_aprobacion'] === null,
-            'comprobante_pago' => $extra['comprobante_pago'],
+            'comprobante_pago' => comprobante_url($extra['comprobante_pago']),
             'estado_pago' => $extra['estado_pago']
         ];
     }

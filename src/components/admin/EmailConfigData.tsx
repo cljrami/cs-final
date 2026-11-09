@@ -18,8 +18,8 @@ export default function EmailConfigData() {
   const [saved, setSaved] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const [formFrom, setFormFrom] = useState('nocontestar@kimi.zona8.cl');
-  const [formFromName, setFormFromName] = useState('Kimi - No responder');
+  const [formFrom, setFormFrom] = useState('nocontestar@consexvip.cl');
+  const [formFromName, setFormFromName] = useState('ConsexVIP - No responder');
 
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [templatesLoading, setTemplatesLoading] = useState(false);
@@ -37,7 +37,7 @@ export default function EmailConfigData() {
 
   const mailHeader = (title: string) => `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>body{margin:0;padding:0;background-color:#0a0a0f;font-family:Arial,Helvetica,sans-serif}p{color:#9ca3af;font-size:15px;line-height:1.6;margin:0 0 12px 0}strong{color:#ffffff}a{color:#ef4444;text-decoration:none;font-weight:600}table.info{width:100%;background:#0f0f1a;border-radius:12px;padding:16px;margin:16px 0;border-collapse:collapse}table.info td{color:#9ca3af;padding:4px 0}table.info td:last-child{color:#ffffff;font-weight:600}ul,ol{color:#d1d5db;padding-left:20px;margin:12px 0}li{margin:4px 0}.btn{display:inline-block;background:linear-gradient(135deg,#ef4444,#dc2626);color:#ffffff;padding:14px 32px;border-radius:12px;text-decoration:none;font-weight:700;font-size:16px}.fallback{color:#6b7280;font-size:12px;word-break:break-all;margin:8px 0 0 0}.warning{color:#9ca3af;font-size:13px;margin:8px 0 0 0}.text-center{text-align:center}.text-green{color:#22c55e}.text-red{color:#ef4444}.text-amber{color:#fbbf24}</style></head><body style="margin:0;padding:0;background-color:#0a0a0f;font-family:Arial,Helvetica,sans-serif"><table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:40px 16px"><table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%"><tr><td style="background:#16161f;border-radius:16px;padding:40px;border:1px solid #2a2a3e"><table width="100%" cellpadding="0" cellspacing="0"><tr><td style="text-align:center;padding-bottom:24px"><h1 style="color:#ffffff;font-size:24px;margin:0;font-weight:700">${title}</h1></td></tr><tr><td style="color:#9ca3af;font-size:15px;line-height:1.6">`;
 
-  const mailFooter = () => `</td></tr></table></td></tr><tr><td style="text-align:center;padding-top:24px"><p style="color:#6b7280;font-size:12px;margin:0">&copy; 2026 Kimi. Todos los derechos reservados.<br>Si no solicitaste este correo, ignóralo.</p></td></tr></table></td></tr></table></body></html>`;
+  const mailFooter = () => `</td></tr></table></td></tr><tr><td style="text-align:center;padding-top:24px"><p style="color:#6b7280;font-size:12px;margin:0">&copy; 2026 ConsexVIP. Todos los derechos reservados.<br>Si no solicitaste este correo, ignóralo.</p></td></tr></table></td></tr></table></body></html>`;
 
   useEffect(() => {
     fetchConfig();
@@ -51,8 +51,8 @@ export default function EmailConfigData() {
       });
       const data = await res.json();
       if (data.success && data.config) {
-        setFormFrom(data.config.email_from || 'nocontestar@kimi.zona8.cl');
-        setFormFromName(data.config.email_from_name || 'Kimi - No responder');
+        setFormFrom(data.config.email_from || 'nocontestar@consexvip.cl');
+        setFormFromName(data.config.email_from_name || 'ConsexVIP - No responder');
         setConfig(data.config);
       }
     } catch {} finally {

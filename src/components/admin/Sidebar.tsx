@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getAdminRol, esAdminOSuperior } from '../../lib/adminRole';
 
 interface SidebarProps {
@@ -8,7 +8,7 @@ interface SidebarProps {
 
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: 'fa-chart-line', href: '/admin', countKey: null },
-   { id: 'escorts', label: 'Escorts', icon: 'fa-users', href: '/admin/escorts', countKey: 'escorts' },
+   { id: 'escorts', label: 'Escorts', icon: 'fa-users', href: '/admin/escorts', countKey: 'escortsPendientes' },
   { id: 'escorts-gira', label: 'Escorts en Gira', icon: 'fa-route', href: '/admin/escorts-gira', countKey: 'escortsEnGira' },
   { id: 'usuarios', label: 'Usuarios', icon: 'fa-user', href: '/admin/usuarios', countKey: null },
   { id: 'suscripciones', label: 'Suscripciones', icon: 'fa-calendar-check', href: '/admin/suscripciones', countKey: 'suscripcionesPendientes' },
@@ -16,11 +16,14 @@ const menuItems = [
   { id: 'solicitudes-vip', label: 'Solicitudes VIP', icon: 'fa-crown', href: '/admin/solicitudes-vip', countKey: 'solicitudesVip' },
   { id: 'vip-activos', label: 'VIP Activos', icon: 'fa-star', href: '/admin/vip-activos', countKey: null },
   { id: 'sticky', label: 'Sticky', icon: 'fa-thumbtack', href: '/admin/sticky', countKey: null },
+  { id: 'banners', label: 'Banners', icon: 'fa-image', href: '/admin/banners', countKey: 'bannersSolicitudes' },
+  { id: 'negocios', label: 'Negocios', icon: 'fa-store', href: '/admin/negocios', countKey: null },
   { id: 'solicitudes-extras', label: 'Solicitudes Extras', icon: 'fa-plus-circle', href: '/admin/solicitudes-extras', countKey: 'extrasPendientes' },
   { id: 'pagos', label: 'Pagos', icon: 'fa-receipt', href: '/admin/pagos', countKey: 'pagosPendientes' },
   { id: 'comentarios', label: 'Comentarios', icon: 'fa-comments', href: '/admin/comentarios', countKey: 'comentariosPendientes' },
   { id: 'reportes', label: 'Reportes', icon: 'fa-flag', href: '/admin/reportes', countKey: 'reportesPendientes' },
   { id: 'notificaciones', label: 'Notificaciones', icon: 'fa-bell', href: '/admin/notificaciones', countKey: null },
+  { id: 'articulos', label: 'Artículos', icon: 'fa-newspaper', href: '/admin/articulos', countKey: null },
 ];
 
 const configItems = [
@@ -39,10 +42,22 @@ const configItems = [
   { id: 'administradores', label: 'Administradores', icon: 'fa-user-shield', href: '/admin/administradores', countKey: null },
   { id: 'configuracion', label: 'Configuración', icon: 'fa-cog', href: '/admin/configuracion', countKey: null },
   { id: 'contenido', label: 'Contenido del sitio', icon: 'fa-file-lines', href: '/admin/contenido', countKey: null },
-  { id: 'seo', label: 'SEO / Sitemap', icon: 'fa-sitemap', href: '/admin/seo', countKey: null },
+  { id: 'seo', label: 'SEO', icon: 'fa-magnifying-glass-chart', href: '/admin/seo', countKey: null },
   { id: 'configuracion-email', label: 'Email', icon: 'fa-envelope', href: '/admin/configuracion-email', countKey: null },
   { id: 'notificaciones-email', label: 'Notificaciones Email', icon: 'fa-bell', href: '/admin/notificaciones-email', countKey: null },
 ];
+
+// Orden alfabético en español, dejando Dashboard siempre arriba.
+function ordenarItems<T extends { id: string; label: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    if (a.id === 'dashboard') return -1;
+    if (b.id === 'dashboard') return 1;
+    return a.label.localeCompare(b.label, 'es', { sensitivity: 'base' });
+  });
+}
+
+const normalizar = (value: string) =>
+  value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
   export default function Sidebar({ activePage = 'dashboard', loading }: SidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -50,6 +65,9 @@ const configItems = [
   const [itemCounts, setItemCounts] = useState<Record<string, number>>({});
   const [adminUser, setAdminUser] = useState<{ nombre: string; rol: string } | null>(null);
   const [rol, setRol] = useState<'admin' | 'superadmin' | 'moderador' | null>(null);
+  const [query, setQuery] = useState('');
+  const [highlight, setHighlight] = useState(0);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem('admin_user');
@@ -62,11 +80,11 @@ const configItems = [
     }
   }, []);
 
-  const isAdminOsuperior = esAdminOSuperior(rol);
+  const isAdminOsuperior = esAdminOSuperior();
   const esModerador = rol === 'moderador';
 
   // Menús visibles según rol
-  const visibleMenuItems = menuItems.filter(item => {
+  const visibleMenuItems = ordenarItems(menuItems.filter(item => {
     if (item.id === 'dashboard') return true;
     if (item.id === 'escorts') return true;
     if (item.id === 'escorts-gira') return true;
@@ -78,12 +96,52 @@ const configItems = [
     // Moderador: solo lectura
     if (item.id === 'suscripciones' || item.id === 'pagos') return true;
     return isAdminOsuperior;
-  });
+  }));
 
-  const visibleConfigItems = configItems.filter(item => {
+  const visibleConfigItems = ordenarItems(configItems.filter(item => {
     if (item.id === 'auditoria') return true;
     return isAdminOsuperior;
-  });
+  }));
+
+  const resultados = query.trim()
+    ? [
+        ...visibleMenuItems.map(item => ({ ...item, grupo: 'Principal' as const })),
+        ...visibleConfigItems.map(item => ({ ...item, grupo: 'Configuración' as const })),
+      ].filter(item => normalizar(item.label).includes(normalizar(query.trim())))
+    : [];
+
+  useEffect(() => {
+    setHighlight(0);
+  }, [query]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      setQuery('');
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlight(h => Math.min(h + 1, Math.max(resultados.length - 1, 0)));
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlight(h => Math.max(h - 1, 0));
+    }
+    if (e.key === 'Enter' && resultados[highlight]) {
+      window.location.href = resultados[highlight].href;
+    }
+  };
 
 
   // Guardar timestamp al visitar cada seccion
@@ -234,21 +292,89 @@ const configItems = [
           </div>
           <div className="min-w-0">
             <div className="font-bold text-base md:text-lg truncate">Admin Panel</div>
-            <div className="text-xs text-admin-muted">Kimi</div>
+            <div className="text-xs text-admin-muted">ConsexVIP</div>
+          </div>
+        </div>
+
+        {/* Buscador del menú */}
+        <div className="px-3 pt-3 flex-shrink-0">
+          <div className="relative">
+            <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs pointer-events-none"></i>
+            <input
+              ref={searchRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
+              placeholder="Buscar en el menú..."
+              aria-label="Buscar en el menú"
+              className="w-full bg-[#252538] border border-admin-border rounded-lg pl-8 pr-14 py-2 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:border-red-500/60 focus:ring-2 focus:ring-red-500/20 transition-colors"
+            />
+            {query ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('');
+                  searchRef.current?.focus();
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white p-1"
+                aria-label="Limpiar búsqueda"
+              >
+                <i className="fas fa-times text-xs"></i>
+              </button>
+            ) : (
+              <kbd className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-500 border border-[#35354a] rounded px-1.5 py-0.5 pointer-events-none">
+                Ctrl K
+              </kbd>
+            )}
           </div>
         </div>
 
         {/* Navegación - scrolleable */}
         <div className="flex-1 overflow-y-auto p-3 min-h-0">
-          <div className="text-[0.7rem] text-gray-500 uppercase tracking-widest px-3 mb-2">
-            Principal
-          </div>
-          {visibleMenuItems.map(item => renderItem(item))}
+          {query.trim() ? (
+            <div>
+              <div className="text-[0.7rem] text-gray-500 uppercase tracking-widest px-3 mb-2">
+                {resultados.length} resultado{resultados.length === 1 ? '' : 's'}
+              </div>
+              {resultados.length === 0 ? (
+                <div className="px-3 py-6 text-center text-sm text-gray-500">
+                  <i className="fas fa-search mb-2 block text-lg"></i>
+                  Sin resultados para “{query.trim()}”
+                </div>
+              ) : (
+                resultados.map((item, idx) => (
+                  <a
+                    key={`${item.grupo}-${item.id}`}
+                    href={item.href}
+                    onClick={closeMobile}
+                    onMouseEnter={() => setHighlight(idx)}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 text-sm transition-colors ${
+                      idx === highlight
+                        ? 'bg-[#2d2d44] text-white'
+                        : 'text-admin-muted hover:bg-[#2d2d44] hover:text-white'
+                    }`}
+                  >
+                    <i className={`fas ${item.icon} w-6 text-center`}></i>
+                    <span className="flex-1 truncate">{item.label}</span>
+                    <span className="text-[10px] uppercase tracking-wide text-gray-500">{item.grupo}</span>
+                  </a>
+                ))
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="text-[0.7rem] text-gray-500 uppercase tracking-widest px-3 mb-2">
+                Principal
+              </div>
+              {visibleMenuItems.map(item => renderItem(item))}
 
-          <div className="text-[0.7rem] text-gray-500 uppercase tracking-widest px-3 mt-4 md:mt-6 mb-2">
-            Configuración
-          </div>
-          {visibleConfigItems.map(item => renderItem(item, true))}
+              <div className="text-[0.7rem] text-gray-500 uppercase tracking-widest px-3 mt-4 md:mt-6 mb-2">
+                Configuración
+              </div>
+              {visibleConfigItems.map(item => renderItem(item, true))}
+            </>
+          )}
         </div>
 
         {/* Footer - fijo abajo */}

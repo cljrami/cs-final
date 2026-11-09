@@ -25,7 +25,7 @@ try {
     }
 
     $token = substr($authHeader, 7);
-    $tokenData = verifyToken($token);
+    $tokenData = verifyEscortToken($token);
 
     if (!$tokenData || ($tokenData['exp'] ?? 0) < time()) {
         http_response_code(401);
@@ -33,25 +33,26 @@ try {
         exit;
     }
 
-    // El onboarding solo se puede completar si la escort ya seleccionó su plan
-    // (tiene al menos una suscripción creada). Evita saltarse el plan.
-    $tienePlan = $pdo->prepare("SELECT 1 FROM suscripciones WHERE escort_id = ? LIMIT 1");
-    $tienePlan->execute([$tokenData['id']]);
-    if (!$tienePlan->fetch()) {
-        http_response_code(422);
-        echo json_encode(['success' => false, 'error' => 'Debes seleccionar tu plan primero']);
-        exit;
-    }
+    // El onboarding ya no exige plan. La selección de plan se hace después en Mi Plan.
+    // Se mantiene opcional para permitir completar el tour sin plan.
+    // $tienePlan = $pdo->prepare("SELECT 1 FROM suscripciones WHERE escort_id = ? AND estado IN ('activa', 'pendiente_aprobacion') LIMIT 1");
+    // $tienePlan->execute([$tokenData['id']]);
+    // if (!$tienePlan->fetch()) {
+    //     http_response_code(422);
+    //     echo json_encode(['success' => false, 'error' => 'Debes seleccionar tu plan primero']);
+    //     exit;
+    // }
 
     // Actualizar en BD
     $stmt = $pdo->prepare("UPDATE escorts SET primer_login = 0 WHERE id = ?");
     $stmt->execute([$tokenData['id']]);
 
-    // Regenerar token con primer_login = 0
+    // Regenerar token con primer_login = 0 (conserva versión de revocación)
     $newTokenData = [
         'id' => $tokenData['id'],
         'usuario' => $tokenData['usuario'] ?? '',
         'tipo' => 'escort',
+        'tv' => (int)($tokenData['tv'] ?? 0),
         'primer_login' => 0,
         'exp' => $tokenData['exp']
     ];

@@ -1,7 +1,7 @@
 ---
 import UserLayout from "../layouts/UserLayout.astro";
 ---
-<UserLayout title="Mis Reportes" activePage="reportes">
+<UserLayout title="Mis Reportes" activePage="reportes" robots="noindex, nofollow">
   <div class="mb-8">
     <h1 class="text-2xl font-bold text-white flex items-center gap-3">
       <i class="fas fa-flag text-red-400"></i>Mis Reportes
@@ -9,8 +9,12 @@ import UserLayout from "../layouts/UserLayout.astro";
     <p class="text-gray-500 mt-1 text-sm">Reportes que has enviado sobre perfiles sospechosos</p>
   </div>
 
-  <div id="loading" class="flex items-center justify-center h-64">
-    <div class="w-10 h-10 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+  <div id="loading" class="space-y-3 p-4">
+    <div class="skel h-4 w-full"></div>
+    <div class="skel h-4 w-5/6"></div>
+    <div class="skel h-4 w-full"></div>
+    <div class="skel h-4 w-4/6"></div>
+    <div class="skel h-4 w-full"></div>
   </div>
 
   <div id="noAuth" class="hidden text-center py-16">
@@ -85,6 +89,19 @@ import UserLayout from "../layouts/UserLayout.astro";
     dismissed: { label: 'Desestimado', cls: 'bg-gray-500/10 text-gray-400 border-gray-500/20', icon: 'fa-times' },
   };
 
+  // Escape para interpolar datos en HTML (vienen de la BD)
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  function safeUrl(u) {
+    u = String(u || '');
+    if (!/^(https?:\/\/|\/)[^\s"'<>`]+$/i.test(u)) return '';
+    return u;
+  }
+  function safeId(v) { return parseInt(v, 10) || 0; }
+
   function cargarReportes() {
     document.getElementById('loading').classList.remove('hidden');
     document.getElementById('list').classList.add('hidden');
@@ -105,11 +122,11 @@ import UserLayout from "../layouts/UserLayout.astro";
 
       data.reportes.forEach(function(r) {
         const st = estadoConfig[r.estado] || estadoConfig.pending;
-        var escortAvatar = r.foto_principal
-          ? '<img src="' + r.foto_principal + '" alt="" class="w-10 h-10 rounded-lg object-cover" loading="lazy" onerror="this.style.display=\'none\'" />'
+        var escortAvatar = r.foto_principal && safeUrl(r.foto_principal)
+          ? '<img src="' + safeUrl(r.foto_principal) + '" alt="" class="w-10 h-10 rounded-lg object-cover" loading="lazy" onerror="this.style.display=\'none\'" />'
           : '<div class="w-10 h-10 rounded-lg bg-[#2a2a3e] flex items-center justify-center"><i class="fas fa-user text-gray-600 text-xs"></i></div>';
         var detalle = r.detalle
-          ? '<p class="text-gray-400 text-sm leading-relaxed mt-2">' + r.detalle.replace(/</g, '&lt;').replace(/\n/g, '<br/>') + '</p>'
+          ? '<p class="text-gray-400 text-sm leading-relaxed mt-2">' + esc(r.detalle).replace(/\n/g, '<br/>') + '</p>'
           : '';
         var card = document.createElement('div');
         card.className = 'bg-[#1a1a2e] border border-white/5 rounded-xl p-4';
@@ -118,8 +135,8 @@ import UserLayout from "../layouts/UserLayout.astro";
             '<div class="flex items-center gap-3 min-w-0">' +
               escortAvatar +
               '<div class="min-w-0">' +
-                '<a href="/' + (r.escort_id || '') + '" target="_blank" class="text-white text-sm font-medium truncate block hover:text-red-400">' + (r.escort_nombre || 'Escort #' + r.escort_id) + '</a>' +
-                '<span class="text-gray-600 text-xs block mt-0.5">Reporte #' + r.id + ' • ' + new Date(r.created_at).toLocaleDateString('es-CL') + '</span>' +
+                '<a href="/' + safeId(r.escort_id) + '" target="_blank" class="text-white text-sm font-medium truncate block hover:text-red-400">' + esc(r.escort_nombre || 'Escort #' + safeId(r.escort_id)) + '</a>' +
+                '<span class="text-gray-600 text-xs block mt-0.5">Reporte #' + safeId(r.id) + ' • ' + new Date(r.created_at).toLocaleDateString('es-CL') + '</span>' +
               '</div>' +
             '</div>' +
             '<span class="inline-flex items-center gap-1 text-[0.6rem] px-2 py-0.5 rounded-full border font-medium shrink-0 ' + st.cls + '">' +
@@ -128,11 +145,11 @@ import UserLayout from "../layouts/UserLayout.astro";
           '</div>' +
           '<div class="mt-3 pt-3 border-t border-white/5">' +
             '<p class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1">Motivo</p>' +
-            '<p class="text-gray-300 text-sm">' + r.motivo.replace(/</g, '&lt;') + '</p>' +
+            '<p class="text-gray-300 text-sm">' + esc(r.motivo) + '</p>' +
             detalle +
           '</div>' +
           '<div class="mt-3 flex justify-end">' +
-            '<button onclick="confirmarEliminarReporte(' + r.id + ')" class="text-xs text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 px-3 py-1.5 rounded-lg transition-colors">' +
+            '<button onclick="confirmarEliminarReporte(' + safeId(r.id) + ')" class="text-xs text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 px-3 py-1.5 rounded-lg transition-colors">' +
               '<i class="fas fa-trash-alt mr-1"></i>Eliminar reporte' +
             '</button>' +
           '</div>';

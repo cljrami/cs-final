@@ -17,7 +17,7 @@ try {
     $adminId = $tokenData['id'] ?? $tokenData['admin_id'] ?? 0;
     if ($adminId <= 0) {
         http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Token invíƒÂ¡lido']);
+        echo json_encode(['success' => false, 'error' => 'Token inválido']);
         exit;
     }
 
@@ -62,14 +62,15 @@ try {
         // Data con UNION de todas las fuentes
         $sql = "
             SELECT * FROM (
-                -- 1. Pagos reales
+                -- 1. Pagos reales (LEFT JOIN: la escort pudo ser eliminada definitivamente)
                 SELECT 
                     p.id AS pago_id,
                     p.escort_id,
-                    e.nombre AS escort_nombre,
-                    e.email AS escort_email,
+                    COALESCE(e.nombre, CONCAT('Escort eliminada #', p.escort_id)) AS escort_nombre,
+                    COALESCE(e.email, '') AS escort_email,
                     e.telefono AS escort_telefono,
                     e.activa AS escort_activa,
+                    CASE WHEN e.id IS NULL THEN 1 ELSE 0 END AS escort_eliminada,
                     e.foto_principal AS escort_foto,
                     p.suscripcion_id,
                     p.plan_id,
@@ -82,31 +83,33 @@ try {
                     p.moneda,
                     p.metodo_pago,
                     p.estado_pago,
-                    p.comprobante_url,
+                    COALESCE(p.comprobante_url, s.comprobante_pago) AS comprobante_url,
                     COALESCE(p.notas, '') AS notas,
                     p.creado_en,
                     p.pagado_en,
                     'pago' AS origen
                 FROM pagos p
-                JOIN escorts e ON e.id = p.escort_id
+                LEFT JOIN escorts e ON e.id = p.escort_id
                 LEFT JOIN planes pl ON pl.id = p.plan_id
+                LEFT JOIN suscripciones s ON s.id = p.suscripcion_id
 
                 UNION ALL
 
-                -- 2. Suscripciones (base + extra) sin pago vinculado
+                -- 2. Suscripciones (base + extra) sin pago vinculado (LEFT JOIN: escort o plan pudieron eliminarse)
                 SELECT 
                     -(100000 + s.id) AS pago_id,
                     s.escort_id,
-                    e.nombre AS escort_nombre,
-                    e.email AS escort_email,
+                    COALESCE(e.nombre, CONCAT('Escort eliminada #', s.escort_id)) AS escort_nombre,
+                    COALESCE(e.email, '') AS escort_email,
                     e.telefono AS escort_telefono,
                     e.activa AS escort_activa,
+                    CASE WHEN e.id IS NULL THEN 1 ELSE 0 END AS escort_eliminada,
                     e.foto_principal AS escort_foto,
                     s.id AS suscripcion_id,
                     pl.id AS plan_id,
-                    pl.nombre AS plan_nombre,
-                    pl.tipo AS plan_tipo,
-                    pl.duracion_dias,
+                    COALESCE(pl.nombre, '(plan eliminado)') AS plan_nombre,
+                    COALESCE(pl.tipo, 'pago') AS plan_tipo,
+                    COALESCE(pl.duracion_dias, 0) AS duracion_dias,
                     COALESCE(pl.uso_unico, 0) AS uso_unico,
                     CASE WHEN pl.extra_tipo IS NOT NULL THEN pl.extra_tipo ELSE 'plan' END AS concepto,
                     s.precio_pagado AS monto,
@@ -119,8 +122,8 @@ try {
                     s.fecha_aprobacion AS pagado_en,
                     'suscripcion' AS origen
                 FROM suscripciones s
-                JOIN escorts e ON e.id = s.escort_id
-                JOIN planes pl ON pl.id = s.plan_id
+                LEFT JOIN escorts e ON e.id = s.escort_id
+                LEFT JOIN planes pl ON pl.id = s.plan_id
                 WHERE NOT EXISTS (
                     SELECT 1 FROM pagos p 
                     WHERE p.suscripcion_id = s.id 
@@ -130,14 +133,15 @@ try {
 
                 UNION ALL
 
-                -- 3. Solicitudes VIP
+                -- 3. Solicitudes VIP (LEFT JOIN: la escort pudo ser eliminada definitivamente)
                 SELECT 
                     (300000 + vs.id) AS pago_id,
                     vs.escort_id,
-                    e.nombre AS escort_nombre,
-                    e.email AS escort_email,
+                    COALESCE(e.nombre, CONCAT('Escort eliminada #', vs.escort_id)) AS escort_nombre,
+                    COALESCE(e.email, '') AS escort_email,
                     e.telefono AS escort_telefono,
                     e.activa AS escort_activa,
+                    CASE WHEN e.id IS NULL THEN 1 ELSE 0 END AS escort_eliminada,
                     e.foto_principal AS escort_foto,
                     NULL AS suscripcion_id,
                     NULL AS plan_id,
@@ -160,7 +164,7 @@ try {
                     vs.fecha_respuesta AS pagado_en,
                     'vip' AS origen
                 FROM escort_vip_solicitudes vs
-                JOIN escorts e ON e.id = vs.escort_id
+                LEFT JOIN escorts e ON e.id = vs.escort_id
             ) sub
             WHERE 1=1 $estadoWhere $searchWhere
             ORDER BY 
@@ -185,12 +189,7 @@ try {
 
         // Normalizar comprobante URLs y foto
         foreach ($pagos as &$p) {
-            $url = $p['comprobante_url'] ?? '';
-            if (empty($url) || preg_match('/^(pendiente|sin_comprobante|none|null|sistema_reparacion)$/i', trim($url))) {
-                $p['comprobante_url'] = null;
-            } else {
-                $p['comprobante_url'] = '/api/serve-upload.php?path=/' . ltrim($url, '/');
-            }
+            $p['comprobante_url'] = comprobante_url($p['comprobante_url'] ?? null);
             $foto = $p['escort_foto'] ?? '';
             $p['escort_foto'] = empty($foto) ? null : '/api/serve-upload.php?path=/' . ltrim($foto, '/');
         }
@@ -227,7 +226,7 @@ try {
 
         if ($id <= 0 || empty($estado)) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'Datos invíƒÂ¡lidos']);
+            echo json_encode(['success' => false, 'error' => 'Datos inválidos']);
             exit;
         }
 
@@ -271,7 +270,7 @@ try {
                 $hoy = date('Y-m-d');
                 $fechaFin = date('Y-m-d', strtotime("+{$pago['duracion_dias']} days"));
 
-                // 2a. Aprobar suscripciíƒÂ³n
+                // 2a. Aprobar suscripción
                 if ($pago['suscripcion_id']) {
                     $updSus = $pdo->prepare("
                         UPDATE suscripciones
@@ -291,7 +290,7 @@ try {
                     ]);
                 }
 
-                // 2b. Si es plan gratis de uso íƒÂºnico, registrar
+                // 2b. Si es plan gratis de uso único, registrar
                 if ($pago['plan_tipo'] === 'base' && $pago['monto'] == 0 && $pago['uso_unico'] == 1) {
                     $usoStmt = $pdo->prepare("
                         INSERT INTO planes_usados (plan_id, email, escort_id, usado_en)
@@ -315,7 +314,7 @@ try {
                 ");
                 $updEscort->execute([$pago['escort_id']]);
 
-                // 2d. Crear notificaciíƒÂ³n para la escort
+                // 2d. Crear notificación para la escort
                 $notifStmt = $pdo->prepare("
                     INSERT INTO notificaciones 
                     (escort_id, tipo, titulo, mensaje, url, created_at)
@@ -323,12 +322,12 @@ try {
                 ");
                 $notifStmt->execute([
                     $pago['escort_id'],
-                    'í‚Â¡Tu publicaciíƒÂ³n estíƒÂ¡ activa!',
+                    '¡Tu publicación está activa!',
                     'Tu pago fue aprobado. Tu anuncio ya es visible en el sitio.',
                     '/micuenta'
                 ]);
 
-                // 2e. Log de auditoríƒÂ­a
+                // 2e. Log de auditoría
                 $logStmt = $pdo->prepare("
                     INSERT INTO logs_auditoria 
                     (escort_id, accion, tabla_afectada, registro_id, datos_nuevos, created_at)
@@ -346,11 +345,11 @@ try {
                     ])
                 ]);
 
-                $mensaje = 'Pago aprobado. La escort ahora estíƒÂ¡ activa y visible.';
+                $mensaje = 'Pago aprobado. La escort ahora está activa y visible.';
                 $escortActivada = true;
             } else {
                 // RECHAZADO
-                // Si hay suscripciíƒÂ³n, marcarla como cancelada
+                // Si hay suscripción, marcarla como cancelada
                 if ($pago['suscripcion_id']) {
                     $updSus = $pdo->prepare("
                         UPDATE suscripciones
@@ -360,7 +359,7 @@ try {
                     $updSus->execute([$pago['suscripcion_id']]);
                 }
 
-                // NotificaciíƒÂ³n de rechazo
+                // Notificación de rechazo
                 $notifStmt = $pdo->prepare("
                     INSERT INTO notificaciones 
                     (escort_id, tipo, titulo, mensaje, url, created_at)
@@ -414,7 +413,7 @@ try {
 
         if ($escortId <= 0 || $monto <= 0 || empty($concepto)) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'Datos invíƒÂ¡lidos: escort, monto y concepto requeridos']);
+            echo json_encode(['success' => false, 'error' => 'Datos inválidos: escort, monto y concepto requeridos']);
             exit;
         }
 
@@ -444,7 +443,7 @@ try {
                 $upd->execute([$escortId]);
 
                 $notifStmt = $pdo->prepare("INSERT INTO notificaciones (escort_id, tipo, titulo, mensaje, url, created_at) VALUES (?, 'sistema', 'Pago registrado', ?, '/micuenta')");
-                $notifStmt->execute([$escortId, 'Se ha registrado un pago manual. Tu anuncio estíƒÂ¡ activo.']);
+                $notifStmt->execute([$escortId, 'Se ha registrado un pago manual. Tu anuncio está activo.']);
             }
 
             $logStmt = $pdo->prepare("INSERT INTO logs_auditoria (escort_id, accion, tabla_afectada, registro_id, datos_nuevos, created_at) VALUES (?, 'pago_creado', 'pagos', ?, ?, NOW())");
@@ -461,28 +460,64 @@ try {
     }
 
     // ============================================================
-    // DELETE - Eliminar pago (o suscripci�n extra si id < 0)  (admin/superadmin)
+    // DELETE - Eliminar pago (o suscripci?n extra si id < 0)  (admin/superadmin)
     // ============================================================
     if ($method === 'DELETE') {
         requireAdminRole($tokenData, ['admin', 'superadmin']);
         $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
         if ($id === 0) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID invíƒÂ¡lido']);
+            echo json_encode(['success' => false, 'error' => 'ID inválido']);
             exit;
         }
 
         $pdo->beginTransaction();
         try {
-            if ($id < 0) {
-                // Extra subscription (suscripciones table)
-                $subId = -$id;
+            if ($id >= 300000) {
+                // Solicitud VIP (escort_vip_solicitudes). El listado genera pago_id = 300000 + vs.id.
+                $vsId = $id - 300000;
+                if ($vsId <= 0) {
+                    $pdo->rollBack();
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'ID inválido']);
+                    exit;
+                }
+                $checkVip = $pdo->prepare("
+                    SELECT vs.*, COALESCE(e.nombre, CONCAT('Escort eliminada #', vs.escort_id)) as escort_nombre
+                    FROM escort_vip_solicitudes vs
+                    LEFT JOIN escorts e ON e.id = vs.escort_id
+                    WHERE vs.id = ?
+                ");
+                $checkVip->execute([$vsId]);
+                $vip = $checkVip->fetch();
+                if (!$vip) {
+                    $pdo->rollBack();
+                    http_response_code(404);
+                    echo json_encode(['success' => false, 'error' => 'Solicitud VIP no encontrada']);
+                    exit;
+                }
+
+                $pdo->prepare("INSERT INTO logs_auditoria (usuario_id, escort_id, accion, tabla_afectada, registro_id, datos_nuevos, ip_address) VALUES (?, ?, 'solicitud_vip_eliminada', 'escort_vip_solicitudes', ?, ?, ?)")
+                    ->execute([$tokenData['id'], $vip['escort_id'], $vsId, json_encode(['solicitud_vip_eliminada' => $vip]), $_SERVER['REMOTE_ADDR'] ?? null]);
+
+                $pdo->prepare("DELETE FROM escort_vip_solicitudes WHERE id = ?")->execute([$vsId]);
+            } elseif ($id < 0) {
+                // Extra subscription (suscripciones table). LEFT JOIN: escort o plan pudieron eliminarse.
+                // El listado genera pago_id = -(100000 + s.id), así que se revierte la fórmula.
+                $subId = -$id - 100000;
+                if ($subId <= 0) {
+                    $pdo->rollBack();
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'ID inválido']);
+                    exit;
+                }
                 $sub = $pdo->prepare("
                     SELECT s.*, p.extra_tipo, p.uso_unico, p.nombre as plan_nombre, p.tipo as plan_tipo,
-                           e.nombre as escort_nombre, e.email as escort_email
+                           COALESCE(e.nombre, CONCAT('Escort eliminada #', s.escort_id)) as escort_nombre,
+                           COALESCE(e.email, '') as escort_email
                     FROM suscripciones s
-                    JOIN planes p ON p.id = s.plan_id
-                    JOIN escorts e ON e.id = s.escort_id
+                    LEFT JOIN planes p ON p.id = s.plan_id
+                    LEFT JOIN escorts e ON e.id = s.escort_id
                     WHERE s.id = ?
                 ");
                 $sub->execute([$subId]);
@@ -490,7 +525,7 @@ try {
                 if (!$suscripcion) {
                     $pdo->rollBack();
                     http_response_code(404);
-                    echo json_encode(['success' => false, 'error' => 'SuscripciíƒÂ³n extra no encontrada']);
+                    echo json_encode(['success' => false, 'error' => 'Suscripción extra no encontrada']);
                     exit;
                 }
 
@@ -513,8 +548,8 @@ try {
                 $pdo->prepare("INSERT INTO logs_auditoria (usuario_id, escort_id, accion, tabla_afectada, registro_id, datos_nuevos, ip_address) VALUES (?, ?, 'eliminar_suscripcion', 'suscripciones', ?, ?, ?)")
                     ->execute([$tokenData['id'], $suscripcion['escort_id'], $subId, json_encode(['notas' => 'Eliminado desde pagos']), $_SERVER['REMOTE_ADDR'] ?? null]);
             } else {
-                // Real pago (pagos table)
-                $check = $pdo->prepare("SELECT p.*, e.nombre as escort_nombre FROM pagos p JOIN escorts e ON e.id = p.escort_id WHERE p.id = ?");
+                // Real pago (pagos table). LEFT JOIN: la escort pudo ser eliminada definitivamente.
+                $check = $pdo->prepare("SELECT p.*, COALESCE(e.nombre, CONCAT('Escort eliminada #', p.escort_id)) as escort_nombre FROM pagos p LEFT JOIN escorts e ON e.id = p.escort_id WHERE p.id = ?");
                 $check->execute([$id]);
                 $pago = $check->fetch();
                 if (!$pago) {
@@ -540,7 +575,7 @@ try {
     }
 
     http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'MíƒÂ©todo no permitido']);
+    echo json_encode(['success' => false, 'error' => 'Método no permitido']);
 } catch (PDOException $e) {
     error_log("Error admin/pagos.php PDO: " . $e->getMessage());
     http_response_code(500);

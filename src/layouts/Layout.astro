@@ -1,11 +1,12 @@
 ---
-// src/layouts/Layout.astro
+ // src/layouts/Layout.astro
 import "@fortawesome/fontawesome-free/css/fontawesome.min.css";
+import "@fortawesome/fontawesome-free/css/brands.min.css";
+import "@fortawesome/fontawesome-free/css/solid.min.css";
 import "../styles/fa-fontfaces.css";
 import "../styles/global.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import AgeGate from "../components/AgeGate";
 
 interface Props {
   title: string;
@@ -252,7 +253,13 @@ if (schemaHabilitado && bcCiudad) {
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <meta name="description" content={seoDescription} />
+    <script is:inline src="/api/public/analytics.php" async></script>
     <script is:inline>
       (function () {
         var t, m;
@@ -394,7 +401,6 @@ if (schemaHabilitado && bcCiudad) {
         <Footer client:load />
       )
     }
-    <AgeGate client:load />
   </body>
 </html>
 
